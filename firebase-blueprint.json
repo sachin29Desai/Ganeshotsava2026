@@ -1,0 +1,82 @@
+{
+  "entities": {
+    "Expense": {
+      "collection": "expenses",
+      "fields": {
+        "id": { "type": "string" },
+        "item": { "type": "string" },
+        "est": { "type": "number" },
+        "adv": { "type": "number" },
+        "bal": { "type": "number" },
+        "act": { "type": "number" },
+        "updatedAt": { "type": "string" }
+      }
+    },
+    "Contribution": {
+      "collection": "contributions",
+      "fields": {
+        "id": { "type": "string" },
+        "rcptNo": { "type": "string" },
+        "name": { "type": "string" },
+        "flat": { "type": "string" },
+        "amt": { "type": "number" },
+        "date": { "type": "string" },
+        "pay": { "type": "string" },
+        "txn": { "type": "string" },
+        "notes": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      }
+    },
+    "Sponsor": {
+      "collection": "sponsors",
+      "fields": {
+        "id": { "type": "string" },
+        "invNo": { "type": "string" },
+        "det": { "type": "string" },
+        "est": { "type": "number" },
+        "act": { "type": "number" },
+        "updatedAt": { "type": "string" }
+      }
+    },
+    "SevaBooking": {
+      "collection": "sevas",
+      "fields": {
+        "id": { "type": "string" },
+        "tokNo": { "type": "string" },
+        "seva": { "type": "string" },
+        "name": { "type": "string" },
+        "flat": { "type": "string" },
+        "amt": { "type": "number" },
+        "date": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      }
+    },
+    "SevaCatalogue": {
+      "collection": "sevaCatalogue",
+      "fields": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "amt": { "type": "number" }
+      }
+    },
+    "Settings": {
+      "collection": "settings",
+      "fields": {
+        "org": { "type": "string" },
+        "location": { "type": "string" },
+        "upi": { "type": "string" },
+        "payee": { "type": "string" },
+        "logo": { "type": "string" },
+        "adminHash": { "type": "string" }
+      }
+    },
+    "Counters": {
+      "collection": "counters",
+      "fields": {
+        "rc": { "type": "number" },
+        "sp": { "type": "number" },
+        "sv": { "type": "number" }
+      }
+    }
+  }
+}

@@ -1,0 +1,10 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Open read for public visitors to view budget, contributions & sevas
+    // Allow write access for festival event ledger management
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}

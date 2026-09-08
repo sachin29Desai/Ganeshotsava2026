@@ -596,6 +596,17 @@ tr:hover td{background:#FAFAF9}
       <div class="rcp-disc">
         <strong>Disclaimer:</strong> Funds are collected into a dedicated account solely for Ganesha Chaturthi expenses. Any contribution is voluntary.
       </div>
+
+      <!-- DIGITAL SIGNATURE BLOCK -->
+      <div style="margin-top:16px;padding-top:12px;border-top:1px solid #E7E5E4;display:flex;justify-content:flex-end;align-items:flex-end">
+        <div style="display:flex;flex-direction:column;align-items:center;text-align:center;flex-shrink:0">
+          <div style="font-family:'Great Vibes','Dancing Script',cursive;font-size:24px;color:#991B1B;line-height:1;margin-bottom:4px;white-space:nowrap;padding:0 2px">Ganeshotsava Samithi</div>
+          <div style="width:160px;border-top:1px solid #1C1917;margin-top:2px;margin-bottom:4px"></div>
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#1C1917;white-space:nowrap">Authorized Signatory</div>
+          <div style="font-size:9px;color:#78716C;white-space:nowrap">Ganeshotsava Samithi 2026</div>
+        </div>
+      </div>
+
       <div class="rcp-footer">Thank you for your generous contribution and support 🙏<br><br><strong>Ganapati Bappa Morya!</strong></div>
     </div>
   </div>
@@ -639,11 +650,14 @@ tr:hover td{background:#FAFAF9}
         Your contribution supports the Ganeshotsava celebrations.<br>
         <em>Ganapati Bappa Morya!</em>
       </div>
-      <div class="inv-footer">
-        <div>Brigade Eldorado Residents Association<br>Ganeshotsava Committee 2026</div>
-        <div style="text-align:right">
-          <div class="inv-sig-line"></div>
-          Authorized Signatory
+
+      <!-- DIGITAL SIGNATURE BLOCK -->
+      <div style="margin-top:16px;padding-top:12px;border-top:1px solid #E7E5E4;display:flex;justify-content:flex-end;align-items:flex-end">
+        <div style="display:flex;flex-direction:column;align-items:center;text-align:center;flex-shrink:0">
+          <div style="font-family:'Great Vibes','Dancing Script',cursive;font-size:24px;color:#991B1B;line-height:1;margin-bottom:4px;white-space:nowrap;padding:0 2px">Ganeshotsava Samithi</div>
+          <div style="width:160px;border-top:1px solid #1C1917;margin-top:2px;margin-bottom:4px"></div>
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#1C1917;white-space:nowrap">Authorized Signatory</div>
+          <div style="font-size:9px;color:#78716C;white-space:nowrap">Ganeshotsava Samithi 2026</div>
         </div>
       </div>
     </div>
@@ -804,10 +818,26 @@ function numWords(n) {
   function c(x) {
     if (x < 20) return o[x];
     if (x < 100) return t[Math.floor(x/10)] + (x%10 ? ' '+o[x%10] : '');
-    if (x < 1000) return o[Math.floor(x/100)] + ' Hundred' + (x%100 ? ' '+c(x%100) : '');
-    if (x < 100000) return c(Math.floor(x/1000)) + ' Thousand' + (x%1000 ? ' '+c(x%1000) : '');
-    if (x < 10000000) return c(Math.floor(x/100000)) + ' Lakh' + (x%100000 ? ' '+c(x%100000) : '');
-    return c(Math.floor(x/10000000)) + ' Crore' + (x%10000000 ? ' '+c(x%10000000) : '');
+    if (x < 1000) {
+      const h = Math.floor(x / 100), rem = x % 100;
+      return o[h] + ' Hundred' + (rem ? ' and ' + c(rem) : '');
+    }
+    if (x < 100000) {
+      const th = Math.floor(x / 1000), rem = x % 1000;
+      if (!rem) return c(th) + ' Thousand';
+      if (rem < 100) return c(th) + ' Thousand and ' + c(rem);
+      return c(th) + ' Thousand ' + c(rem);
+    }
+    if (x < 10000000) {
+      const lk = Math.floor(x / 100000), rem = x % 100000;
+      if (!rem) return c(lk) + ' Lakh';
+      if (rem < 100) return c(lk) + ' Lakh and ' + c(rem);
+      return c(lk) + ' Lakh ' + c(rem);
+    }
+    const cr = Math.floor(x / 10000000), rem = x % 10000000;
+    if (!rem) return c(cr) + ' Crore';
+    if (rem < 100) return c(cr) + ' Crore and ' + c(rem);
+    return c(cr) + ' Crore ' + c(rem);
   }
   return c(n) + ' Rupees Only';
 }
@@ -834,10 +864,11 @@ function saveExpense() {
   if (!item) { alert('Please enter an item description.'); return; }
   const data = dbLoad(K.exp);
   const existing = document.getElementById('eId').value;
+  const est = parseFloat(document.getElementById('eEst').value) || 0;
   const adv = parseFloat(document.getElementById('eAdv').value) || 0;
-  const bal = parseFloat(document.getElementById('eBal').value) || 0;
+  const bal = Math.max(0, est - adv);
   const act = adv + bal;
-  const row = { id: existing || Date.now().toString(), item, est: parseFloat(document.getElementById('eEst').value) || 0, adv, bal, act };
+  const row = { id: existing || Date.now().toString(), item, est, adv, bal, act };
   if (existing) { const i = data.findIndex(e => e.id === existing); if (i >= 0) data[i] = row; else data.push(row); }
   else data.push(row);
   dbSave(K.exp, data);
@@ -857,7 +888,7 @@ function renderExpenses() {
   document.getElementById('expToolbar').innerHTML = isAdmin ? '<button class="btn btn-primary btn-sm" onclick="openExpenseModal()">+ Add Expense</button>' : '';
   document.getElementById('expActionsHdr').style.display = isAdmin ? '' : 'none';
   document.getElementById('expTbody').innerHTML = data.map((r, i) => {
-    const est = Number(r.est || 0), adv = Number(r.adv || 0), bal = Number(r.bal || 0), act = adv + bal;
+    const est = Number(r.est || 0), adv = Number(r.adv || 0), bal = Math.max(0, est - adv), act = Math.max(est, adv);
     totEst += est; totAdv += adv; totBal += bal; totAct += act;
     return \`<tr>
       <td>\${i+1}</td>

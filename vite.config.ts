@@ -64,9 +64,55 @@ function aistudioMediaPlugin(): Plugin {
 }
 // LINT.ThenChange(//depot/google3/java/com/google/alkali/boq/makersuite/applet_dev_service/templates/initializers/react_theme/vite.config.ts:aistudio_media_plugin)
 
+function shortUrlPlugin(): Plugin {
+  return {
+    name: 'short-url-proxy',
+    configureServer(server) {
+      server.middlewares.use(async (req, res, next) => {
+        if (req.url && req.url.startsWith('/api/create-short-link')) {
+          try {
+            const urlObj = new URL(req.url, 'http://localhost:3000');
+            const targetUrl = urlObj.searchParams.get('url');
+            const alias = urlObj.searchParams.get('alias');
+
+            if (!targetUrl) {
+              res.statusCode = 400;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ success: false, error: 'Missing target url parameter' }));
+              return;
+            }
+
+            let tinyUrlApi = `https://tinyurl.com/api-create.php?url=${encodeURIComponent(targetUrl)}`;
+            if (alias && alias.trim()) {
+              tinyUrlApi += `&alias=${encodeURIComponent(alias.trim())}`;
+            }
+
+            const apiResp = await fetch(tinyUrlApi);
+            const body = await apiResp.text();
+
+            if (apiResp.ok && body.startsWith('http')) {
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ success: true, shortUrl: body.trim() }));
+            } else {
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ success: false, error: body || 'Could not create custom alias.' }));
+            }
+          } catch (err: any) {
+            res.statusCode = 500;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ success: false, error: err?.message || 'Failed to reach shortener service' }));
+          }
+          return;
+        }
+        next();
+      });
+    }
+  };
+}
+
 export default defineConfig(() => {
   return {
-    plugins: [react(), tailwindcss(), aistudioMediaPlugin()],
+    plugins: [react(), tailwindcss(), aistudioMediaPlugin(), shortUrlPlugin()],
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),
@@ -78,6 +124,12 @@ export default defineConfig(() => {
       hmr: process.env.DISABLE_HMR !== 'true',
       // Disable file watching when DISABLE_HMR is true to save CPU during agent edits.
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
+    },
+    build: {
+      outDir: 'dist',
+      emptyOutDir: true,
+      sourcemap: false,
+      chunkSizeWarningLimit: 3000,
     },
   };
 });

@@ -1,20 +1,34 @@
 {
   "entities": {
     "Expense": {
-      "collection": "expenses",
-      "fields": {
+      "title": "Expense",
+      "description": "Festival expenditure and vendor payments",
+      "type": "object",
+      "properties": {
         "id": { "type": "string" },
         "item": { "type": "string" },
         "est": { "type": "number" },
         "adv": { "type": "number" },
         "bal": { "type": "number" },
         "act": { "type": "number" },
+        "receiptUrl": { "type": "string" },
+        "receiptName": { "type": "string" },
+        "receiptType": { "type": "string" },
+        "receiptDate": { "type": "string" },
+        "notes": { "type": "string" },
+        "bills": {
+          "type": "array",
+          "description": "Attached bills and invoice receipts with comments"
+        },
         "updatedAt": { "type": "string" }
-      }
+      },
+      "required": ["id", "item"]
     },
     "Contribution": {
-      "collection": "contributions",
-      "fields": {
+      "title": "Contribution",
+      "description": "Voluntary patron donations from residents",
+      "type": "object",
+      "properties": {
         "id": { "type": "string" },
         "rcptNo": { "type": "string" },
         "name": { "type": "string" },
@@ -25,22 +39,44 @@
         "txn": { "type": "string" },
         "notes": { "type": "string" },
         "updatedAt": { "type": "string" }
-      }
+      },
+      "required": ["id", "rcptNo", "name", "amt"]
     },
     "Sponsor": {
-      "collection": "sponsors",
-      "fields": {
+      "title": "Sponsor",
+      "description": "Commercial and corporate festival sponsorships",
+      "type": "object",
+      "properties": {
         "id": { "type": "string" },
         "invNo": { "type": "string" },
         "det": { "type": "string" },
         "est": { "type": "number" },
         "act": { "type": "number" },
         "updatedAt": { "type": "string" }
-      }
+      },
+      "required": ["id", "invNo", "det", "act"]
+    },
+    "CommercialStall": {
+      "title": "CommercialStall",
+      "description": "Commercial stall and kiosk vendor bookings",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "invNo": { "type": "string" },
+        "det": { "type": "string" },
+        "est": { "type": "number" },
+        "act": { "type": "number" },
+        "date": { "type": "string" },
+        "notes": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "invNo", "det", "act"]
     },
     "SevaBooking": {
-      "collection": "sevas",
-      "fields": {
+      "title": "SevaBooking",
+      "description": "Devotional seva and pooja bookings",
+      "type": "object",
+      "properties": {
         "id": { "type": "string" },
         "tokNo": { "type": "string" },
         "seva": { "type": "string" },
@@ -48,20 +84,58 @@
         "flat": { "type": "string" },
         "amt": { "type": "number" },
         "date": { "type": "string" },
+        "notes": { "type": "string" },
         "updatedAt": { "type": "string" }
-      }
+      },
+      "required": ["id", "tokNo", "seva", "name", "amt"]
     },
     "SevaCatalogue": {
-      "collection": "sevaCatalogue",
-      "fields": {
+      "title": "SevaCatalogue",
+      "description": "Pooja and seva menu pricing catalogue",
+      "type": "object",
+      "properties": {
         "id": { "type": "string" },
         "name": { "type": "string" },
         "amt": { "type": "number" }
-      }
+      },
+      "required": ["id", "name", "amt"]
+    },
+    "HundiCollection": {
+      "title": "HundiCollection",
+      "description": "Hundi, sanctum and aarti collection counts",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "det": { "type": "string" },
+        "act": { "type": "number" },
+        "date": { "type": "string" },
+        "countedBy": { "type": "string" },
+        "notes": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "det", "act", "date"]
+    },
+    "AuctionItem": {
+      "title": "AuctionItem",
+      "description": "Maha Laddu and puja artifact auction bids",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "invNo": { "type": "string" },
+        "det": { "type": "string" },
+        "by": { "type": "string" },
+        "act": { "type": "number" },
+        "date": { "type": "string" },
+        "notes": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "invNo", "det", "by", "act"]
     },
     "Settings": {
-      "collection": "settings",
-      "fields": {
+      "title": "Settings",
+      "description": "Application and event configuration",
+      "type": "object",
+      "properties": {
         "org": { "type": "string" },
         "location": { "type": "string" },
         "upi": { "type": "string" },
@@ -71,12 +145,58 @@
       }
     },
     "Counters": {
-      "collection": "counters",
-      "fields": {
-        "rc": { "type": "number" },
-        "sp": { "type": "number" },
-        "sv": { "type": "number" }
+      "title": "Counters",
+      "description": "Sequential numbering counters for receipts and invoices",
+      "type": "object",
+      "properties": {
+        "rc": { "type": "string" },
+        "sp": { "type": "string" },
+        "cs": { "type": "string" },
+        "sv": { "type": "string" },
+        "auc": { "type": "string" }
       }
+    }
+  },
+  "firestore": {
+    "/expenses/{expenseId}": {
+      "schema": "Expense",
+      "description": "Collection of all expenditure items"
+    },
+    "/contributions/{contributionId}": {
+      "schema": "Contribution",
+      "description": "Collection of voluntary resident donations"
+    },
+    "/sponsors/{sponsorId}": {
+      "schema": "Sponsor",
+      "description": "Collection of sponsor invoices"
+    },
+    "/commercialStalls/{stallId}": {
+      "schema": "CommercialStall",
+      "description": "Collection of commercial stall vendor bookings"
+    },
+    "/sevas/{sevaId}": {
+      "schema": "SevaBooking",
+      "description": "Collection of seva bookings"
+    },
+    "/sevaCatalogue/{itemId}": {
+      "schema": "SevaCatalogue",
+      "description": "Catalogue of poojas and suggested amounts"
+    },
+    "/hundi/{hundiId}": {
+      "schema": "HundiCollection",
+      "description": "Collection of hundi counts"
+    },
+    "/auctions/{auctionId}": {
+      "schema": "AuctionItem",
+      "description": "Collection of auction winning bids"
+    },
+    "/settings/{configId}": {
+      "schema": "Settings",
+      "description": "Global event settings"
+    },
+    "/metadata/{metaId}": {
+      "schema": "Counters",
+      "description": "Sequential auto-number metadata counters"
     }
   }
 }

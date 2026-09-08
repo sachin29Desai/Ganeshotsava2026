@@ -1,0 +1,417 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 1200" width="100%" height="100%">
+  <defs>
+    <!-- Watercolor filter for soft textured edges -->
+    <filter id="watercolorBlur" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="12" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+    <filter id="softBlur" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="6" />
+    </filter>
+
+    <!-- Gradients for Cyan Ganesha Skin -->
+    <linearGradient id="ganeshaSkin" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#BAE6FD" />
+      <stop offset="40%" stop-color="#7DD3FC" />
+      <stop offset="80%" stop-color="#38BDF8" />
+      <stop offset="100%" stop-color="#0284C7" />
+    </linearGradient>
+    <linearGradient id="ganeshaSkinLight" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F0F9FF" />
+      <stop offset="60%" stop-color="#BAE6FD" />
+      <stop offset="100%" stop-color="#7DD3FC" />
+    </linearGradient>
+    <linearGradient id="ganeshaSkinDark" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38BDF8" />
+      <stop offset="100%" stop-color="#0369A1" />
+    </linearGradient>
+
+    <!-- Golden Crown & Ornaments -->
+    <linearGradient id="crownGold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FEF08A" />
+      <stop offset="30%" stop-color="#FDE047" />
+      <stop offset="70%" stop-color="#EAB308" />
+      <stop offset="100%" stop-color="#A16207" />
+    </linearGradient>
+    <linearGradient id="richGold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFBEB" />
+      <stop offset="40%" stop-color="#FBBF24" />
+      <stop offset="85%" stop-color="#D97706" />
+      <stop offset="100%" stop-color="#92400E" />
+    </linearGradient>
+
+    <!-- Saffron Dhoti -->
+    <linearGradient id="dhotiOrange" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FB923C" />
+      <stop offset="40%" stop-color="#F97316" />
+      <stop offset="80%" stop-color="#EA580C" />
+      <stop offset="100%" stop-color="#C2410C" />
+    </linearGradient>
+
+    <!-- Watercolor Warm Washes -->
+    <radialGradient id="washOchre" cx="10%" cy="10%" r="70%">
+      <stop offset="0%" stop-color="#FDBA74" stop-opacity="0.75" />
+      <stop offset="40%" stop-color="#FED7AA" stop-opacity="0.55" />
+      <stop offset="75%" stop-color="#FEF3C7" stop-opacity="0.3" />
+      <stop offset="100%" stop-color="#FFFBEB" stop-opacity="0" />
+    </radialGradient>
+    <radialGradient id="washPeachBottom" cx="85%" cy="85%" r="65%">
+      <stop offset="0%" stop-color="#FB923C" stop-opacity="0.65" />
+      <stop offset="35%" stop-color="#FED7AA" stop-opacity="0.45" />
+      <stop offset="70%" stop-color="#FEF3C7" stop-opacity="0.2" />
+      <stop offset="100%" stop-color="#FFFBEB" stop-opacity="0" />
+    </radialGradient>
+
+    <!-- Mandala pattern definition -->
+    <g id="petalSingle">
+      <path d="M 0,0 C -6,-15 -8,-30 0,-45 C 8,-30 6,-15 0,0 Z" fill="none" stroke="#B45309" stroke-width="1" opacity="0.6" />
+    </g>
+    <g id="marigoldFlower">
+      <circle cx="0" cy="0" r="14" fill="#FB923C" opacity="0.85" />
+      <circle cx="0" cy="0" r="9" fill="#F97316" />
+      <circle cx="0" cy="0" r="5" fill="#D97706" />
+      <path d="M-14,0 C-18,-8 -8,-18 0,-14 C8,-18 18,-8 14,0 C18,8 8,18 0,14 C-8,18 -18,8 -14,0 Z" fill="#FDBA74" opacity="0.7" />
+    </g>
+    <g id="smallFlower">
+      <circle cx="0" cy="0" r="6" fill="#FDBA74" />
+      <circle cx="-8" cy="-3" r="5" fill="#FED7AA" opacity="0.8" />
+      <circle cx="8" cy="-3" r="5" fill="#FED7AA" opacity="0.8" />
+      <circle cx="-5" cy="7" r="5" fill="#FED7AA" opacity="0.8" />
+      <circle cx="5" cy="7" r="5" fill="#FED7AA" opacity="0.8" />
+      <circle cx="0" cy="-9" r="5" fill="#FED7AA" opacity="0.8" />
+      <circle cx="0" cy="0" r="3.5" fill="#EA580C" />
+    </g>
+  </defs>
+
+  <!-- STRICT CLIP RECTANGLE PREVENTING ANY OVERFLOW BEYOND THE 900x1200 RECEIPT BOUNDARIES -->
+  <clipPath id="receiptClip">
+    <rect x="0" y="0" width="900" height="1200" />
+  </clipPath>
+
+  <g clip-path="url(#receiptClip)">
+    <!-- 1. BASE CLEAN PARCHMENT (TRANSPARENT/CLEAN) -->
+    <rect width="900" height="1200" fill="#FFFFFF" fill-opacity="0" />
+
+  <!-- 2. TOP-LEFT WATERCOLOR FRAME & WASHES (MATCHING ATTACHED IMAGE) -->
+  <g id="top_left_watercolor" opacity="0.85">
+    <!-- Soft watercolor splash clouds -->
+    <path d="M 0,0 L 380,0 C 350,70 380,120 320,160 C 260,200 280,260 210,290 C 150,320 90,290 50,350 C 20,380 0,390 0,390 Z" fill="url(#washOchre)" filter="url(#watercolorBlur)" />
+    <path d="M 0,0 L 260,0 C 240,60 260,100 200,130 C 140,160 160,210 100,230 C 50,250 10,240 0,270 Z" fill="#FDBA74" opacity="0.35" filter="url(#softBlur)" />
+    <path d="M 0,0 L 160,0 C 140,40 180,80 120,110 C 60,130 80,180 0,190 Z" fill="#FB923C" opacity="0.3" filter="url(#softBlur)" />
+
+    <!-- Organic watercolor splatters & droplets -->
+    <circle cx="280" cy="80" r="8" fill="#FB923C" opacity="0.45" />
+    <circle cx="320" cy="120" r="5" fill="#F97316" opacity="0.4" />
+    <circle cx="240" cy="190" r="6" fill="#FDBA74" opacity="0.5" />
+    <circle cx="180" cy="260" r="4" fill="#FB923C" opacity="0.35" />
+    <circle cx="110" cy="320" r="7" fill="#F59E0B" opacity="0.4" />
+    <circle cx="70" cy="370" r="5" fill="#D97706" opacity="0.3" />
+
+    <!-- Sacred Mandala circular geometric linework in top-left corner -->
+    <g transform="translate(90, 90)" opacity="0.45">
+      <circle cx="0" cy="0" r="40" fill="none" stroke="#B45309" stroke-width="1.5" stroke-dasharray="3,3" />
+      <circle cx="0" cy="0" r="70" fill="none" stroke="#B45309" stroke-width="1" />
+      <circle cx="0" cy="0" r="100" fill="none" stroke="#D97706" stroke-width="1.5" stroke-dasharray="4,4" />
+      <circle cx="0" cy="0" r="130" fill="none" stroke="#B45309" stroke-width="1" />
+      <circle cx="0" cy="0" r="160" fill="none" stroke="#D97706" stroke-width="1" stroke-dasharray="5,5" />
+      
+      <!-- Radiating Mandala Petals -->
+      <g transform="rotate(0)"><use href="#petalSingle" /></g>
+      <g transform="rotate(30)"><use href="#petalSingle" /></g>
+      <g transform="rotate(60)"><use href="#petalSingle" /></g>
+      <g transform="rotate(90)"><use href="#petalSingle" /></g>
+      <g transform="rotate(120)"><use href="#petalSingle" /></g>
+      <g transform="rotate(150)"><use href="#petalSingle" /></g>
+      <g transform="rotate(180)"><use href="#petalSingle" /></g>
+      <g transform="rotate(210)"><use href="#petalSingle" /></g>
+      <g transform="rotate(240)"><use href="#petalSingle" /></g>
+      <g transform="rotate(270)"><use href="#petalSingle" /></g>
+      <g transform="rotate(300)"><use href="#petalSingle" /></g>
+      <g transform="rotate(330)"><use href="#petalSingle" /></g>
+    </g>
+
+    <!-- Delicate watercolor orange flowers at top-left -->
+    <g transform="translate(50, 40)"><use href="#marigoldFlower" /></g>
+    <g transform="translate(180, 50)"><use href="#smallFlower" /></g>
+    <g transform="translate(40, 160)"><use href="#smallFlower" /></g>
+    <g transform="translate(130, 130)"><use href="#marigoldFlower" transform="scale(0.8)" /></g>
+    <g transform="translate(210, 100)"><use href="#smallFlower" transform="scale(0.7)" /></g>
+    <g transform="translate(90, 220)"><use href="#marigoldFlower" transform="scale(0.65)" /></g>
+  </g>
+
+  <!-- 3. TOP & BOTTOM PERIMETER WATERCOLOR SPLATTERS & FLOATING PETALS -->
+  <g id="borders_accent" opacity="0.5">
+    <!-- Top edge splashes -->
+    <ellipse cx="450" cy="15" rx="140" ry="18" fill="#FED7AA" opacity="0.35" filter="url(#softBlur)" />
+    <ellipse cx="700" cy="10" rx="90" ry="14" fill="#FEF3C7" opacity="0.4" filter="url(#softBlur)" />
+    <!-- Bottom edge splashes -->
+    <ellipse cx="250" cy="1185" rx="160" ry="22" fill="#FED7AA" opacity="0.4" filter="url(#softBlur)" />
+    <ellipse cx="480" cy="1190" rx="120" ry="16" fill="#FDE68A" opacity="0.3" filter="url(#softBlur)" />
+
+    <!-- Floating marigold petals -->
+    <path d="M 310,25 C 318,20 326,24 324,32 C 322,38 312,38 310,32 Z" fill="#EA580C" opacity="0.55" />
+    <path d="M 550,18 C 556,12 566,16 564,24 C 562,30 552,28 550,22 Z" fill="#F97316" opacity="0.5" />
+    <path d="M 180,1165 C 188,1158 198,1162 195,1170 C 192,1176 182,1174 180,1168 Z" fill="#EA580C" opacity="0.5" />
+    <path d="M 380,1170 C 386,1162 396,1166 394,1174 C 392,1180 382,1178 380,1172 Z" fill="#F97316" opacity="0.45" />
+  </g>
+
+  <!-- 4. BOTTOM-RIGHT SACRED MANDALA RADIATING AURA (BEHIND GANESHA) -->
+  <g id="bottom_right_mandala_aura" transform="translate(680, 970) scale(0.85)">
+    <!-- Big warm watercolor backdrop wash -->
+    <circle cx="0" cy="0" r="260" fill="url(#washPeachBottom)" filter="url(#watercolorBlur)" />
+    <circle cx="-20" cy="-20" r="180" fill="#FDBA74" opacity="0.28" filter="url(#softBlur)" />
+
+    <!-- Intricate circular sacred geometry matching user reference -->
+    <circle cx="0" cy="0" r="60" fill="none" stroke="#D97706" stroke-width="1.5" opacity="0.4" stroke-dasharray="3,3" />
+    <circle cx="0" cy="0" r="100" fill="none" stroke="#B45309" stroke-width="1" opacity="0.35" />
+    <circle cx="0" cy="0" r="140" fill="none" stroke="#D97706" stroke-width="1.5" opacity="0.4" stroke-dasharray="4,4" />
+    <circle cx="0" cy="0" r="180" fill="none" stroke="#B45309" stroke-width="1" opacity="0.3" />
+    <circle cx="0" cy="0" r="220" fill="none" stroke="#D97706" stroke-width="1.5" opacity="0.35" stroke-dasharray="5,5" />
+    <circle cx="0" cy="0" r="260" fill="none" stroke="#B45309" stroke-width="0.75" opacity="0.25" />
+
+    <!-- Radiating Lotus Rays -->
+    <g opacity="0.4">
+      <g transform="rotate(0)"><use href="#petalSingle" transform="scale(1.4)" /></g>
+      <g transform="rotate(20)"><use href="#petalSingle" transform="scale(1.4)" /></g>
+      <g transform="rotate(40)"><use href="#petalSingle" transform="scale(1.4)" /></g>
+      <g transform="rotate(60)"><use href="#petalSingle" transform="scale(1.4)" /></g>
+      <g transform="rotate(80)"><use href="#petalSingle" transform="scale(1.4)" /></g>
+      <g transform="rotate(100)"><use href="#petalSingle" transform="scale(1.4)" /></g>
+      <g transform="rotate(120)"><use href="#petalSingle" transform="scale(1.4)" /></g>
+      <g transform="rotate(140)"><use href="#petalSingle" transform="scale(1.4)" /></g>
+      <g transform="rotate(160)"><use href="#petalSingle" transform="scale(1.4)" /></g>
+      <g transform="rotate(180)"><use href="#petalSingle" transform="scale(1.4)" /></g>
+      <g transform="rotate(200)"><use href="#petalSingle" transform="scale(1.4)" /></g>
+      <g transform="rotate(220)"><use href="#petalSingle" transform="scale(1.4)" /></g>
+      <g transform="rotate(240)"><use href="#petalSingle" transform="scale(1.4)" /></g>
+      <g transform="rotate(260)"><use href="#petalSingle" transform="scale(1.4)" /></g>
+      <g transform="rotate(280)"><use href="#petalSingle" transform="scale(1.4)" /></g>
+      <g transform="rotate(300)"><use href="#petalSingle" transform="scale(1.4)" /></g>
+      <g transform="rotate(320)"><use href="#petalSingle" transform="scale(1.4)" /></g>
+      <g transform="rotate(340)"><use href="#petalSingle" transform="scale(1.4)" /></g>
+    </g>
+
+    <!-- Floating flowers around Ganesha -->
+    <g transform="translate(-190, -110)"><use href="#marigoldFlower" transform="scale(0.85)" /></g>
+    <g transform="translate(-150, -180)"><use href="#smallFlower" transform="scale(0.8)" /></g>
+    <g transform="translate(-70, -220)"><use href="#marigoldFlower" transform="scale(0.7)" /></g>
+    <g transform="translate(30, -230)"><use href="#smallFlower" transform="scale(0.75)" /></g>
+    <g transform="translate(-220, 20)"><use href="#smallFlower" transform="scale(0.85)" /></g>
+    <g transform="translate(-190, 110)"><use href="#marigoldFlower" transform="scale(0.75)" /></g>
+  </g>
+
+  <!-- 5. LORD GANESHA WATERCOLOR ILLUSTRATION (BOTTOM RIGHT - EXACT MATCH TO ATTACHED IMAGE) -->
+  <g id="ganesha_illustration" transform="translate(680, 980) scale(0.85)">
+    
+    <!-- A. Halo / Prabhavali Glow -->
+    <circle cx="0" cy="-110" r="85" fill="#FEF08A" opacity="0.55" filter="url(#softBlur)" />
+    <circle cx="0" cy="-110" r="70" fill="none" stroke="#F59E0B" stroke-width="2.5" opacity="0.7" stroke-dasharray="4,3" />
+
+    <!-- B. Back Arms (Upper Arms) -->
+    <!-- Upper Left Arm (carrying Lotus / Pasha) -->
+    <g id="upper_left_arm">
+      <path d="M 42,-55 C 65,-75 95,-70 102,-40 C 105,-25 95,-15 80,-20" fill="url(#ganeshaSkin)" stroke="#0369A1" stroke-width="1.5" />
+      <!-- Golden Armlet (Bajuband) -->
+      <path d="M 65,-65 C 75,-60 85,-65 88,-55" stroke="url(#richGold)" stroke-width="4" stroke-linecap="round" fill="none" />
+      <!-- Golden Bracelet (Kada) -->
+      <path d="M 94,-35 C 98,-30 102,-35 100,-25" stroke="url(#richGold)" stroke-width="3.5" stroke-linecap="round" fill="none" />
+      <!-- Divine Lotus in Hand -->
+      <g transform="translate(105, -50)">
+        <path d="M 0,0 C -12,-15 -5,-28 0,-32 C 5,-28 12,-15 0,0 Z" fill="#F472B6" stroke="#BE185D" stroke-width="1" />
+        <path d="M -6,-5 C -18,-15 -14,-25 -7,-27 C -2,-20 0,-10 -6,-5 Z" fill="#FBCFE8" />
+        <path d="M 6,-5 C 18,-15 14,-25 7,-27 C 2,-20 0,-10 6,-5 Z" fill="#FBCFE8" />
+      </g>
+    </g>
+
+    <!-- Upper Right Arm (carrying Ankusha / Divine Goad) -->
+    <g id="upper_right_arm">
+      <path d="M -42,-55 C -65,-75 -95,-70 -102,-40 C -105,-25 -95,-15 -80,-20" fill="url(#ganeshaSkin)" stroke="#0369A1" stroke-width="1.5" />
+      <!-- Golden Armlet (Bajuband) -->
+      <path d="M -65,-65 C -75,-60 -85,-65 -88,-55" stroke="url(#richGold)" stroke-width="4" stroke-linecap="round" fill="none" />
+      <!-- Golden Bracelet (Kada) -->
+      <path d="M -94,-35 C -98,-30 -102,-35 -100,-25" stroke="url(#richGold)" stroke-width="3.5" stroke-linecap="round" fill="none" />
+      <!-- Golden Ankusha (Axe/Goad) -->
+      <g transform="translate(-105, -45) rotate(-20)">
+        <line x1="0" y1="-30" x2="0" y2="35" stroke="url(#richGold)" stroke-width="3.5" stroke-linecap="round" />
+        <path d="M 0,-15 C -15,-20 -20,-5 -5,0 Z" fill="url(#richGold)" stroke="#92400E" stroke-width="1" />
+        <circle cx="0" cy="-30" r="4" fill="#DC2626" />
+      </g>
+    </g>
+
+    <!-- C. Ears (Large, Divine Watercolor Cyan Ears) -->
+    <!-- Left Ear -->
+    <g id="left_ear">
+      <path d="M 38,-135 C 75,-165 110,-130 115,-85 C 120,-45 90,-25 45,-45 Z" fill="url(#ganeshaSkin)" stroke="#0284C7" stroke-width="2" />
+      <!-- Soft Pink/Peach Inner Ear Watercolor Blush -->
+      <path d="M 50,-125 C 80,-145 100,-120 102,-85 C 104,-55 85,-45 55,-60 Z" fill="#FED7AA" opacity="0.6" />
+      <!-- Gold Earring (Kundal) -->
+      <circle cx="85" cy="-40" r="8" fill="url(#richGold)" stroke="#B45309" stroke-width="1.5" />
+      <circle cx="85" cy="-40" r="3" fill="#DC2626" />
+    </g>
+    <!-- Right Ear -->
+    <g id="right_ear">
+      <path d="M -38,-135 C -75,-165 -110,-130 -115,-85 C -120,-45 -90,-25 -45,-45 Z" fill="url(#ganeshaSkin)" stroke="#0284C7" stroke-width="2" />
+      <!-- Soft Pink/Peach Inner Ear Watercolor Blush -->
+      <path d="M -50,-125 C -80,-145 -100,-120 -102,-85 C -104,-55 -85,-45 -55,-60 Z" fill="#FED7AA" opacity="0.6" />
+      <!-- Gold Earring (Kundal) -->
+      <circle cx="-85" cy="-40" r="8" fill="url(#richGold)" stroke="#B45309" stroke-width="1.5" />
+      <circle cx="-85" cy="-40" r="3" fill="#DC2626" />
+    </g>
+
+    <!-- D. Seated Legs & Saffron Dhoti (Sukhasana Posture) -->
+    <g id="dhoti_and_legs">
+      <!-- Plump legs folded -->
+      <path d="M -95,65 C -115,50 -105,15 -60,20 C -20,22 -10,35 0,35 C 10,35 20,22 60,20 C 105,15 115,50 95,65 C 65,85 -65,85 -95,65 Z" fill="url(#dhotiOrange)" stroke="#9A3412" stroke-width="2" />
+      
+      <!-- Dhoti Pleats & Folds (Patta) -->
+      <path d="M -45,30 C -30,65 -20,80 -25,95" stroke="#7C2D12" stroke-width="2.5" fill="none" />
+      <path d="M 0,35 C 0,70 -5,85 0,100" stroke="#7C2D12" stroke-width="2.5" fill="none" />
+      <path d="M 45,30 C 30,65 20,80 25,95" stroke="#7C2D12" stroke-width="2.5" fill="none" />
+      
+      <!-- Golden Border Zari on Dhoti -->
+      <path d="M -85,68 C -45,85 45,85 85,68" stroke="url(#richGold)" stroke-width="4" fill="none" stroke-linecap="round" />
+
+      <!-- Cute Cyan Feet peeking out -->
+      <ellipse cx="-75" cy="72" rx="16" ry="10" fill="url(#ganeshaSkinLight)" stroke="#0284C7" stroke-width="1.5" />
+      <ellipse cx="75" cy="72" rx="16" ry="10" fill="url(#ganeshaSkinLight)" stroke="#0284C7" stroke-width="1.5" />
+      <!-- Gold Anklets (Payal) -->
+      <path d="M -86,68 C -75,72 -65,70 -64,66" stroke="url(#richGold)" stroke-width="3" fill="none" />
+      <path d="M 64,66 C 65,70 75,72 86,68" stroke="url(#richGold)" stroke-width="3" fill="none" />
+    </g>
+
+    <!-- E. Plump Torso & Angavastra (Scarf) -->
+    <g id="torso">
+      <!-- Cute plump belly -->
+      <path d="M -48,-35 C -65,5 -55,42 0,45 C 55,42 65,5 48,-35 Z" fill="url(#ganeshaSkin)" stroke="#0284C7" stroke-width="1.8" />
+      
+      <!-- Subtle navel mark -->
+      <ellipse cx="0" cy="26" rx="4" ry="2.5" fill="#0369A1" opacity="0.6" />
+
+      <!-- Golden Sacred Thread (Janeu) running diagonally -->
+      <path d="M -32,-30 C -15,-5 5,18 28,38" stroke="url(#richGold)" stroke-width="2.5" fill="none" stroke-linecap="round" />
+
+      <!-- Golden Beaded Necklaces -->
+      <path d="M -30,-32 C -18,-15 18,-15 30,-32" stroke="url(#richGold)" stroke-width="4" fill="none" />
+      <!-- Central Ruby Pendant -->
+      <circle cx="0" cy="-20" r="6" fill="#DC2626" stroke="url(#richGold)" stroke-width="2" />
+      <circle cx="0" cy="-20" r="2.5" fill="#FEF08A" />
+    </g>
+
+    <!-- F. Front Hands (Lower Hands) -->
+    <!-- Lower Right Hand (Abhaya Mudra - Blessing Gesture) -->
+    <g id="front_right_hand">
+      <path d="M -45,-15 C -65,-5 -75,5 -65,22 C -55,30 -42,20 -38,5" fill="url(#ganeshaSkinLight)" stroke="#0284C7" stroke-width="1.5" />
+      <!-- Open Palm in Blessing -->
+      <ellipse cx="-60" cy="10" rx="14" ry="16" fill="url(#ganeshaSkinLight)" stroke="#0284C7" stroke-width="1.5" />
+      <!-- Sacred Auspicious Red Om / Lotus on Palm -->
+      <circle cx="-60" cy="10" r="4.5" fill="#EF4444" opacity="0.85" />
+      <path d="M -60,6 L -60,14 M -64,10 L -56,10" stroke="#FEF08A" stroke-width="1.5" />
+      <!-- Golden Kada on wrist -->
+      <path d="M -48,-2 C -42,3 -45,10 -52,6" stroke="url(#richGold)" stroke-width="3.5" stroke-linecap="round" fill="none" />
+    </g>
+
+    <!-- Lower Left Hand (Holding Sweet Golden Modak) -->
+    <g id="front_left_hand">
+      <path d="M 45,-15 C 65,-5 75,5 65,22 C 55,30 42,20 38,5" fill="url(#ganeshaSkinLight)" stroke="#0284C7" stroke-width="1.5" />
+      <!-- Palm holding modak plate -->
+      <ellipse cx="55" cy="14" rx="15" ry="12" fill="url(#ganeshaSkinLight)" stroke="#0284C7" stroke-width="1.5" />
+      <!-- Golden Bowl of Modaks -->
+      <path d="M 42,12 C 42,22 68,22 68,12 Z" fill="url(#richGold)" stroke="#B45309" stroke-width="1.5" />
+      <!-- Delicious Golden Modak with pointed top -->
+      <path d="M 50,12 C 48,6 55,0 55,-2 C 55,0 62,6 60,12 Z" fill="#FBBF24" stroke="#D97706" stroke-width="1.5" />
+      <circle cx="55" cy="-2" r="2" fill="#EF4444" />
+      <!-- Golden Kada on wrist -->
+      <path d="M 48,-2 C 42,3 45,10 52,6" stroke="url(#richGold)" stroke-width="3.5" stroke-linecap="round" fill="none" />
+    </g>
+
+    <!-- G. Head, Cheeks & Trunk -->
+    <g id="head_and_trunk">
+      <!-- Main Head Contour -->
+      <path d="M -40,-130 C -55,-100 -50,-50 -20,-45 C -15,-40 -10,-35 0,-35 C 10,-35 15,-40 20,-45 C 50,-50 55,-100 40,-130 Z" fill="url(#ganeshaSkin)" stroke="#0284C7" stroke-width="2" />
+
+      <!-- Cute Chubby Cheeks -->
+      <ellipse cx="-32" cy="-65" rx="16" ry="14" fill="#BAE6FD" opacity="0.5" />
+      <ellipse cx="32" cy="-65" rx="16" ry="14" fill="#BAE6FD" opacity="0.5" />
+
+      <!-- White Sacred Tusks (Danta) -->
+      <!-- Left Tusk (Full) -->
+      <path d="M 18,-52 C 28,-50 34,-45 32,-38 C 30,-36 24,-45 16,-48 Z" fill="#FFFFFF" stroke="#B45309" stroke-width="1" />
+      <path d="M 21,-50 L 23,-45" stroke="url(#richGold)" stroke-width="1.5" />
+      <!-- Right Tusk (Broken - Ekadanta) -->
+      <path d="M -18,-52 C -24,-50 -28,-46 -26,-42 C -24,-40 -20,-46 -16,-48 Z" fill="#FFFFFF" stroke="#B45309" stroke-width="1" />
+
+      <!-- Trunk (Gracefully curved to his left towards the Modak) -->
+      <path d="M -14,-50 C -12,-25 -8,0 5,12 C 18,24 35,22 45,15 C 52,8 52,-2 46,-4 C 40,-6 38,4 30,5 C 22,6 12,-2 6,-18 C 0,-32 4,-45 14,-50 Z" fill="url(#ganeshaSkin)" stroke="#0284C7" stroke-width="2" />
+
+      <!-- Trunk Horizontal Grooves (Folds) -->
+      <path d="M -5,-30 C 0,-28 5,-30 6,-32" stroke="#0369A1" stroke-width="1.5" fill="none" opacity="0.7" />
+      <path d="M -2,-15 C 3,-13 8,-15 10,-18" stroke="#0369A1" stroke-width="1.5" fill="none" opacity="0.7" />
+      <path d="M 4,0 C 9,2 14,0 16,-3" stroke="#0369A1" stroke-width="1.5" fill="none" opacity="0.7" />
+      <path d="M 15,10 C 20,12 25,9 26,6" stroke="#0369A1" stroke-width="1.5" fill="none" opacity="0.7" />
+
+      <!-- Gold Bell on Trunk Tip -->
+      <circle cx="48" cy="-1" r="3.5" fill="url(#richGold)" stroke="#92400E" stroke-width="1" />
+
+      <!-- Peaceful Divine Eyes -->
+      <!-- Right Eye -->
+      <g transform="translate(-24, -85)">
+        <path d="M -12,0 C -5,-7 5,-7 12,0 C 5,6 -5,6 -12,0 Z" fill="#FFFFFF" stroke="#0F172A" stroke-width="1.5" />
+        <!-- Iris & Pupil -->
+        <ellipse cx="0" cy="0" rx="4.5" ry="5" fill="#1E293B" />
+        <circle cx="0" cy="0" r="2.5" fill="#000000" />
+        <circle cx="-1.5" cy="-1.5" r="1.2" fill="#FFFFFF" />
+        <!-- Arched Eyebrow -->
+        <path d="M -14,-6 C -6,-12 4,-12 12,-6" stroke="#0369A1" stroke-width="2" fill="none" stroke-linecap="round" />
+      </g>
+      <!-- Left Eye -->
+      <g transform="translate(24, -85)">
+        <path d="M -12,0 C -5,-7 5,-7 12,0 C 5,6 -5,6 -12,0 Z" fill="#FFFFFF" stroke="#0F172A" stroke-width="1.5" />
+        <!-- Iris & Pupil -->
+        <ellipse cx="0" cy="0" rx="4.5" ry="5" fill="#1E293B" />
+        <circle cx="0" cy="0" r="2.5" fill="#000000" />
+        <circle cx="-1.5" cy="-1.5" r="1.2" fill="#FFFFFF" />
+        <!-- Arched Eyebrow -->
+        <path d="M -12,-6 C -4,-12 6,-12 14,-6" stroke="#0369A1" stroke-width="2" fill="none" stroke-linecap="round" />
+      </g>
+
+      <!-- Sacred Forehead Tilak (Trishul / Urdhva Pundra + Red Bindu) -->
+      <g transform="translate(0, -90)">
+        <!-- Sandalwood paste yellow base -->
+        <path d="M -12,-15 C -8,-8 0,-5 0,0 C 0,-5 8,-8 12,-15 C 6,-10 0,-10 -12,-15 Z" fill="#FDE047" stroke="#CA8A04" stroke-width="1" />
+        <!-- Central Red Kumkum Line / Trishul peak -->
+        <path d="M 0,-24 L 0,0" stroke="#DC2626" stroke-width="3" stroke-linecap="round" />
+        <circle cx="0" cy="-2" r="2.5" fill="#DC2626" />
+      </g>
+    </g>
+
+    <!-- H. Ornate Royal Crown (Mukut) - Golden with Red Rubies -->
+    <g id="royal_mukut" transform="translate(0, -125)">
+      <!-- Crown Base Band -->
+      <path d="M -38,0 C -18,6 18,6 38,0 C 35,-12 -35,-12 -38,0 Z" fill="url(#crownGold)" stroke="#78350F" stroke-width="1.5" />
+      <!-- Jewels on base band -->
+      <circle cx="-25" cy="-3" r="3" fill="#EF4444" />
+      <circle cx="-12" cy="-2" r="3" fill="#10B981" />
+      <circle cx="0" cy="-1" r="3.5" fill="#EF4444" />
+      <circle cx="12" cy="-2" r="3" fill="#10B981" />
+      <circle cx="25" cy="-3" r="3" fill="#EF4444" />
+
+      <!-- Middle Tier Arches -->
+      <path d="M -34,-10 C -20,-28 0,-30 0,-30 C 0,-30 20,-28 34,-10 C 22,-18 -22,-18 -34,-10 Z" fill="url(#richGold)" stroke="#78350F" stroke-width="1.5" />
+      <!-- Central Large Ruby Emblem -->
+      <path d="M 0,-34 C -10,-24 0,-14 0,-14 C 0,-14 10,-24 0,-34 Z" fill="#DC2626" stroke="url(#crownGold)" stroke-width="2" />
+      <circle cx="0" cy="-24" r="2.5" fill="#FEF08A" />
+
+      <!-- Upper Crown Pinnacle (Kalash & Peacock Fan Motif) -->
+      <path d="M -20,-26 C -12,-55 0,-65 0,-65 C 0,-65 12,-55 20,-26 Z" fill="url(#crownGold)" stroke="#78350F" stroke-width="1.5" />
+      <circle cx="0" cy="-45" r="4" fill="#EF4444" stroke="url(#richGold)" stroke-width="1" />
+      <!-- Golden Pinnacle Spire -->
+      <path d="M 0,-65 L -4,-76 L 0,-85 L 4,-76 Z" fill="url(#richGold)" stroke="#92400E" stroke-width="1" />
+      <circle cx="0" cy="-85" r="3" fill="#EF4444" />
+    </g>
+
+  </g>
+
+  <!-- End of receiptClip group -->
+  </g>
+
+</svg>

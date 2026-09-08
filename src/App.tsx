@@ -1,36 +1,37 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   FileText,
-  DollarSign,
-  Users,
-  Building2,
-  HeartHandshake,
+  CreditCard,
+  Coins,
   Settings,
   Share2,
   Lock,
   Unlock,
-  Plus,
-  Edit2,
-  Trash2,
-  Printer,
-  Download,
-  Upload,
-  Zap,
   CheckCircle2,
   Copy,
   AlertTriangle,
   QrCode,
   Sparkles,
-  PhoneCall
+  PhoneCall,
+  RefreshCw,
+  Save,
+  LogOut,
+  Crown,
+  Briefcase,
+  Users2
 } from 'lucide-react';
 import {
   Expense,
   Contribution,
   Sponsor,
+  CommercialStall,
   SevaBooking,
   SevaCatalogueItem,
+  HundiCollection,
+  AuctionItem,
   AppSettings,
-  AppState
+  AppState,
+  UserRole
 } from './types';
 import {
   INITIAL_STATE,
@@ -39,27 +40,56 @@ import {
   fmtDate,
   today,
   numWords,
-  sha256
+  sha256,
+  getExpenseBalance,
+  getExpenseActual
 } from './utils/helpers';
 import { generateStandaloneHTML } from './utils/htmlExporter';
 import {
   initFirestoreSync,
+  cloudSyncAllData,
   cloudSaveExpense,
   cloudDeleteExpense,
   cloudSaveContribution,
   cloudDeleteContribution,
   cloudSaveSponsor,
   cloudDeleteSponsor,
+  cloudSaveCommercialStall,
+  cloudDeleteCommercialStall,
   cloudSaveSeva,
   cloudDeleteSeva,
   cloudSaveSevaCatalogueItem,
   cloudDeleteSevaCatalogueItem,
+  cloudSaveHundi,
+  cloudDeleteHundi,
+  cloudSaveAuction,
+  cloudDeleteAuction,
   cloudSaveSettings,
   cloudSaveCounters,
   cloudBulkImportContributions,
   cloudClearAllData,
+  fetchFreshDataFromServer,
   SyncStatus
 } from './lib/firebase';
+
+import { StatementView } from './components/StatementView';
+import { ExpenditureView } from './components/ExpenditureView';
+import { DonationsView } from './components/DonationsView';
+import { SponsorshipView } from './components/SponsorshipView';
+import { CommercialStallsView } from './components/CommercialStallsView';
+import { SevasView } from './components/SevasView';
+import { HundiView } from './components/HundiView';
+import { AuctionsView } from './components/AuctionsView';
+import { SettingsView } from './components/SettingsView';
+import { ReceiptInvoiceModal, PrintData } from './components/ReceiptInvoiceModal';
+import { PublicReceiptPortal } from './components/PublicReceiptPortal';
+import { CommitteeAuthGate } from './components/CommitteeAuthGate';
+import {
+  getReceiptDocumentTitle,
+  getReceiptPdfFilename,
+  downloadBlobAsFile,
+  generateReceiptPdfBlob
+} from './utils/pdfGenerator';
 
 declare global {
   interface Window {
@@ -73,147 +103,279 @@ declare global {
 }
 
 export function App() {
-  // --- Persistent State ---
-  const [expenses, setExpenses] = useState<Expense[]>(() => {
+  // Purge any historical on-device localStorage items so NO application data is stored on the device
+  useEffect(() => {
     try {
-      const saved = localStorage.getItem('eg_expenses');
-      if (saved) return JSON.parse(saved);
+      const keysToRemove = [
+        'eg_expenses',
+        'eg_contributions',
+        'eg_sponsors',
+        'eg_commercial_stalls',
+        'eg_sevas',
+        'eg_seva_catalogue',
+        'eg_hundi',
+        'eg_auctions',
+        'eg_settings',
+        'eg_rc_num',
+        'eg_sp_num',
+        'eg_cs_num',
+        'eg_sv_num',
+        'eg_auc_num'
+      ];
+      keysToRemove.forEach(k => localStorage.removeItem(k));
     } catch {}
-    return window.__E__?.expenses || INITIAL_STATE.expenses;
+  }, []);
+
+  // --- Live Application State (Purely sourced from Firebase) ---
+  const [expenses, setExpenses] = useState<Expense[]>(() => window.__E__?.expenses || []);
+  const [contributions, setContributions] = useState<Contribution[]>(() => window.__E__?.contributions || []);
+  const [sponsors, setSponsors] = useState<Sponsor[]>(() => window.__E__?.sponsors || []);
+  const [commercialStalls, setCommercialStalls] = useState<CommercialStall[]>(() => window.__E__?.commercialStalls || []);
+  const [sevas, setSevas] = useState<SevaBooking[]>(() => window.__E__?.sevas || []);
+  const [sevaCatalogue, setSevaCatalogue] = useState<SevaCatalogueItem[]>(() => window.__E__?.sevaCatalogue || DEFAULT_SEVAS);
+  const [hundi, setHundi] = useState<HundiCollection[]>(() => window.__E__?.hundi || []);
+  const [auctions, setAuctions] = useState<AuctionItem[]>(() => window.__E__?.auctions || []);
+  const [settings, setSettings] = useState<AppSettings>(() => window.__E__?.settings || INITIAL_STATE.settings);
+
+  // In-memory counters synced with Firestore metadata/counters
+  const [counters, setCounters] = useState<{
+    rc?: string | null;
+    sp?: string | null;
+    cs?: string | null;
+    sv?: string | null;
+    auc?: string | null;
+  }>({});
+  const countersRef = useRef<{
+    rc?: string | null;
+    sp?: string | null;
+    cs?: string | null;
+    sv?: string | null;
+    auc?: string | null;
+  }>({});
+
+  useEffect(() => {
+    countersRef.current = counters;
+  }, [counters]);
+
+  // --- Active Tab Navigation ---
+  // First Level: 'statement' | 'income' | 'expenditure' | 'settings'
+  const [activeTab, setActiveTab] = useState<'statement' | 'income' | 'expenditure' | 'settings'>('statement');
+  // Sub-level under 'income': 'donations' | 'sponsorship' | 'stalls' | 'sevas' | 'hundi' | 'auctions'
+  const [activeIncomeSubTab, setActiveIncomeSubTab] = useState<'donations' | 'sponsorship' | 'stalls' | 'sevas' | 'hundi' | 'auctions'>('donations');
+
+  // Dedicated Isolated Public Devotee Receipt Portal check
+  const checkIsReceiptPortal = () => {
+    if (typeof window === 'undefined') return false;
+    const path = (window.location.pathname || '').toLowerCase().replace(/\/+$/, '');
+    const isPathMatch = path === '/receipts' || path === '/receipt' || path === '/portal' || path === '/download';
+    const params = new URLSearchParams(window.location.search);
+    const hash = window.location.hash.toLowerCase();
+    return (
+      isPathMatch ||
+      params.get('view') === 'receipts' ||
+      params.get('portal') === 'receipts' ||
+      params.has('receipt-portal') ||
+      params.has('receipts') ||
+      hash === '#receipt-portal' ||
+      hash === '#receipts' ||
+      hash === '#receipt'
+    );
+  };
+
+  const [isReceiptPortal, setIsReceiptPortal] = useState<boolean>(checkIsReceiptPortal);
+
+  useEffect(() => {
+    const handleUrlChange = () => {
+      setIsReceiptPortal(checkIsReceiptPortal());
+    };
+    window.addEventListener('popstate', handleUrlChange);
+    window.addEventListener('hashchange', handleUrlChange);
+    return () => {
+      window.removeEventListener('popstate', handleUrlChange);
+      window.removeEventListener('hashchange', handleUrlChange);
+    };
+  }, []);
+
+  // --- Committee Authentication & Multi-Role Access Control (3-Tiers) ---
+  // Tier 1: Admin - Super User, all access to view & modify data, settings, export, sync
+  // Tier 2: Sponsor - Read-only access to view all data (cannot modify)
+  // Tier 3: Volunteer - Read-only access, restricted from Sponsorship & Commercial Stalls tabs
+  const [userRole, setUserRole] = useState<UserRole | null>(() => {
+    if (typeof window === 'undefined') return null;
+    const auth = sessionStorage.getItem('eg_committee_auth') === 'true';
+    if (!auth) return null;
+    const r = sessionStorage.getItem('eg_user_role') as UserRole;
+    return r || 'admin';
+  });
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return sessionStorage.getItem('eg_committee_auth') === 'true';
+  });
+  const [isAdmin, setIsAdmin] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    const auth = sessionStorage.getItem('eg_committee_auth') === 'true';
+    const r = sessionStorage.getItem('eg_user_role');
+    return auth && (r === 'admin' || !r);
   });
 
-  const [contributions, setContributions] = useState<Contribution[]>(() => {
-    try {
-      const saved = localStorage.getItem('eg_contributions');
-      if (saved) return JSON.parse(saved);
-    } catch {}
-    return window.__E__?.contributions || INITIAL_STATE.contributions;
-  });
+  // Guard restricted tabs for Volunteers
+  useEffect(() => {
+    if (userRole === 'volunteer') {
+      if (activeIncomeSubTab === 'sponsorship' || activeIncomeSubTab === 'stalls') {
+        setActiveIncomeSubTab('donations');
+      }
+    }
+  }, [userRole, activeIncomeSubTab]);
 
-  const [sponsors, setSponsors] = useState<Sponsor[]>(() => {
-    try {
-      const saved = localStorage.getItem('eg_sponsors');
-      if (saved) return JSON.parse(saved);
-    } catch {}
-    return window.__E__?.sponsors || INITIAL_STATE.sponsors;
-  });
-
-  const [sevas, setSevas] = useState<SevaBooking[]>(() => {
-    try {
-      const saved = localStorage.getItem('eg_sevas');
-      if (saved) return JSON.parse(saved);
-    } catch {}
-    return window.__E__?.sevas || INITIAL_STATE.sevas;
-  });
-
-  const [sevaCatalogue, setSevaCatalogue] = useState<SevaCatalogueItem[]>(() => {
-    try {
-      const saved = localStorage.getItem('eg_seva_catalogue');
-      if (saved) return JSON.parse(saved);
-    } catch {}
-    return window.__E__?.sevaCatalogue || DEFAULT_SEVAS;
-  });
-
-  const [settings, setSettings] = useState<AppSettings>(() => {
-    try {
-      const saved = localStorage.getItem('eg_settings');
-      if (saved) return JSON.parse(saved);
-    } catch {}
-    return window.__E__?.settings || INITIAL_STATE.settings;
-  });
-
-  // --- Active Tab & Admin State ---
-  const [activeTab, setActiveTab] = useState<'report' | 'expenses' | 'contributions' | 'sponsors' | 'sevas' | 'settings'>('report');
-  const [isAdmin, setIsAdmin] = useState(false);
+  // Guard settings for Non-Admins
+  useEffect(() => {
+    if (userRole && userRole !== 'admin' && activeTab === 'settings') {
+      setActiveTab('statement');
+    }
+  }, [userRole, activeTab]);
   const [viewOnly, setViewOnly] = useState(false);
   const [activeFileHandle, setActiveFileHandle] = useState<FileSystemFileHandle | null>(null);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'unsaved' | null>(null);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('connecting');
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const hasUnsavedChangesRef = useRef(false);
+  const [syncToast, setSyncToast] = useState<string | null>(null);
 
-  // Search States
-  const [ctSearch, setCtSearch] = useState('');
-  const [svSearch, setSvSearch] = useState('');
-
-  // Modals
-  const [expModal, setExpModal] = useState<{ open: boolean; item?: Expense | null }>({ open: false });
-  const [ctModal, setCtModal] = useState<{ open: boolean; item?: Contribution | null }>({ open: false });
-  const [spModal, setSpModal] = useState<{ open: boolean; item?: Sponsor | null }>({ open: false });
-  const [svModal, setSvModal] = useState<{ open: boolean; item?: SevaBooking | null }>({ open: false });
-  const [scModal, setScModal] = useState<{ open: boolean; item?: SevaCatalogueItem | null }>({ open: false });
-  const [shareModalOpen, setShareModalOpen] = useState(false);
-  const [shareUrl, setShareUrl] = useState('');
-  const [copiedLink, setCopiedLink] = useState(false);
-
-  // Print Bill State
-  const [printData, setPrintData] = useState<{ type: 'receipt' | 'invoice'; item: any } | null>(null);
+  // --- Modals & Printing ---
+  const [receiptModalOpen, setReceiptModalOpen] = useState(false);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [printData, setPrintData] = useState<PrintData | null>(null);
 
   // Refs
-  const shareQrRef = useRef<HTMLDivElement>(null);
-  const rcpQrRef = useRef<HTMLDivElement>(null);
+  const modalQrRef = useRef<HTMLDivElement>(null);
   const autoSaveTimerRef = useRef<any>(null);
 
-  // Sync to local storage & embedded state
+  // Get current state snapshot in memory
   const getCurrentState = (): AppState => ({
     expenses,
     contributions,
     sponsors,
+    commercialStalls,
     sevas,
     sevaCatalogue,
+    hundi,
+    auctions,
     settings,
     counters: {
-      rc: localStorage.getItem('eg_rc_num'),
-      sp: localStorage.getItem('eg_sp_num'),
-      sv: localStorage.getItem('eg_sv_num')
+      rc: countersRef.current.rc || null,
+      sp: countersRef.current.sp || null,
+      cs: countersRef.current.cs || null,
+      sv: countersRef.current.sv || null,
+      auc: countersRef.current.auc || null
     }
   });
 
+  // Direct real-time server fetcher (bypasses any stale local device cache)
+  const triggerLiveServerSync = async (manual = false) => {
+    if (manual && hasUnsavedChanges) {
+      if (!window.confirm('You have unsaved changes that will be overwritten with cloud data. Do you want to continue?')) {
+        return;
+      }
+    }
+    setIsRefreshing(true);
+    try {
+      const serverData = await fetchFreshDataFromServer();
+      setContributions(serverData.contributions);
+      setExpenses(serverData.expenses);
+      setSponsors(serverData.sponsors);
+      setCommercialStalls(serverData.commercialStalls);
+      setSevas(serverData.sevas);
+      setSevaCatalogue(serverData.sevaCatalogue);
+      setHundi(serverData.hundi);
+      setAuctions(serverData.auctions);
+      if (serverData.settings) setSettings(prev => ({ ...prev, ...serverData.settings }));
+      if (serverData.counters) {
+        setCounters(serverData.counters);
+        countersRef.current = serverData.counters;
+      }
+
+      setSyncStatus('synced');
+      hasUnsavedChangesRef.current = false;
+      setHasUnsavedChanges(false);
+
+      if (manual) {
+        setSyncToast('Data refreshed successfully');
+        setTimeout(() => setSyncToast(null), 3000);
+      }
+    } catch (err: any) {
+      console.error('Failed to fetch direct server data:', err);
+      if (manual) {
+        setSyncToast(err?.message || 'Failed to refresh data');
+        setTimeout(() => setSyncToast(null), 3000);
+      }
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   // Real-time Firestore Cloud Sync
   useEffect(() => {
+    // 1. Trigger immediate fresh server pull
+    triggerLiveServerSync(false);
+
+    // 2. Establish continuous real-time listeners
     const unsub = initFirestoreSync(
       {
         onExpenses: data => {
-          if (data && data.length > 0) setExpenses(data);
+          if (data && !hasUnsavedChangesRef.current) setExpenses(data);
         },
         onContributions: data => {
-          if (data && data.length > 0) setContributions(data);
+          if (data && !hasUnsavedChangesRef.current) setContributions(data);
         },
         onSponsors: data => {
-          if (data && data.length > 0) setSponsors(data);
+          if (data && !hasUnsavedChangesRef.current) setSponsors(data);
+        },
+        onCommercialStalls: data => {
+          if (data && !hasUnsavedChangesRef.current) setCommercialStalls(data);
         },
         onSevas: data => {
-          if (data && data.length > 0) setSevas(data);
+          if (data && !hasUnsavedChangesRef.current) setSevas(data);
         },
         onSevaCatalogue: data => {
-          if (data && data.length > 0) setSevaCatalogue(data);
+          if (data && data.length > 0 && !hasUnsavedChangesRef.current) setSevaCatalogue(data);
+        },
+        onHundi: data => {
+          if (data && !hasUnsavedChangesRef.current) setHundi(data);
+        },
+        onAuctions: data => {
+          if (data && !hasUnsavedChangesRef.current) setAuctions(data);
         },
         onSettings: data => {
-          if (data) setSettings(prev => ({ ...prev, ...data }));
+          if (data && !hasUnsavedChangesRef.current) setSettings(prev => ({ ...prev, ...data }));
         },
         onCounters: data => {
-          if (data?.rc) localStorage.setItem('eg_rc_num', String(data.rc));
-          if (data?.sp) localStorage.setItem('eg_sp_num', String(data.sp));
-          if (data?.sv) localStorage.setItem('eg_sv_num', String(data.sv));
+          if (data && !hasUnsavedChangesRef.current) {
+            setCounters(prev => {
+              const updated = {
+                rc: data.rc !== undefined ? String(data.rc) : prev.rc,
+                sp: data.sp !== undefined ? String(data.sp) : prev.sp,
+                cs: data.cs !== undefined ? String(data.cs) : prev.cs,
+                sv: data.sv !== undefined ? String(data.sv) : prev.sv,
+                auc: data.auc !== undefined ? String(data.auc) : prev.auc,
+              };
+              countersRef.current = updated;
+              return updated;
+            });
+          }
         },
         onStatusChange: status => {
           setSyncStatus(status);
         }
-      },
-      getCurrentState()
+      }
     );
 
     return () => unsub();
   }, []);
 
   useEffect(() => {
-    try {
-      localStorage.setItem('eg_expenses', JSON.stringify(expenses));
-      localStorage.setItem('eg_contributions', JSON.stringify(contributions));
-      localStorage.setItem('eg_sponsors', JSON.stringify(sponsors));
-      localStorage.setItem('eg_sevas', JSON.stringify(sevas));
-      localStorage.setItem('eg_seva_catalogue', JSON.stringify(sevaCatalogue));
-      localStorage.setItem('eg_settings', JSON.stringify(settings));
-    } catch {}
-
+    // Zero on-device storage. Live state is saved and synced exclusively to Firebase.
     window.__E__ = getCurrentState();
 
     if (isAdmin && activeFileHandle) {
@@ -232,7 +394,7 @@ export function App() {
         }
       }, 700);
     }
-  }, [expenses, contributions, sponsors, sevas, sevaCatalogue, settings]);
+  }, [expenses, contributions, sponsors, commercialStalls, sevas, sevaCatalogue, hundi, auctions, settings]);
 
   // Handle Hash on load (Share Snapshot view)
   useEffect(() => {
@@ -247,8 +409,11 @@ export function App() {
             if (data.eg_expenses) setExpenses(data.eg_expenses);
             if (data.eg_contributions) setContributions(data.eg_contributions);
             if (data.eg_sponsors) setSponsors(data.eg_sponsors);
+            if (data.eg_commercial_stalls) setCommercialStalls(data.eg_commercial_stalls);
             if (data.eg_sevas) setSevas(data.eg_sevas);
             if (data.eg_seva_catalogue) setSevaCatalogue(data.eg_seva_catalogue);
+            if (data.eg_hundi) setHundi(data.eg_hundi);
+            if (data.eg_auctions) setAuctions(data.eg_auctions);
             if (data.org || data.location) {
               setSettings(prev => ({ ...prev, org: data.org || prev.org, location: data.location || prev.location }));
             }
@@ -261,16 +426,20 @@ export function App() {
     }
   }, []);
 
-  // Summary Calculations
-  const spAct = sponsors.reduce((s, r) => s + Number(r.act || 0), 0);
+  // Summary Totals
   const ctTot = contributions.reduce((s, r) => s + Number(r.amt || 0), 0);
+  const spAct = sponsors.reduce((s, r) => s + Number(r.act || 0), 0);
+  const csAct = commercialStalls.reduce((s, r) => s + Number(r.act || 0), 0);
   const svTot = sevas.reduce((s, r) => s + Number(r.amt || 0), 0);
-  const exAct = expenses.reduce((s, r) => s + Number(r.act || (Number(r.adv || 0) + Number(r.bal || 0))), 0);
-  const totalIncome = spAct + ctTot + svTot;
+  const hundiTot = hundi.reduce((s, r) => s + Number(r.act || 0), 0);
+  const aucTot = auctions.reduce((s, r) => s + Number(r.act || 0), 0);
+  const totalIncome = ctTot + spAct + csAct + svTot + hundiTot + aucTot;
+
+  const exAct = expenses.reduce((s, r) => s + getExpenseActual(r), 0);
   const netBalance = totalIncome - exAct;
 
-  // Cloud & Local Handlers
-  const handleSaveExpense = async (row: Expense) => {
+  // Handlers for modifying data in memory (Cloud sync happens on manual Save click)
+  const handleSaveExpense = (row: Expense) => {
     setExpenses(prev => {
       const idx = prev.findIndex(x => x.id === row.id);
       if (idx >= 0) {
@@ -280,23 +449,17 @@ export function App() {
       }
       return [...prev, row];
     });
-    try {
-      await cloudSaveExpense(row);
-    } catch (e) {
-      console.warn('Saved locally; cloud sync pending', e);
-    }
+    hasUnsavedChangesRef.current = true;
+    setHasUnsavedChanges(true);
   };
 
-  const handleDeleteExpense = async (id: string) => {
+  const handleDeleteExpense = (id: string) => {
     setExpenses(prev => prev.filter(x => x.id !== id));
-    try {
-      await cloudDeleteExpense(id);
-    } catch (e) {
-      console.warn('Deleted locally; cloud delete pending', e);
-    }
+    hasUnsavedChangesRef.current = true;
+    setHasUnsavedChanges(true);
   };
 
-  const handleSaveContribution = async (row: Contribution) => {
+  const handleSaveContribution = (row: Contribution) => {
     setContributions(prev => {
       const idx = prev.findIndex(x => x.id === row.id);
       if (idx >= 0) {
@@ -306,24 +469,43 @@ export function App() {
       }
       return [...prev, row];
     });
-    try {
-      await cloudSaveContribution(row);
-      await cloudSaveCounters({ rc: localStorage.getItem('eg_rc_num') });
-    } catch (e) {
-      console.warn('Saved locally; cloud sync pending', e);
+    const match = row.rcptNo?.match(/(\d+)$/);
+    if (match) {
+      const n = parseInt(match[1], 10);
+      const cur = parseInt(countersRef.current.rc || '0', 10);
+      if (n > cur) {
+        countersRef.current = { ...countersRef.current, rc: String(n) };
+        setCounters(prev => ({ ...prev, rc: String(n) }));
+      }
     }
+    hasUnsavedChangesRef.current = true;
+    setHasUnsavedChanges(true);
   };
 
-  const handleDeleteContribution = async (id: string) => {
+  const handleDeleteContribution = (id: string) => {
     setContributions(prev => prev.filter(x => x.id !== id));
-    try {
-      await cloudDeleteContribution(id);
-    } catch (e) {
-      console.warn('Deleted locally; cloud delete pending', e);
-    }
+    hasUnsavedChangesRef.current = true;
+    setHasUnsavedChanges(true);
   };
 
-  const handleSaveSponsor = async (row: Sponsor) => {
+  const handleBulkImportContributions = (newItems: Contribution[]) => {
+    let maxNum = parseInt(countersRef.current.rc || '0', 10);
+    newItems.forEach(c => {
+      const match = c.rcptNo?.match(/(\d+)$/);
+      if (match) {
+        const n = parseInt(match[1], 10);
+        if (n > maxNum) maxNum = n;
+      }
+    });
+    const newRc = String(maxNum);
+    countersRef.current = { ...countersRef.current, rc: newRc };
+    setCounters(prev => ({ ...prev, rc: newRc }));
+    setContributions(prev => [...prev, ...newItems]);
+    hasUnsavedChangesRef.current = true;
+    setHasUnsavedChanges(true);
+  };
+
+  const handleSaveSponsor = (row: Sponsor) => {
     setSponsors(prev => {
       const idx = prev.findIndex(x => x.id === row.id);
       if (idx >= 0) {
@@ -333,24 +515,55 @@ export function App() {
       }
       return [...prev, row];
     });
-    try {
-      await cloudSaveSponsor(row);
-      await cloudSaveCounters({ sp: localStorage.getItem('eg_sp_num') });
-    } catch (e) {
-      console.warn('Saved locally; cloud sync pending', e);
+    const match = row.invNo?.match(/(\d+)$/);
+    if (match) {
+      const n = parseInt(match[1], 10);
+      const cur = parseInt(countersRef.current.sp || '0', 10);
+      if (n > cur) {
+        countersRef.current = { ...countersRef.current, sp: String(n) };
+        setCounters(prev => ({ ...prev, sp: String(n) }));
+      }
     }
+    hasUnsavedChangesRef.current = true;
+    setHasUnsavedChanges(true);
   };
 
-  const handleDeleteSponsor = async (id: string) => {
+  const handleDeleteSponsor = (id: string) => {
     setSponsors(prev => prev.filter(x => x.id !== id));
-    try {
-      await cloudDeleteSponsor(id);
-    } catch (e) {
-      console.warn('Deleted locally; cloud delete pending', e);
-    }
+    hasUnsavedChangesRef.current = true;
+    setHasUnsavedChanges(true);
   };
 
-  const handleSaveSeva = async (row: SevaBooking) => {
+  const handleSaveCommercialStall = (row: CommercialStall) => {
+    setCommercialStalls(prev => {
+      const idx = prev.findIndex(x => x.id === row.id);
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = row;
+        return next;
+      }
+      return [...prev, row];
+    });
+    const match = row.invNo?.match(/(\d+)$/);
+    if (match) {
+      const n = parseInt(match[1], 10);
+      const cur = parseInt(countersRef.current.cs || '0', 10);
+      if (n > cur) {
+        countersRef.current = { ...countersRef.current, cs: String(n) };
+        setCounters(prev => ({ ...prev, cs: String(n) }));
+      }
+    }
+    hasUnsavedChangesRef.current = true;
+    setHasUnsavedChanges(true);
+  };
+
+  const handleDeleteCommercialStall = (id: string) => {
+    setCommercialStalls(prev => prev.filter(x => x.id !== id));
+    hasUnsavedChangesRef.current = true;
+    setHasUnsavedChanges(true);
+  };
+
+  const handleSaveSeva = (row: SevaBooking) => {
     setSevas(prev => {
       const idx = prev.findIndex(x => x.id === row.id);
       if (idx >= 0) {
@@ -360,24 +573,75 @@ export function App() {
       }
       return [...prev, row];
     });
-    try {
-      await cloudSaveSeva(row);
-      await cloudSaveCounters({ sv: localStorage.getItem('eg_sv_num') });
-    } catch (e) {
-      console.warn('Saved locally; cloud sync pending', e);
+    const match = row.tokNo?.match(/(\d+)$/);
+    if (match) {
+      const n = parseInt(match[1], 10);
+      const cur = parseInt(countersRef.current.sv || '0', 10);
+      if (n > cur) {
+        countersRef.current = { ...countersRef.current, sv: String(n) };
+        setCounters(prev => ({ ...prev, sv: String(n) }));
+      }
     }
+    hasUnsavedChangesRef.current = true;
+    setHasUnsavedChanges(true);
   };
 
-  const handleDeleteSeva = async (id: string) => {
+  const handleDeleteSeva = (id: string) => {
     setSevas(prev => prev.filter(x => x.id !== id));
-    try {
-      await cloudDeleteSeva(id);
-    } catch (e) {
-      console.warn('Deleted locally; cloud delete pending', e);
-    }
+    hasUnsavedChangesRef.current = true;
+    setHasUnsavedChanges(true);
   };
 
-  const handleSaveSevaCatalogue = async (row: SevaCatalogueItem) => {
+  const handleSaveHundi = (row: HundiCollection) => {
+    setHundi(prev => {
+      const idx = prev.findIndex(x => x.id === row.id);
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = row;
+        return next;
+      }
+      return [...prev, row];
+    });
+    hasUnsavedChangesRef.current = true;
+    setHasUnsavedChanges(true);
+  };
+
+  const handleDeleteHundi = (id: string) => {
+    setHundi(prev => prev.filter(x => x.id !== id));
+    hasUnsavedChangesRef.current = true;
+    setHasUnsavedChanges(true);
+  };
+
+  const handleSaveAuction = (row: AuctionItem) => {
+    setAuctions(prev => {
+      const idx = prev.findIndex(x => x.id === row.id);
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = row;
+        return next;
+      }
+      return [...prev, row];
+    });
+    const match = row.invNo?.match(/(\d+)$/);
+    if (match) {
+      const n = parseInt(match[1], 10);
+      const cur = parseInt(countersRef.current.auc || '0', 10);
+      if (n > cur) {
+        countersRef.current = { ...countersRef.current, auc: String(n) };
+        setCounters(prev => ({ ...prev, auc: String(n) }));
+      }
+    }
+    hasUnsavedChangesRef.current = true;
+    setHasUnsavedChanges(true);
+  };
+
+  const handleDeleteAuction = (id: string) => {
+    setAuctions(prev => prev.filter(x => x.id !== id));
+    hasUnsavedChangesRef.current = true;
+    setHasUnsavedChanges(true);
+  };
+
+  const handleSaveSevaCatalogue = (row: SevaCatalogueItem) => {
     setSevaCatalogue(prev => {
       const idx = prev.findIndex(x => x.id === row.id);
       if (idx >= 0) {
@@ -387,72 +651,64 @@ export function App() {
       }
       return [...prev, row];
     });
-    try {
-      await cloudSaveSevaCatalogueItem(row);
-    } catch (e) {
-      console.warn('Saved locally; cloud sync pending', e);
-    }
+    hasUnsavedChangesRef.current = true;
+    setHasUnsavedChanges(true);
   };
 
-  const handleDeleteSevaCatalogue = async (id: string) => {
+  const handleDeleteSevaCatalogue = (id: string) => {
     setSevaCatalogue(prev => prev.filter(x => x.id !== id));
-    try {
-      await cloudDeleteSevaCatalogueItem(id);
-    } catch (e) {
-      console.warn('Deleted locally; cloud delete pending', e);
-    }
+    hasUnsavedChangesRef.current = true;
+    setHasUnsavedChanges(true);
   };
 
-  const handleSaveSettings = async (cfg: AppSettings) => {
+  const handleSaveSettings = (cfg: AppSettings) => {
     setSettings(cfg);
+    hasUnsavedChangesRef.current = true;
+    setHasUnsavedChanges(true);
+  };
+
+  // Global Manual Save to Firebase Firestore (Admin Only)
+  const handleSaveAllToCloud = async () => {
+    if (!isAdmin) return;
+    setIsSaving(true);
     try {
-      await cloudSaveSettings(cfg);
-    } catch (e) {
-      console.warn('Settings saved locally; cloud sync pending', e);
+      await cloudSyncAllData(getCurrentState());
+      hasUnsavedChangesRef.current = false;
+      setHasUnsavedChanges(false);
+      setSyncToast('Data saved successfully');
+      setTimeout(() => setSyncToast(null), 3000);
+    } catch (err: any) {
+      console.error('Failed to save data:', err);
+      setSyncToast(err?.message || 'Failed to save data. Please retry.');
+      setTimeout(() => setSyncToast(null), 4000);
+    } finally {
+      setIsSaving(false);
     }
   };
 
-  // Admin toggling
+  // Committee Login Success handler
+  const handleLoginSuccess = (role: UserRole = 'admin') => {
+    sessionStorage.setItem('eg_committee_auth', 'true');
+    sessionStorage.setItem('eg_user_role', role);
+    setUserRole(role);
+    setIsAuthenticated(true);
+    setIsAdmin(role === 'admin');
+  };
+
+  // Committee Logout & Lock handler
+  const handleLogout = () => {
+    sessionStorage.removeItem('eg_committee_auth');
+    sessionStorage.removeItem('eg_user_role');
+    setUserRole(null);
+    setIsAuthenticated(false);
+    setIsAdmin(false);
+  };
+
+  // Lock / Sign out handler
   const handleToggleAdmin = async () => {
-    if (viewOnly) {
-      alert('This is a view-only snapshot. Admin features are disabled.');
-      return;
+    if (window.confirm('Lock the management portal and sign out?')) {
+      handleLogout();
     }
-    if (isAdmin) {
-      setIsAdmin(false);
-      return;
-    }
-    if (!settings.adminHash) {
-      const p1 = window.prompt('No admin password set yet.\nEnter a new admin password:');
-      if (!p1) return;
-      const p2 = window.prompt('Confirm new admin password:');
-      if (p1 !== p2) {
-        alert('Passwords do not match.');
-        return;
-      }
-      const hash = await sha256(p1);
-      setSettings(prev => ({ ...prev, adminHash: hash }));
-      setIsAdmin(true);
-      alert('Admin password created! Admin mode is now active.');
-      return;
-    }
-    const entered = window.prompt('Enter admin password:');
-    if (!entered) return;
-    const testHash = await sha256(entered);
-    if (testHash === settings.adminHash) {
-      setIsAdmin(true);
-    } else {
-      alert('Incorrect password.');
-    }
-  };
-
-  // Next Sequence Numbers
-  const getNextNum = (key: string, prefix: string): string => {
-    const current = parseInt(localStorage.getItem(key) || '0', 10) + 1;
-    try {
-      localStorage.setItem(key, String(current));
-    } catch {}
-    return `${prefix}${String(current).padStart(4, '0')}`;
   };
 
   // Connect File (File System Access API)
@@ -507,2057 +763,939 @@ export function App() {
     alert('💾 Single-file standalone HTML downloaded! Open it anywhere offline.');
   };
 
-  // Mobile Snapshot File Share
-  const handleShareSnapshotFile = async () => {
-    const doc = generateStandaloneHTML(getCurrentState(), true);
-    const filename = `Ganeshotsava_Snapshot_${today()}.html`;
-    const file = new File([doc], filename, { type: 'text/html' });
-
-    if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      try {
-        await navigator.share({
-          files: [file],
-          title: `${settings.org || 'Brigade Eldorado'} Ganeshotsava 2026 Snapshot`,
-          text: 'Here is the latest financial ledger & budget snapshot.'
-        });
-        return;
-      } catch (e: any) {
-        if (e.name === 'AbortError') return;
-      }
-    }
-
-    const blob = new Blob([doc], { type: 'text/html;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
-    alert('📱 Snapshot file ready! Share this file via WhatsApp, AirDrop, or Google Drive for 100% offline view on iPhone & Android.');
-  };
-
-  // Open Share Modal & Generate QR
-  const handleOpenShareModal = () => {
-    const payload = {
-      eg_expenses: expenses,
-      eg_contributions: contributions,
-      eg_sponsors: sponsors,
-      eg_sevas: sevas,
-      eg_seva_catalogue: sevaCatalogue,
-      org: settings.org,
-      location: settings.location
-    };
-    if (window.LZString) {
-      const compressed = window.LZString.compressToEncodedURIComponent(JSON.stringify(payload));
-      const url = `${window.location.origin}${window.location.pathname}#share=${compressed}`;
-      setShareUrl(url);
-      setShareModalOpen(true);
-      setTimeout(() => {
-        if (shareQrRef.current && window.QRCode) {
-          shareQrRef.current.innerHTML = '';
-          new window.QRCode(shareQrRef.current, {
-            text: url,
-            width: 140,
-            height: 140,
-            correctLevel: window.QRCode.CorrectLevel.M
-          });
-        }
-      }, 100);
-    } else {
-      setShareUrl(window.location.href);
-      setShareModalOpen(true);
-    }
-  };
-
-  const handleCopyLink = async () => {
-    try {
-      await navigator.clipboard.writeText(shareUrl);
-      setCopiedLink(true);
-      setTimeout(() => setCopiedLink(false), 2000);
-    } catch {
-      alert('Copied link to clipboard!');
-    }
-  };
-
-  // WhatsApp Helpers
+  // WhatsApp Messaging
   const openWhatsApp = (msg: string) => {
     window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
   };
 
-  const shareWhatsAppSummary = () => {
-    const msg = `📊 *Ganeshotsava 2026 — Budget Summary*\n*${settings.org || 'Brigade Eldorado'}*\n\n💰 *INCOME*\n• Sponsor Contributions: ₹${fmt(spAct)}\n• Resident Contributions: ₹${fmt(ctTot)}\n• Seva Bookings: ₹${fmt(svTot)}\n▶ *Total Income: ₹${fmt(totalIncome)}*\n\n📤 *EXPENDITURE*\n• Expenses (Actual): ₹${fmt(exAct)}\n▶ *Total Expenditure: ₹${fmt(exAct)}*\n\n${netBalance >= 0 ? '✅' : '⚠️'} *Net Balance: ₹${fmt(Math.abs(netBalance))}${netBalance < 0 ? ' (Deficit)' : ''}*\n\n_Ganapati Bappa Morya!_ 🪔`;
-    openWhatsApp(msg);
-  };
+  // Generate & Download or Share PDF via WhatsApp
+  const handleShareReceiptPDFWhatsApp = async () => {
+    if (!printData) return;
+    setIsGeneratingPdf(true);
 
-  const shareWhatsAppContribution = (c: Contribution) => {
-    const msg = `🪔 *Ganeshotsava Contribution Receipt*\n\n*${settings.org || 'Brigade Eldorado'}*\n3rd Year Ganeshotsava\n14th September – 18th September 2026\n\n📋 Receipt No: ${c.rcptNo}\n📅 Date: ${fmtDate(c.date)}\n👤 Contributor: ${c.name}\n🏠 Flat: ${c.flat}\n💳 Payment: ${c.pay || ''}${c.txn ? ' — ' + c.txn : ''}\n💰 Amount: ₹${fmt(c.amt)}\n    (${numWords(c.amt)})${c.notes ? '\n📝 Notes: ' + c.notes : ''}\n\nThank you for your generous contribution and support 🙏\n*Ganapati Bappa Morya!*`;
-    openWhatsApp(msg);
-  };
+    const isRcpt = printData.type === 'receipt';
+    const num = isRcpt ? (printData.item.rcptNo || printData.item.tokNo || '') : (printData.item.invNo || '');
+    const flat = printData.item.flat || '';
+    const name = printData.item.name || printData.item.det || 'Partner';
+    const filename = getReceiptPdfFilename(isRcpt, num, flat);
 
-  const shareWhatsAppSeva = (s: SevaBooking) => {
-    const msg = `🙏 *Seva Booking Confirmation*\n\n*${settings.org || 'Brigade Eldorado'}*\n3rd Year Ganeshotsava\n14th September – 18th September 2026\n\n🎟️ Token No: ${s.tokNo}\n🪔 Seva: ${s.seva}\n📅 Date: ${fmtDate(s.date)}\n👤 Resident: ${s.name}\n🏠 Flat: ${s.flat}\n💰 Amount: ₹${fmt(s.amt)}\n    (${numWords(s.amt)})\n\nThank you for your participation 🙏\n*Ganapati Bappa Morya!*`;
-    openWhatsApp(msg);
-  };
-
-  const shareWhatsAppSponsor = (s: Sponsor) => {
-    const msg = `📄 *Sponsorship Invoice*\n\n*${settings.org || 'Brigade Eldorado'}*\n3rd Year Ganeshotsava\n14th September – 18th September 2026\n\n🔖 Invoice No: ${s.invNo}\n📅 Date: ${new Date().toLocaleDateString('en-IN')}\n🏢 Sponsor: ${s.det}\n💰 Amount: ₹${fmt(s.act)}\n    (${numWords(s.act)})\n\nThank you for your generous sponsorship! 🙏\n*Ganapati Bappa Morya!*`;
-    openWhatsApp(msg);
-  };
-
-  // Print Handlers
-  const handlePrintReceipt = (item: Contribution | SevaBooking, isSeva = false) => {
-    setPrintData({ type: 'receipt', item: { ...item, isSeva } });
-    setTimeout(() => {
-      if (settings.upi && rcpQrRef.current && window.QRCode) {
-        rcpQrRef.current.innerHTML = '';
-        const upiUrl = `upi://pay?pa=${encodeURIComponent(settings.upi)}&pn=${encodeURIComponent(settings.payee)}&am=${encodeURIComponent(item.amt || 0)}&cu=INR`;
-        new window.QRCode(rcpQrRef.current, { text: upiUrl, width: 95, height: 95, correctLevel: window.QRCode.CorrectLevel.H });
+    let msg = '';
+    if (isRcpt) {
+      if (printData.item.isSeva || printData.subType === 'seva') {
+        msg = `🙏 *Seva Booking Official Receipt — PDF Attached*\n\n*${settings.org || 'Brigade Eldorado Residents Association'}*\n3rd Year Ganeshotsava (14th – 18th Sept 2026)\n\n🎟️ Token No: ${printData.item.tokNo}\n🪔 Seva: ${printData.item.seva}\n📅 Date: ${fmtDate(printData.item.date)}\n👤 Devotee: ${printData.item.name}\n🏠 Flat: ${printData.item.flat}\n💰 Amount: ₹${fmt(printData.item.amt)} (${numWords(printData.item.amt)})\n\n📄 *Official PDF receipt with Digital Signature & Watermark is attached.*\n\nThank you for your seva and devotional support 🙏\n*Ganapati Bappa Morya!*`;
+      } else {
+        msg = `🪔 *Voluntary Resident Contribution Receipt — PDF Attached*\n\n*${settings.org || 'Brigade Eldorado Residents Association'}*\n3rd Year Ganeshotsava (14th – 18th Sept 2026)\n\n📋 Receipt No: ${printData.item.rcptNo}\n📅 Date: ${fmtDate(printData.item.date)}\n👤 Contributor: ${printData.item.name}\n🏠 Flat: ${printData.item.flat}\n💳 Payment: ${printData.item.pay || 'UPI'}${printData.item.txn ? ' (Ref: ' + printData.item.txn + ')' : ''}\n💰 Amount: ₹${fmt(printData.item.amt)} (${numWords(printData.item.amt)})${printData.item.notes ? '\n📝 Notes: ' + printData.item.notes : ''}\n\n📄 *Official PDF receipt with Digital Signature & Watermark is attached.*\n\nThank you for your generous contribution 🙏\n*Ganapati Bappa Morya!*`;
       }
-      window.print();
-    }, 200);
+    } else {
+      const typeLabel = printData.subType === 'stall' ? 'Commercial Stall Invoice' : printData.subType === 'auction' ? 'Auction Winning Bid Invoice' : 'Sponsorship Invoice';
+      msg = `📄 *${typeLabel} — PDF Attached*\n\n*${settings.org || 'Brigade Eldorado Residents Association'}*\n3rd Year Ganeshotsava (14th – 18th Sept 2026)\n\n🔖 Invoice No: ${printData.item.invNo}\n📅 Date: ${new Date().toLocaleDateString('en-IN')}\n🏢 Particulars: ${printData.item.det}\n💰 Amount: ₹${fmt(printData.item.act || printData.item.amt)} (${numWords(printData.item.act || printData.item.amt)})\n\n📄 *Official Invoice PDF with Digital Signature & Watermark is attached.*\n\nThank you for your generous partnership & support! 🙏\n*Ganapati Bappa Morya!*`;
+    }
+
+    const element = document.getElementById('receipt-print-target');
+    if (element) {
+      try {
+        const pdfBlob = await generateReceiptPdfBlob(element, { scale: 2, quality: 0.96 });
+        const pdfFile = new File([pdfBlob], filename, { type: 'application/pdf' });
+
+        if (navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
+          try {
+            await navigator.share({
+              files: [pdfFile],
+              title: `${isRcpt ? 'Receipt' : 'Invoice'} - ${name}`,
+              text: msg
+            });
+            setIsGeneratingPdf(false);
+            return;
+          } catch (shareErr: any) {
+            if (shareErr.name === 'AbortError') {
+              setIsGeneratingPdf(false);
+              return;
+            }
+          }
+        }
+
+        downloadBlobAsFile(pdfBlob, filename);
+
+        setTimeout(() => {
+          openWhatsApp(msg);
+          setIsGeneratingPdf(false);
+        }, 600);
+        return;
+      } catch (err) {
+        console.error('PDF generation error:', err);
+      }
+    }
+
+    openWhatsApp(msg);
+    setIsGeneratingPdf(false);
   };
 
-  const handlePrintInvoice = (item: Sponsor) => {
-    setPrintData({ type: 'invoice', item });
-    setTimeout(() => {
-      window.print();
-    }, 200);
+  // Direct download receipt/invoice as a standalone PDF file (Never opens print dialog)
+  const handleDownloadReceiptPDF = async () => {
+    if (!printData) return;
+    setIsGeneratingPdf(true);
+
+    const isRcpt = printData.type === 'receipt';
+    const num = isRcpt ? (printData.item.rcptNo || printData.item.tokNo || '') : (printData.item.invNo || '');
+    const flat = printData.item.flat || '';
+    const filename = getReceiptPdfFilename(isRcpt, num, flat);
+
+    try {
+      const element = document.getElementById('receipt-print-target');
+      if (!element) {
+        throw new Error('Receipt preview element not found');
+      }
+
+      const pdfBlob = await generateReceiptPdfBlob(element, { scale: 2, quality: 0.96 });
+      downloadBlobAsFile(pdfBlob, filename);
+    } catch (err) {
+      console.error('PDF download error:', err);
+      alert('Could not save PDF file directly. Please check your browser download settings.');
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
+
+  const shareWhatsAppSummary = () => {
+    const msg = `📊 *Ganeshotsava 2026 — Income & Expenditure Statement*\n*${settings.org || 'Brigade Eldorado'}*\n\n💰 *INCOME (RECEIPTS)*\n• Voluntary Contributions: ₹${fmt(ctTot)}\n• Sponsorship: ₹${fmt(spAct)}\n• Commercial Stalls: ₹${fmt(csAct)}\n• Seva Bookings: ₹${fmt(svTot)}\n• Hundi Collection: ₹${fmt(hundiTot)}\n• Auctions: ₹${fmt(aucTot)}\n▶ *Total Income: ₹${fmt(totalIncome)}*\n\n📤 *EXPENDITURE (PAYMENTS)*\n• Actual Incurred: ₹${fmt(exAct)}\n▶ *Total Expenditure: ₹${fmt(exAct)}*\n\n${netBalance >= 0 ? '✅' : '⚠️'} *Net Surplus/(Deficit): ₹${fmt(Math.abs(netBalance))}${netBalance < 0 ? ' (Deficit)' : ' (Surplus)'}*\n\n_Ganapati Bappa Morya!_ 🪔`;
+    openWhatsApp(msg);
+  };
+
+  // QR Code generator for modal
+  const generateModalQR = () => {
+    if (!settings.upi || !modalQrRef.current) return;
+    modalQrRef.current.innerHTML = '';
+    const upiUrl = `upi://pay?pa=${encodeURIComponent(settings.upi)}&pn=${encodeURIComponent(settings.payee || settings.org || 'Ganeshotsava')}&cu=INR`;
+    if (window.QRCode) {
+      new window.QRCode(modalQrRef.current, {
+        text: upiUrl,
+        width: 110,
+        height: 110,
+        colorDark: '#000000',
+        colorLight: '#ffffff',
+        correctLevel: window.QRCode.CorrectLevel.M
+      });
+    }
+  };
+
+  useEffect(() => {
+    if (receiptModalOpen && printData) {
+      const isRcpt = printData.type === 'receipt';
+      const num = isRcpt ? (printData.item?.rcptNo || printData.item?.tokNo || '') : (printData.item?.invNo || '');
+      const flat = printData.item?.flat || '';
+      const originalTitle = document.title;
+      document.title = getReceiptDocumentTitle(isRcpt, num, flat);
+
+      if (isRcpt) {
+        setTimeout(generateModalQR, 100);
+      }
+
+      return () => {
+        document.title = originalTitle;
+      };
+    }
+  }, [receiptModalOpen, printData, settings.upi]);
+
+  // Isolated print trigger - ensures ONLY the receipt is printed without background records
+  const triggerDirectPrint = () => {
+    const element = document.getElementById('receipt-print-target');
+    if (element && receiptModalOpen) {
+      // Remove any existing print frame
+      const oldFrame = document.getElementById('receipt-print-iframe');
+      if (oldFrame) oldFrame.remove();
+
+      const printFrame = document.createElement('iframe');
+      printFrame.id = 'receipt-print-iframe';
+      printFrame.style.position = 'fixed';
+      printFrame.style.right = '0';
+      printFrame.style.bottom = '0';
+      printFrame.style.width = '0';
+      printFrame.style.height = '0';
+      printFrame.style.border = '0';
+      printFrame.style.opacity = '0';
+      printFrame.style.pointerEvents = 'none';
+      document.body.appendChild(printFrame);
+
+      const frameDoc = printFrame.contentWindow?.document || printFrame.contentDocument;
+      if (frameDoc) {
+        // Collect existing styles and external stylesheet links
+        const styles = Array.from(document.querySelectorAll('link[rel="stylesheet"], style'))
+          .map(el => el.outerHTML)
+          .join('\n');
+
+        const isRcpt = printData?.type === 'receipt';
+        const num = isRcpt ? (printData?.item?.rcptNo || printData?.item?.tokNo || '') : (printData?.item?.invNo || '');
+        const flat = printData?.item?.flat || '';
+        const docTitle = getReceiptDocumentTitle(isRcpt, num, flat);
+
+        frameDoc.open();
+        frameDoc.write(`
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <meta charset="utf-8">
+              <title>${docTitle}</title>
+              <link rel="preconnect" href="https://fonts.googleapis.com">
+              <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+              <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=Great+Vibes&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Playfair+Display:ital,wght@0,600;0,700;0,900;1,400&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+              ${styles}
+              <style>
+                * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; box-sizing: border-box; }
+                body { margin: 0; padding: 12px; background: #fff !important; font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif; }
+                .font-serif { font-family: 'Playfair Display', Georgia, serif; }
+                .font-mono { font-family: 'JetBrains Mono', monospace; }
+                .font-signature { font-family: 'Great Vibes', 'Dancing Script', cursive; }
+                #isolated-receipt-wrapper { max-width: 650px; margin: 0 auto; background: #fff; }
+                @page { size: A4 portrait; margin: 10mm 12mm; }
+              </style>
+            </head>
+            <body>
+              <div id="isolated-receipt-wrapper">
+                ${element.outerHTML}
+              </div>
+            </body>
+          </html>
+        `);
+        frameDoc.close();
+
+        setTimeout(() => {
+          try {
+            printFrame.contentWindow?.focus();
+            printFrame.contentWindow?.print();
+          } catch (e) {
+            console.error('Frame print failed:', e);
+            window.print();
+          }
+        }, 350);
+        return;
+      }
+    }
+
+    // Default window.print for Statement view or other views
+    window.print();
   };
 
   // Excel Export
   const handleExportExcel = () => {
     if (!window.XLSX) {
-      alert('Excel library not loaded.');
+      alert('Excel export library is loading. Please try again in a moment.');
       return;
     }
     const wb = window.XLSX.utils.book_new();
 
-    // Expenses Sheet
-    const expRows = [
-      ['#', 'Item / Description', 'Estimated Amount (₹)', 'Advance (₹)', 'Balance (₹)', 'Actual Amount (₹)'],
-      ...expenses.map((r, i) => [i + 1, r.item, Number(r.est) || 0, Number(r.adv) || 0, Number(r.bal) || 0, Number(r.act) || 0]),
-      ['', 'TOTAL', expenses.reduce((s, r) => s + (r.est || 0), 0), expenses.reduce((s, r) => s + (r.adv || 0), 0), expenses.reduce((s, r) => s + (r.bal || 0), 0), expenses.reduce((s, r) => s + (r.act || 0), 0)]
-    ];
-    window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.aoa_to_sheet(expRows), 'Estimated Expenses');
-
-    // Contributions Sheet
-    const ctRows = [
-      ['Receipt No', 'Date', 'Name', 'Flat No', 'Amount (₹)', 'Payment Mode', 'Transaction Ref', 'Notes'],
-      ...contributions.map(r => [r.rcptNo, r.date, r.name, r.flat, Number(r.amt) || 0, r.pay || '', r.txn || '', r.notes || '']),
-      ['', '', '', 'TOTAL', ctTot, '', '', '']
-    ];
-    window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.aoa_to_sheet(ctRows), 'Contributions');
-
-    // Sponsors Sheet
-    const spRows = [
-      ['Invoice No', 'Sponsor Details', 'Estimated Amount (₹)', 'Actual Amount (₹)'],
-      ...sponsors.map(r => [r.invNo, r.det, Number(r.est) || 0, Number(r.act) || 0]),
-      ['', 'TOTAL', sponsors.reduce((s, r) => s + (r.est || 0), 0), spAct]
-    ];
-    window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.aoa_to_sheet(spRows), 'Sponsors');
-
-    // Sevas Sheet
-    const svRows = [
-      ['Token No', 'Seva Name', 'Resident Name', 'Flat No', 'Amount (₹)', 'Date'],
-      ...sevas.map(r => [r.tokNo, r.seva, r.name, r.flat, Number(r.amt) || 0, r.date]),
-      ['', '', '', 'TOTAL', svTot, '']
-    ];
-    window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.aoa_to_sheet(svRows), 'Seva Bookings');
-
-    // Budget Report Sheet
-    const rptRows = [
-      ['Particulars', 'Amount (₹)'],
-      ['─── INCOME ───', ''],
-      ['Sponsor Contributions (Actual)', spAct],
-      ['Resident Contributions', ctTot],
+    // 1. Income & Expenditure Statement
+    const statementRows = [
+      ['INCOME & EXPENDITURE STATEMENT — GANESHOTSAVA 2026'],
+      ['Organization', settings.org || 'Brigade Eldorado'],
+      ['Location', settings.location || 'Amphitheatre'],
+      [],
+      ['A. INCOME (RECEIPTS)', 'AMOUNT (₹)'],
+      ['Voluntary Contributions Resident', ctTot],
+      ['Sponsorship (Actual)', spAct],
+      ['Commercial Stalls (Actual)', csAct],
       ['Seva Bookings', svTot],
-      ['Total Income', totalIncome],
-      ['─── EXPENDITURE ───', ''],
-      ['Expenses (Actual)', exAct],
-      ['Total Expenditure', exAct],
-      ['Net Balance', netBalance]
+      ['Hundi Collections', hundiTot],
+      ['Auctions (Maha Laddu / Artifacts)', aucTot],
+      ['TOTAL INCOME (A)', totalIncome],
+      [],
+      ['B. EXPENDITURE (PAYMENTS)', 'AMOUNT (₹)'],
+      ...expenses.map(e => [e.item, getExpenseActual(e)]),
+      ['TOTAL EXPENDITURE (B)', exAct],
+      [],
+      ['NET SURPLUS / (DEFICIT) (A - B)', netBalance]
     ];
-    window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.aoa_to_sheet(rptRows), 'Budget Report');
+    window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.aoa_to_sheet(statementRows), 'Statement');
 
-    window.XLSX.writeFile(wb, `${(settings.org || 'Ganeshotsava_2026').replace(/\s+/g, '_')}_Financials.xlsx`);
+    // 2. Voluntary Contributions Resident
+    const ctData = contributions.map(c => ({
+      'Receipt No': c.rcptNo,
+      'Resident / Contributor': c.name,
+      'Flat No': c.flat,
+      'Amount (₹)': c.amt,
+      'Date': c.date,
+      'Payment Mode': c.pay,
+      'Txn ID': c.txn,
+      'Notes': c.notes
+    }));
+    window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.json_to_sheet(ctData), 'Voluntary Contributions');
+
+    // 3. Sponsorship
+    const spData = sponsors.map(s => ({
+      'Invoice No': s.invNo,
+      'Sponsor Details': s.det,
+      'Payment Mode': s.payMode || 'UPI',
+      'Notes': s.notes || '',
+      'Estimated (₹)': s.est,
+      'Actual (₹)': s.act
+    }));
+    window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.json_to_sheet(spData), 'Sponsorship');
+
+    // 4. Commercial Stalls
+    const csData = commercialStalls.map(s => {
+      const p = s.particular || (s.det.includes(' — ') ? s.det.split(' — ')[0] : s.det);
+      const v = s.vendor || (s.det.includes(' — ') ? s.det.split(' — ').slice(1).join(' — ') : '');
+      return {
+        'Invoice No': s.invNo,
+        'Particular': p,
+        'Vendor Details': v,
+        'Estimated (₹)': s.est,
+        'Actual (₹)': s.act,
+        'Date': s.date,
+        'Notes': s.notes
+      };
+    });
+    window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.json_to_sheet(csData), 'Commercial Stalls');
+
+    // 5. Sevas
+    const svData = sevas.map(v => ({
+      'Token No': v.tokNo,
+      'Seva Name': v.seva,
+      'Resident Name': v.name,
+      'Flat No': v.flat,
+      'Amount (₹)': v.amt,
+      'Date': v.date,
+      'Notes': v.notes
+    }));
+    window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.json_to_sheet(svData), 'Seva Bookings');
+
+    // 6. Hundi
+    const hundiData = hundi.map(h => ({
+      'Particular Details': h.det,
+      'Actual (₹)': h.act,
+      'Date': h.date,
+      'Counted By': h.countedBy,
+      'Notes': h.notes
+    }));
+    window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.json_to_sheet(hundiData), 'Hundi Collections');
+
+    // 7. Auctions
+    const aucData = auctions.map(a => ({
+      'Invoice No': a.invNo,
+      'Auction Details': a.det,
+      'Auctioned (By)': a.by,
+      'Winning Amount (₹)': a.act,
+      'Date': a.date,
+      'Notes': a.notes
+    }));
+    window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.json_to_sheet(aucData), 'Auctions');
+
+    // 8. Expenditure (Payments)
+    const exData = expenses.map(e => {
+      const bills = (e.bills && e.bills.length > 0)
+        ? e.bills
+        : (e.receiptUrl ? [{ name: e.receiptName || 'Bill', comments: '' }] : []);
+      const billsCount = bills.length;
+      const billComments = bills
+        .map((b, i) => `Bill ${i + 1}: ${b.name}${b.comments ? ` [Note: ${b.comments}]` : ''}`)
+        .join('; ');
+
+      return {
+        'Item': e.item,
+        'Estimated (₹)': e.est,
+        'Advance (₹)': e.adv,
+        'Balance (₹)': getExpenseBalance(e),
+        'Actual (₹)': getExpenseActual(e),
+        'Bills Count': billsCount > 0 ? `${billsCount} bill${billsCount > 1 ? 's' : ''}` : 'No bills',
+        'Attached Bills & Comments': billComments || (e.receiptName || 'None'),
+        'Notes': e.notes || ''
+      };
+    });
+    window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.json_to_sheet(exData), 'Expenditure');
+
+    window.XLSX.writeFile(wb, `Ganeshotsava_Accounts_${today()}.xlsx`);
   };
 
-  // Excel Import
-  const handleImportExcel = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !window.XLSX) return;
-    const reader = new FileReader();
-    reader.onload = evt => {
-      try {
-        const wb = window.XLSX.read(evt.target?.result, { type: 'array' });
-        const getSheet = (...names: string[]) => {
-          for (const n of names) {
-            const s = wb.Sheets[n];
-            if (s) return window.XLSX.utils.sheet_to_json(s, { header: 1, defval: '' }) as any[][];
-          }
-          return null;
-        };
-        let imported = 0;
+  // Bulk Import Contributions
+  const handleBulkImport = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.csv,.xlsx,.xls';
+    input.onchange = async (e: any) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
 
-        const es = getSheet('Estimated Expenses', 'Expenses', 'Sheet1');
-        if (es && es.length > 1) {
-          const rows = es.slice(1).filter(r => r[1] && String(r[1]).toUpperCase() !== 'TOTAL');
-          if (rows.length) {
-            setExpenses(rows.map((r, i) => ({
-              id: `imp_e_${Date.now()}_${i}`,
-              item: String(r[1] || ''),
-              est: Number(r[2]) || 0,
-              adv: Number(r[3]) || 0,
-              bal: Number(r[4]) || 0,
-              act: Number(r[3] || 0) + Number(r[4] || 0)
-            })));
-            imported++;
+      const reader = new FileReader();
+      reader.onload = async (evt: any) => {
+        try {
+          let rows: any[] = [];
+          if (file.name.endsWith('.csv')) {
+            const text = evt.target.result as string;
+            const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+            const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+            for (let i = 1; i < lines.length; i++) {
+              const vals = lines[i].split(',').map(v => v.trim());
+              const rowObj: any = {};
+              headers.forEach((h, idx) => {
+                rowObj[h] = vals[idx] || '';
+              });
+              rows.push(rowObj);
+            }
+          } else if (window.XLSX) {
+            const data = new Uint8Array(evt.target.result);
+            const wb = window.XLSX.read(data, { type: 'array' });
+            const sheet = wb.Sheets[wb.SheetNames[0]];
+            rows = window.XLSX.utils.sheet_to_json(sheet);
           }
+
+          if (rows.length === 0) return alert('No data found in uploaded file.');
+
+          let currentSeq = parseInt(countersRef.current.rc || '0', 10);
+          const newContributions: Contribution[] = rows.map((r: any) => {
+            currentSeq++;
+            const name = r.name || r['resident / contributor'] || r.contributor || r.resident || 'Resident';
+            const flat = r.flat || r['flat no'] || r['flat / unit'] || '';
+            const amt = parseFloat(r.amt || r.amount || r['amount (₹)'] || 0) || 0;
+            const pay = r.pay || r['payment mode'] || r.mode || 'UPI';
+            const txn = r.txn || r['txn id'] || r.reference || '';
+            const notes = r.notes || r.remarks || '';
+            const rcptNo = r.rcptno || r['receipt no'] || `GE-2026-${String(currentSeq).padStart(4, '0')}`;
+
+            return {
+              id: `${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+              rcptNo,
+              name,
+              flat,
+              amt,
+              date: r.date || today(),
+              pay,
+              txn,
+              notes
+            };
+          });
+
+          const newRcStr = String(currentSeq);
+          countersRef.current = { ...countersRef.current, rc: newRcStr };
+          setCounters(prev => ({ ...prev, rc: newRcStr }));
+          setContributions(prev => [...prev, ...newContributions]);
+
+          try {
+            await cloudBulkImportContributions(newContributions);
+            await cloudSaveCounters({ rc: String(currentSeq) });
+          } catch (err) {
+            console.warn('Cloud sync for bulk import pending', err);
+          }
+
+          alert(`Successfully imported ${newContributions.length} contribution records!`);
+        } catch (err) {
+          console.error(err);
+          alert('Failed to parse file. Ensure headers match Name, Flat, Amount.');
         }
+      };
 
-        const cs = getSheet('Contributions', 'Sheet2');
-        if (cs && cs.length > 1) {
-          const rows = cs.slice(1).filter(r => r[0] && !String(r[2]).toUpperCase().includes('TOTAL'));
-          if (rows.length) {
-            let maxN = 0;
-            const newCt = rows.map((r, i) => {
-              const n = parseInt(String(r[0]).split('-').pop() || '0', 10);
-              if (n > maxN) maxN = n;
-              return {
-                id: `imp_c_${Date.now()}_${i}`,
-                rcptNo: String(r[0]),
-                date: String(r[1] || today()),
-                name: String(r[2] || ''),
-                flat: String(r[3] || ''),
-                amt: Number(r[4]) || 0,
-                pay: String(r[5] || 'UPI'),
-                txn: String(r[6] || ''),
-                notes: String(r[7] || '')
-              };
-            });
-            setContributions(newCt);
-            if (maxN) localStorage.setItem('eg_rc_num', String(maxN));
-            cloudBulkImportContributions(newCt).catch(e => console.warn('Cloud batch import error', e));
-            imported++;
-          }
-        }
-
-        alert(`✅ Excel file parsed successfully! ${imported} sheet(s) imported.`);
-      } catch (err: any) {
-        alert(`Failed to import Excel: ${err.message}`);
+      if (file.name.endsWith('.csv')) {
+        reader.readAsText(file);
+      } else {
+        reader.readAsArrayBuffer(file);
       }
-      e.target.value = '';
     };
-    reader.readAsArrayBuffer(file);
+    input.click();
   };
+
+  // If visiting the public receipt portal link, render ONLY the isolated receipt search and download page.
+  // Completely public and accessible by ANY resident/devotee without password!
+  if (isReceiptPortal) {
+    return (
+      <PublicReceiptPortal
+        contributions={contributions}
+        settings={settings}
+        onBackToApp={
+          isAuthenticated
+            ? () => {
+                const url = new URL(window.location.href);
+                url.searchParams.delete('view');
+                url.searchParams.delete('portal');
+                url.searchParams.delete('receipt-portal');
+                url.searchParams.delete('receipts');
+                url.searchParams.delete('q');
+                url.searchParams.delete('flat');
+                url.searchParams.delete('name');
+                url.searchParams.delete('rcpt');
+                url.pathname = '/';
+                url.hash = '';
+                window.history.pushState({}, '', '/');
+                setIsReceiptPortal(false);
+              }
+            : undefined
+        }
+      />
+    );
+  }
+
+  // If visiting the root or main application link without /receipts, and NOT yet authenticated,
+  // require Committee Authentication before showing ANY financial data, statements, or expenses!
+  if (!isAuthenticated) {
+    return (
+      <CommitteeAuthGate
+        settings={settings}
+        onSuccess={handleLoginSuccess}
+        onGoToReceiptPortal={() => {
+          window.history.pushState({}, '', '/receipts');
+          setIsReceiptPortal(true);
+        }}
+        onSaveSettings={handleSaveSettings}
+      />
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-[#FDF8F3] text-[#1A1A1A] font-sans antialiased flex flex-col selection:bg-[#991B1B] selection:text-white">
-      {/* Top Framing Accent Stripe */}
-      <div className="h-1.5 bg-[#991B1B] w-full" />
-
-      {/* Header */}
-      <header className="bg-white border-b border-stone-200 px-6 py-4 shadow-sm no-print">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div className="flex items-center gap-4">
+    <div id="mainAppView" className="min-h-screen bg-[#FDFBF7] text-[#1A1A1A] flex flex-col font-sans selection:bg-[#991B1B] selection:text-white pb-12">
+      {/* 1. TOP HEADER */}
+      <header className="bg-[#991B1B] text-white shadow-md border-b-2 border-[#7F1D1D] no-print sticky top-0 z-30">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3">
+          {/* Brand / Logo */}
+          <div className="flex items-center gap-3">
             {settings.logo ? (
               <img
                 src={settings.logo}
                 alt="Logo"
-                className="w-14 h-14 object-contain rounded border border-stone-200"
+                className="w-10 h-10 object-contain rounded bg-white/10 p-0.5 border border-white/20"
               />
-            ) : null}
-            <div>
-              <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#991B1B] mb-0.5">
-                {settings.org || 'Brigade Eldorado Residents Association'}
+            ) : (
+              <div className="w-10 h-10 rounded-full bg-amber-400 text-[#991B1B] flex items-center justify-center font-bold font-serif text-xl shadow-inner select-none shrink-0">
+                🪔
               </div>
-              <h1 className="text-2xl font-serif font-black tracking-tight text-[#1A1A1A] flex items-center gap-2">
-                <span>🪔 Ganeshotsava 2026</span>
-              </h1>
-              <p className="text-xs text-stone-500 font-medium tracking-wide">
-                3rd Year Celebration • 14th September – 18th September 2026 • {settings.location || 'Amphitheatre'}
+            )}
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-base sm:text-lg font-serif font-black tracking-wide leading-tight">
+                  {settings.org || 'Brigade Eldorado Residents Association'}
+                </h1>
+                <span className="hidden sm:inline-block bg-amber-400 text-stone-900 text-[10px] font-bold px-1.5 py-0.5 rounded tracking-wider uppercase">
+                  3rd Year
+                </span>
+                {userRole === 'admin' && (
+                  <span className="bg-amber-300 text-[#7F1D1D] text-[10px] font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-1 uppercase tracking-wider shadow-2xs">
+                    <Crown className="w-3 h-3 text-[#991B1B]" />
+                    <span>Super Admin</span>
+                  </span>
+                )}
+                {userRole === 'sponsor' && (
+                  <span className="bg-amber-200 text-amber-950 text-[10px] font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-1 uppercase tracking-wider shadow-2xs">
+                    <Briefcase className="w-3 h-3 text-amber-800" />
+                    <span>Sponsors (View Only)</span>
+                  </span>
+                )}
+                {userRole === 'volunteer' && (
+                  <span className="bg-stone-200 text-stone-900 text-[10px] font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-1 uppercase tracking-wider shadow-2xs">
+                    <Users2 className="w-3 h-3 text-stone-700" />
+                    <span>Volunteers (Restricted)</span>
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-amber-200/90 font-medium">
+                Ganeshotsava 2026 • {settings.location || 'Amphitheatre'}
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2.5 flex-wrap">
-            {viewOnly && (
-              <span className="bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-bold uppercase tracking-wider px-3 py-1 rounded-full inline-flex items-center gap-1.5">
-                👁 View Only Snapshot
-              </span>
-            )}
+          {/* Action Bar */}
+          <div className="flex items-center gap-2 flex-wrap text-xs">
+            {/* Manual Live Cloud Refresh Button */}
+            <button
+              onClick={() => triggerLiveServerSync(true)}
+              disabled={isRefreshing || isSaving}
+              className="px-2.5 py-1 rounded-full font-bold uppercase tracking-wider inline-flex items-center gap-1.5 transition-colors cursor-pointer text-[11px] bg-white/10 text-amber-200 hover:text-white hover:bg-white/20 border border-white/20 shadow-xs disabled:opacity-50"
+              title="Refresh Data"
+            >
+              <RefreshCw className={`w-3 h-3 ${isRefreshing ? 'animate-spin text-amber-300' : ''}`} />
+              <span>{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
+            </button>
 
-            {/* Cloud Sync Status Indicator */}
-            {(syncStatus === 'synced' || syncStatus === 'connected') && (
-              <span
-                className="bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-bold uppercase tracking-wider px-3 py-1 rounded-full inline-flex items-center gap-1.5"
-                title="Google Firebase Firestore (Live Multi-Device Sync Active)"
-              >
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                <span>Cloud Synced</span>
-              </span>
-            )}
-            {syncStatus === 'saving' && (
-              <span className="bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-bold uppercase tracking-wider px-3 py-1 rounded-full inline-flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping"></span>
-                <span>Syncing Cloud...</span>
-              </span>
-            )}
-            {syncStatus === 'connecting' && (
-              <span className="bg-stone-100 border border-stone-200 text-stone-700 text-[11px] font-bold uppercase tracking-wider px-3 py-1 rounded-full inline-flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-stone-400"></span>
-                <span>Connecting Cloud...</span>
-              </span>
-            )}
-
+            {/* Save Button (Admin Only) */}
             {isAdmin && (
               <button
-                onClick={handleOpenShareModal}
-                className="bg-white border border-stone-300 text-stone-800 hover:bg-stone-50 text-xs font-bold uppercase tracking-wider px-3.5 py-2 rounded inline-flex items-center gap-1.5 transition-colors shadow-sm"
-                title="Universal Share for Android & iPhone"
+                onClick={handleSaveAllToCloud}
+                disabled={isSaving || isRefreshing}
+                className={`px-3 py-1 rounded-full font-bold uppercase tracking-wider inline-flex items-center gap-1.5 transition-all cursor-pointer text-[11px] shadow-xs ${
+                  hasUnsavedChanges
+                    ? 'bg-emerald-600 hover:bg-emerald-500 text-white ring-2 ring-emerald-300 ring-offset-1 ring-offset-[#991B1B]'
+                    : 'bg-white/10 text-white/90 hover:bg-white/20 border border-white/20'
+                } disabled:opacity-50`}
+                title={hasUnsavedChanges ? 'Unsaved changes! Click to save modified data' : 'Save data'}
               >
-                <Share2 className="w-3.5 h-3.5 text-[#991B1B]" />
-                <span>Share Snapshot</span>
+                <Save className={`w-3 h-3 ${isSaving ? 'animate-bounce' : ''}`} />
+                <span>{isSaving ? 'Saving...' : hasUnsavedChanges ? 'Save *' : 'Save'}</span>
               </button>
             )}
 
-            {isAdmin && saveStatus && (
-              <span
-                className={`text-[11px] font-bold uppercase tracking-wider px-3 py-1 rounded-full inline-flex items-center gap-1 ${
-                  saveStatus === 'saved'
-                    ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
-                    : 'bg-amber-50 border border-amber-200 text-amber-800'
-                }`}
-              >
-                {saveStatus === 'saved' ? '✓ Saved' : '⏺ Unsaved'}
-              </span>
-            )}
+            {/* Direct Devotee Portal Quick Switch */}
+            <button
+              onClick={() => {
+                window.history.pushState({}, '', '/receipts');
+                setIsReceiptPortal(true);
+              }}
+              className="px-2.5 py-1 rounded-full font-bold uppercase tracking-wider inline-flex items-center gap-1.5 transition-colors cursor-pointer text-[11px] bg-amber-400 text-stone-950 hover:bg-amber-300 shadow-xs"
+              title="Open Public Devotee Receipt Portal"
+            >
+              <FileText className="w-3 h-3 text-[#991B1B]" />
+              <span>Devotee Portal</span>
+            </button>
 
-            {isAdmin && (
-              <>
-                <button
-                  onClick={handleConnectFile}
-                  className="bg-stone-900 text-white hover:bg-stone-800 text-xs font-bold uppercase tracking-wider px-3.5 py-2 rounded inline-flex items-center gap-1.5 transition-colors shadow-sm"
-                  title="Direct 2-way sync with local HTML file"
-                >
-                  <Zap className="w-3.5 h-3.5 text-amber-400" />
-                  <span>{activeFileHandle ? `⚡ Connected (${activeFileHandle.name})` : '⚡ Connect File'}</span>
-                </button>
-
-                <button
-                  onClick={handleSaveHTML}
-                  className="bg-[#991B1B] text-white hover:bg-[#7F1D1D] text-xs font-bold uppercase tracking-wider px-3.5 py-2 rounded inline-flex items-center gap-1.5 transition-colors shadow-sm"
-                  title="Download standalone self-updating HTML"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>Save HTML</span>
-                </button>
-              </>
-            )}
-
-            {isAdmin ? (
-              <span className="bg-red-50 border border-red-200 text-[#991B1B] text-[11px] font-bold uppercase tracking-wider px-3 py-1 rounded-full inline-flex items-center gap-1">
-                <Unlock className="w-3 h-3" /> Admin Active
-              </span>
-            ) : null}
-
-            {!viewOnly && (
-              <button
-                onClick={handleToggleAdmin}
-                className="bg-stone-100 hover:bg-stone-200 text-stone-700 p-2 rounded transition-colors"
-                title={isAdmin ? 'Lock Admin Mode' : 'Enter Admin Mode'}
-              >
-                {isAdmin ? <Unlock className="w-4 h-4 text-[#991B1B]" /> : <Lock className="w-4 h-4" />}
-              </button>
-            )}
+            {/* Lock / Logout Button */}
+            <button
+              onClick={handleToggleAdmin}
+              className="px-2.5 py-1 rounded-full font-bold uppercase tracking-wider inline-flex items-center gap-1.5 transition-colors cursor-pointer text-[11px] bg-white/10 text-white hover:bg-white/20 border border-white/20"
+              title="Lock management portal and sign out"
+            >
+              <LogOut className="w-3 h-3" />
+              <span>Lock &amp; Sign Out</span>
+            </button>
           </div>
         </div>
-      </header>
 
-      {/* Navigation Tabs */}
-      <nav className="bg-white border-b border-stone-200 px-6 overflow-x-auto no-print">
-        <div className="max-w-7xl mx-auto flex gap-6">
-          <button
-            onClick={() => setActiveTab('report')}
-            className={`py-3.5 font-sans text-xs font-bold uppercase tracking-[0.15em] border-b-2 transition-all whitespace-nowrap inline-flex items-center gap-2 ${
-              activeTab === 'report'
-                ? 'border-[#991B1B] text-[#991B1B]'
-                : 'border-transparent text-stone-500 hover:text-stone-900'
-            }`}
-          >
-            <FileText className="w-4 h-4" />
-            <span>Budget Report</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('expenses')}
-            className={`py-3.5 font-sans text-xs font-bold uppercase tracking-[0.15em] border-b-2 transition-all whitespace-nowrap inline-flex items-center gap-2 ${
-              activeTab === 'expenses'
-                ? 'border-[#991B1B] text-[#991B1B]'
-                : 'border-transparent text-stone-500 hover:text-stone-900'
-            }`}
-          >
-            <DollarSign className="w-4 h-4" />
-            <span>Expenses ({expenses.length})</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('contributions')}
-            className={`py-3.5 font-sans text-xs font-bold uppercase tracking-[0.15em] border-b-2 transition-all whitespace-nowrap inline-flex items-center gap-2 ${
-              activeTab === 'contributions'
-                ? 'border-[#991B1B] text-[#991B1B]'
-                : 'border-transparent text-stone-500 hover:text-stone-900'
-            }`}
-          >
-            <Users className="w-4 h-4" />
-            <span>Contributions ({contributions.length})</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('sponsors')}
-            className={`py-3.5 font-sans text-xs font-bold uppercase tracking-[0.15em] border-b-2 transition-all whitespace-nowrap inline-flex items-center gap-2 ${
-              activeTab === 'sponsors'
-                ? 'border-[#991B1B] text-[#991B1B]'
-                : 'border-transparent text-stone-500 hover:text-stone-900'
-            }`}
-          >
-            <Building2 className="w-4 h-4" />
-            <span>Sponsors ({sponsors.length})</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('sevas')}
-            className={`py-3.5 font-sans text-xs font-bold uppercase tracking-[0.15em] border-b-2 transition-all whitespace-nowrap inline-flex items-center gap-2 ${
-              activeTab === 'sevas'
-                ? 'border-[#991B1B] text-[#991B1B]'
-                : 'border-transparent text-stone-500 hover:text-stone-900'
-            }`}
-          >
-            <HeartHandshake className="w-4 h-4" />
-            <span>Sevas ({sevas.length})</span>
-          </button>
-
-          {isAdmin && (
+        {/* 2. PRIMARY FIRST-LEVEL NAVIGATION TABS */}
+        <div className="bg-[#7F1D1D] border-t border-red-800/60 overflow-x-auto no-scrollbar">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center gap-1 sm:gap-2 text-xs font-bold uppercase tracking-wider py-1">
+            {/* Tab 1: Income & Expenditure statement */}
             <button
-              onClick={() => setActiveTab('settings')}
-              className={`py-3.5 font-sans text-xs font-bold uppercase tracking-[0.15em] border-b-2 transition-all whitespace-nowrap inline-flex items-center gap-2 ${
-                activeTab === 'settings'
-                  ? 'border-[#991B1B] text-[#991B1B]'
-                  : 'border-transparent text-stone-500 hover:text-stone-900'
+              onClick={() => setActiveTab('statement')}
+              className={`px-3.5 py-2 rounded-t font-semibold transition-all inline-flex items-center gap-2 cursor-pointer border-b-2 whitespace-nowrap ${
+                activeTab === 'statement'
+                  ? 'bg-[#FDFBF7] text-[#991B1B] border-amber-400 shadow-xs'
+                  : 'text-white/85 hover:text-white hover:bg-red-900/50 border-transparent'
               }`}
             >
-              <Settings className="w-4 h-4" />
-              <span>Settings</span>
+              <FileText className="w-4 h-4" />
+              <span>Income &amp; Expenditure statement</span>
             </button>
-          )}
-        </div>
-      </nav>
 
-      {/* Main Content Area */}
-      <main className="max-w-7xl w-full mx-auto p-6 flex-1">
-        {/* TAB 1: BUDGET REPORT */}
-        {activeTab === 'report' && (
-          <div className="space-y-6">
-            {/* KPI Cards Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-              <div className="bg-white border border-stone-200 rounded p-4 shadow-sm">
-                <div className="text-[10px] font-bold text-stone-500 uppercase tracking-[0.18em] mb-1">
-                  Sponsor Inflow
-                </div>
-                <div className="text-2xl font-mono font-semibold text-emerald-700">
-                  ₹ {fmt(spAct)}
-                </div>
-              </div>
+            {/* Tab 2: Income(receipts) */}
+            <button
+              onClick={() => setActiveTab('income')}
+              className={`px-3.5 py-2 rounded-t font-semibold transition-all inline-flex items-center gap-2 cursor-pointer border-b-2 whitespace-nowrap ${
+                activeTab === 'income'
+                  ? 'bg-[#FDFBF7] text-[#991B1B] border-amber-400 shadow-xs'
+                  : 'text-white/85 hover:text-white hover:bg-red-900/50 border-transparent'
+              }`}
+            >
+              <Coins className="w-4 h-4" />
+              <span>Income(receipts)</span>
+              <span className="bg-amber-400 text-[#991B1B] text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold">
+                ₹{fmt(totalIncome)}
+              </span>
+            </button>
 
-              <div className="bg-white border border-stone-200 rounded p-4 shadow-sm">
-                <div className="text-[10px] font-bold text-stone-500 uppercase tracking-[0.18em] mb-1">
-                  Resident Contributions
-                </div>
-                <div className="text-2xl font-mono font-semibold text-emerald-700">
-                  ₹ {fmt(ctTot)}
-                </div>
-              </div>
+            {/* Tab 3: Expenditure(payments) */}
+            <button
+              onClick={() => setActiveTab('expenditure')}
+              className={`px-3.5 py-2 rounded-t font-semibold transition-all inline-flex items-center gap-2 cursor-pointer border-b-2 whitespace-nowrap ${
+                activeTab === 'expenditure'
+                  ? 'bg-[#FDFBF7] text-[#991B1B] border-amber-400 shadow-xs'
+                  : 'text-white/85 hover:text-white hover:bg-red-900/50 border-transparent'
+              }`}
+            >
+              <CreditCard className="w-4 h-4" />
+              <span>Expenditure(payments)</span>
+              <span className="bg-white/20 text-white text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold">
+                ₹{fmt(exAct)}
+              </span>
+            </button>
 
-              <div className="bg-white border border-stone-200 rounded p-4 shadow-sm">
-                <div className="text-[10px] font-bold text-stone-500 uppercase tracking-[0.18em] mb-1">
-                  Seva Bookings
-                </div>
-                <div className="text-2xl font-mono font-semibold text-emerald-700">
-                  ₹ {fmt(svTot)}
-                </div>
-              </div>
-
-              <div className="bg-white border border-stone-200 rounded p-4 shadow-sm">
-                <div className="text-[10px] font-bold text-stone-500 uppercase tracking-[0.18em] mb-1">
-                  Total Expenditure (Actual)
-                </div>
-                <div className="text-2xl font-mono font-semibold text-red-600">
-                  ₹ {fmt(exAct)}
-                </div>
-              </div>
-
-              <div className="bg-white border border-stone-200 rounded p-4 shadow-sm">
-                <div className="text-[10px] font-bold text-stone-500 uppercase tracking-[0.18em] mb-1">
-                  Net Balance
-                </div>
-                <div className={`text-2xl font-mono font-bold ${netBalance >= 0 ? 'text-[#991B1B]' : 'text-red-600'}`}>
-                  ₹ {fmt(Math.abs(netBalance))} {netBalance < 0 && '(Deficit)'}
-                </div>
-              </div>
-            </div>
-
-            {/* Detailed Ledger Breakdown */}
-            <div className="bg-white border border-stone-200 rounded shadow-sm overflow-hidden">
-              <div className="px-6 py-4 border-b border-stone-200 bg-stone-50/50">
-                <h2 className="text-lg font-serif font-bold text-[#1A1A1A]">
-                  Editorial Financial Ledger Summary
-                </h2>
-              </div>
-              <div className="divide-y divide-stone-100 font-sans text-sm">
-                <div className="bg-[#FDF8F3] px-6 py-2.5 text-[10px] font-bold text-stone-500 uppercase tracking-[0.18em]">
-                  Income Sources
-                </div>
-                <div className="px-6 py-3.5 flex justify-between items-center">
-                  <span className="text-stone-700">Sponsor Contributions (Actual)</span>
-                  <span className="font-mono font-medium">₹ {fmt(spAct)}</span>
-                </div>
-                <div className="px-6 py-3.5 flex justify-between items-center">
-                  <span className="text-stone-700">Resident Contributions</span>
-                  <span className="font-mono font-medium">₹ {fmt(ctTot)}</span>
-                </div>
-                <div className="px-6 py-3.5 flex justify-between items-center">
-                  <span className="text-stone-700">Seva Bookings</span>
-                  <span className="font-mono font-medium">₹ {fmt(svTot)}</span>
-                </div>
-                <div className="bg-red-50/40 px-6 py-3 flex justify-between items-center font-bold text-[#7F1D1D]">
-                  <span>Total Income</span>
-                  <span className="font-mono text-base">₹ {fmt(totalIncome)}</span>
-                </div>
-
-                <div className="bg-[#FDF8F3] px-6 py-2.5 text-[10px] font-bold text-stone-500 uppercase tracking-[0.18em]">
-                  Expenditure
-                </div>
-                <div className="px-6 py-3.5 flex justify-between items-center">
-                  <span className="text-stone-700">Expenses (Actual Incurred)</span>
-                  <span className="font-mono font-medium">₹ {fmt(exAct)}</span>
-                </div>
-                <div className="bg-red-50/40 px-6 py-3 flex justify-between items-center font-bold text-[#7F1D1D]">
-                  <span>Total Expenditure</span>
-                  <span className="font-mono text-base">₹ {fmt(exAct)}</span>
-                </div>
-
-                <div className={`px-6 py-4 flex justify-between items-center font-bold text-base ${netBalance >= 0 ? 'bg-emerald-50 text-emerald-800' : 'bg-red-50 text-red-800'}`}>
-                  <span>Net Ledger Balance</span>
-                  <span className="font-mono text-lg">
-                    ₹ {fmt(Math.abs(netBalance))} {netBalance < 0 && '(Deficit)'}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* TAB 2: EXPENSES */}
-        {activeTab === 'expenses' && (
-          <div className="bg-white border border-stone-200 rounded shadow-sm overflow-hidden">
-            <div className="px-6 py-4 border-b border-stone-200 flex flex-wrap items-center justify-between gap-4">
-              <div>
-                <h2 className="text-lg font-serif font-bold text-[#1A1A1A]">Estimated Expenses</h2>
-                <p className="text-xs text-stone-500">Track budgeted items, advances, balance, and actual costs.</p>
-              </div>
-              {isAdmin && (
-                <button
-                  onClick={() => setExpModal({ open: true, item: null })}
-                  className="bg-[#991B1B] text-white hover:bg-[#7F1D1D] text-xs font-bold uppercase tracking-wider px-3.5 py-2 rounded inline-flex items-center gap-1.5 transition-colors"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Add Expense</span>
-                </button>
-              )}
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-sm">
-                <thead>
-                  <tr className="bg-[#FDF8F3] border-b border-stone-200 text-[10px] font-bold text-stone-500 uppercase tracking-[0.15em]">
-                    <th className="py-3 px-4 w-12">#</th>
-                    <th className="py-3 px-4">Item / Description</th>
-                    <th className="py-3 px-4 text-right">Estimated (₹)</th>
-                    <th className="py-3 px-4 text-right">Advance (₹)</th>
-                    <th className="py-3 px-4 text-right">Balance (₹)</th>
-                    <th className="py-3 px-4 text-right">Actual (₹)</th>
-                    {isAdmin && <th className="py-3 px-4 text-right">Actions</th>}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-stone-100">
-                  {expenses.length === 0 ? (
-                    <tr>
-                      <td colSpan={isAdmin ? 7 : 6} className="py-8 text-center text-stone-400">
-                        No expenses recorded yet.
-                      </td>
-                    </tr>
-                  ) : (
-                    expenses.map((e, idx) => (
-                      <tr key={e.id} className="hover:bg-stone-50/60 transition-colors">
-                        <td className="py-3 px-4 text-stone-400 text-xs">{idx + 1}</td>
-                        <td className="py-3 px-4 font-semibold text-stone-900">{e.item}</td>
-                        <td className="py-3 px-4 font-mono text-right text-stone-700">₹ {fmt(e.est)}</td>
-                        <td className="py-3 px-4 font-mono text-right text-emerald-700">₹ {fmt(e.adv)}</td>
-                        <td className="py-3 px-4 font-mono text-right text-stone-700">₹ {fmt(e.bal)}</td>
-                        <td className="py-3 px-4 font-mono text-right font-bold text-stone-900">
-                          ₹ {fmt(e.act || Number(e.adv || 0) + Number(e.bal || 0))}
-                        </td>
-                        {isAdmin && (
-                          <td className="py-3 px-4 text-right">
-                            <div className="inline-flex gap-1.5 justify-end">
-                              <button
-                                onClick={() => setExpModal({ open: true, item: e })}
-                                className="p-1.5 text-stone-600 hover:text-stone-900 hover:bg-stone-100 rounded"
-                                title="Edit"
-                              >
-                                <Edit2 className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                onClick={() => {
-                                  if (confirm('Delete this expense?')) {
-                                    handleDeleteExpense(e.id);
-                                  }
-                                }}
-                                className="p-1.5 text-red-600 hover:text-red-800 hover:bg-red-50 rounded"
-                                title="Delete"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </td>
-                        )}
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-                <tfoot>
-                  <tr className="bg-red-50/50 border-t-2 border-[#991B1B] text-xs font-bold text-[#7F1D1D] font-mono">
-                    <td colSpan={2} className="py-3 px-4 font-sans uppercase">Total</td>
-                    <td className="py-3 px-4 text-right">₹ {fmt(expenses.reduce((s, r) => s + (r.est || 0), 0))}</td>
-                    <td className="py-3 px-4 text-right">₹ {fmt(expenses.reduce((s, r) => s + (r.adv || 0), 0))}</td>
-                    <td className="py-3 px-4 text-right">₹ {fmt(expenses.reduce((s, r) => s + (r.bal || 0), 0))}</td>
-                    <td className="py-3 px-4 text-right font-black">₹ {fmt(exAct)}</td>
-                    {isAdmin && <td></td>}
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* TAB 3: CONTRIBUTIONS */}
-        {activeTab === 'contributions' && (
-          <div className="bg-white border border-stone-200 rounded shadow-sm overflow-hidden">
-            <div className="px-6 py-4 border-b border-stone-200 flex flex-wrap items-center justify-between gap-4">
-              <div>
-                <h2 className="text-lg font-serif font-bold text-[#1A1A1A]">Resident Contributions</h2>
-                <div className="text-xs text-stone-500">
-                  Total Collected: <strong className="text-emerald-700 font-mono">₹ {fmt(ctTot)}</strong> ({contributions.length} receipts)
-                </div>
-              </div>
-              <div className="flex items-center gap-2.5 flex-wrap">
-                <input
-                  type="text"
-                  placeholder="🔍 Search name, flat, receipt…"
-                  value={ctSearch}
-                  onChange={e => setCtSearch(e.target.value)}
-                  className="border border-stone-300 rounded px-3 py-1.5 text-xs bg-stone-50 focus:bg-white outline-none focus:border-[#991B1B] w-64"
-                />
-                {isAdmin && (
-                  <>
-                    <button
-                      onClick={handleExportExcel}
-                      className="bg-emerald-700 text-white hover:bg-emerald-800 text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded transition-colors"
-                      title="Export Contributions to Excel"
-                    >
-                      Export
-                    </button>
-                    <label className="bg-stone-100 hover:bg-stone-200 text-stone-800 text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded cursor-pointer transition-colors">
-                      Import
-                      <input type="file" accept=".xlsx,.xls" onChange={handleImportExcel} className="hidden" />
-                    </label>
-                    <button
-                      onClick={() => setCtModal({ open: true, item: null })}
-                      className="bg-[#991B1B] text-white hover:bg-[#7F1D1D] text-xs font-bold uppercase tracking-wider px-3.5 py-1.5 rounded inline-flex items-center gap-1.5 transition-colors"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>Add</span>
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-sm">
-                <thead>
-                  <tr className="bg-[#FDF8F3] border-b border-stone-200 text-[10px] font-bold text-stone-500 uppercase tracking-[0.15em]">
-                    <th className="py-3 px-4">Receipt No</th>
-                    <th className="py-3 px-4">Date</th>
-                    <th className="py-3 px-4">Contributor Name</th>
-                    <th className="py-3 px-4">Flat No</th>
-                    <th className="py-3 px-4 text-right">Amount (₹)</th>
-                    <th className="py-3 px-4">Mode</th>
-                    <th className="py-3 px-4">Txn Ref</th>
-                    <th className="py-3 px-4 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-stone-100">
-                  {contributions
-                    .filter(
-                      c =>
-                        c.name.toLowerCase().includes(ctSearch.toLowerCase()) ||
-                        (c.flat || '').toLowerCase().includes(ctSearch.toLowerCase()) ||
-                        (c.rcptNo || '').toLowerCase().includes(ctSearch.toLowerCase())
-                    )
-                    .map(c => (
-                      <tr key={c.id} className="hover:bg-stone-50/60 transition-colors">
-                        <td className="py-3 px-4 font-mono font-bold text-stone-900">{c.rcptNo}</td>
-                        <td className="py-3 px-4 text-stone-600 text-xs">{fmtDate(c.date)}</td>
-                        <td className="py-3 px-4 font-semibold text-stone-900">{c.name}</td>
-                        <td className="py-3 px-4">
-                          <span className="bg-stone-100 text-stone-700 text-xs font-medium px-2 py-0.5 rounded">
-                            {c.flat}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 font-mono text-right font-bold text-emerald-700">₹ {fmt(c.amt)}</td>
-                        <td className="py-3 px-4 text-stone-600 text-xs">{c.pay}</td>
-                        <td className="py-3 px-4 font-mono text-stone-500 text-xs">{c.txn || '—'}</td>
-                        <td className="py-3 px-4 text-right">
-                          <div className="inline-flex gap-1.5 justify-end">
-                            <button
-                              onClick={() => handlePrintReceipt(c, false)}
-                              className="bg-stone-100 hover:bg-stone-200 text-stone-800 text-xs font-medium px-2.5 py-1 rounded inline-flex items-center gap-1 transition-colors"
-                              title="Print Receipt"
-                            >
-                              <Printer className="w-3 h-3 text-[#991B1B]" />
-                              <span>Receipt</span>
-                            </button>
-                            <button
-                              onClick={() => shareWhatsAppContribution(c)}
-                              className="bg-[#25D366] hover:bg-[#20bd5a] text-white p-1.5 rounded transition-colors"
-                              title="Share on WhatsApp"
-                            >
-                              <PhoneCall className="w-3 h-3" />
-                            </button>
-                            {isAdmin && (
-                              <>
-                                <button
-                                  onClick={() => setCtModal({ open: true, item: c })}
-                                  className="p-1.5 text-stone-600 hover:text-stone-900 hover:bg-stone-100 rounded"
-                                  title="Edit"
-                                >
-                                  <Edit2 className="w-3.5 h-3.5" />
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    if (confirm('Delete this contribution?')) {
-                                      handleDeleteContribution(c.id);
-                                    }
-                                  }}
-                                  className="p-1.5 text-red-600 hover:text-red-800 hover:bg-red-50 rounded"
-                                  title="Delete"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* TAB 4: SPONSORS */}
-        {activeTab === 'sponsors' && (
-          <div className="bg-white border border-stone-200 rounded shadow-sm overflow-hidden">
-            <div className="px-6 py-4 border-b border-stone-200 flex flex-wrap items-center justify-between gap-4">
-              <div>
-                <h2 className="text-lg font-serif font-bold text-[#1A1A1A]">Sponsors</h2>
-                <p className="text-xs text-stone-500">Corporate & community partners backing the celebration.</p>
-              </div>
-              {isAdmin && (
-                <button
-                  onClick={() => setSpModal({ open: true, item: null })}
-                  className="bg-[#991B1B] text-white hover:bg-[#7F1D1D] text-xs font-bold uppercase tracking-wider px-3.5 py-2 rounded inline-flex items-center gap-1.5 transition-colors"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Add Sponsor</span>
-                </button>
-              )}
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-sm">
-                <thead>
-                  <tr className="bg-[#FDF8F3] border-b border-stone-200 text-[10px] font-bold text-stone-500 uppercase tracking-[0.15em]">
-                    <th className="py-3 px-4">Invoice No</th>
-                    <th className="py-3 px-4">Sponsor Details</th>
-                    <th className="py-3 px-4 text-right">Estimated (₹)</th>
-                    <th className="py-3 px-4 text-right">Actual (₹)</th>
-                    <th className="py-3 px-4 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-stone-100">
-                  {sponsors.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="py-8 text-center text-stone-400">
-                        No sponsors added yet.
-                      </td>
-                    </tr>
-                  ) : (
-                    sponsors.map(s => (
-                      <tr key={s.id} className="hover:bg-stone-50/60 transition-colors">
-                        <td className="py-3 px-4 font-mono font-bold text-stone-900">{s.invNo}</td>
-                        <td className="py-3 px-4 font-semibold text-stone-900 whitespace-pre-line">{s.det}</td>
-                        <td className="py-3 px-4 font-mono text-right text-stone-700">₹ {fmt(s.est)}</td>
-                        <td className="py-3 px-4 font-mono text-right font-bold text-emerald-700">₹ {fmt(s.act)}</td>
-                        <td className="py-3 px-4 text-right">
-                          <div className="inline-flex gap-1.5 justify-end">
-                            <button
-                              onClick={() => handlePrintInvoice(s)}
-                              className="bg-stone-100 hover:bg-stone-200 text-stone-800 text-xs font-medium px-2.5 py-1 rounded inline-flex items-center gap-1 transition-colors"
-                              title="Print Invoice"
-                            >
-                              <Printer className="w-3 h-3 text-[#991B1B]" />
-                              <span>Invoice</span>
-                            </button>
-                            <button
-                              onClick={() => shareWhatsAppSponsor(s)}
-                              className="bg-[#25D366] hover:bg-[#20bd5a] text-white p-1.5 rounded transition-colors"
-                              title="Share on WhatsApp"
-                            >
-                              <PhoneCall className="w-3 h-3" />
-                            </button>
-                            {isAdmin && (
-                              <>
-                                <button
-                                  onClick={() => setSpModal({ open: true, item: s })}
-                                  className="p-1.5 text-stone-600 hover:text-stone-900 hover:bg-stone-100 rounded"
-                                  title="Edit"
-                                >
-                                  <Edit2 className="w-3.5 h-3.5" />
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    if (confirm('Delete this sponsor?')) {
-                                      handleDeleteSponsor(s.id);
-                                    }
-                                  }}
-                                  className="p-1.5 text-red-600 hover:text-red-800 hover:bg-red-50 rounded"
-                                  title="Delete"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* TAB 5: SEVAS */}
-        {activeTab === 'sevas' && (
-          <div className="space-y-6">
-            {/* Seva Catalogue */}
-            <div className="bg-white border border-stone-200 rounded shadow-sm overflow-hidden">
-              <div className="px-6 py-4 border-b border-stone-200 flex items-center justify-between">
-                <div>
-                  <h2 className="text-lg font-serif font-bold text-[#1A1A1A]">Available Sevas Catalogue</h2>
-                  <p className="text-xs text-stone-500">Preset offerings with suggested donation amounts.</p>
-                </div>
-                {isAdmin && (
-                  <button
-                    onClick={() => setScModal({ open: true, item: null })}
-                    className="bg-[#991B1B] text-white hover:bg-[#7F1D1D] text-xs font-bold uppercase tracking-wider px-3.5 py-2 rounded inline-flex items-center gap-1.5 transition-colors"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Add Seva</span>
-                  </button>
-                )}
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse text-sm">
-                  <thead>
-                    <tr className="bg-[#FDF8F3] border-b border-stone-200 text-[10px] font-bold text-stone-500 uppercase tracking-[0.15em]">
-                      <th className="py-3 px-4 w-12">#</th>
-                      <th className="py-3 px-4">Seva Name</th>
-                      <th className="py-3 px-4 text-right">Suggested Amount (₹)</th>
-                      {isAdmin && <th className="py-3 px-4 text-right">Actions</th>}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-stone-100">
-                    {sevaCatalogue.map((sc, idx) => (
-                      <tr key={sc.id} className="hover:bg-stone-50/60 transition-colors">
-                        <td className="py-3 px-4 text-stone-400 text-xs">{idx + 1}</td>
-                        <td className="py-3 px-4 font-semibold text-stone-900">{sc.name}</td>
-                        <td className="py-3 px-4 font-mono text-right text-stone-700">₹ {fmt(sc.amt)}</td>
-                        {isAdmin && (
-                          <td className="py-3 px-4 text-right">
-                            <div className="inline-flex gap-1.5 justify-end">
-                              <button
-                                onClick={() => setScModal({ open: true, item: sc })}
-                                className="p-1.5 text-stone-600 hover:text-stone-900 hover:bg-stone-100 rounded"
-                              >
-                                <Edit2 className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                onClick={() => {
-                                  if (confirm('Delete this seva catalogue item?')) {
-                                    handleDeleteSevaCatalogue(sc.id);
-                                  }
-                                }}
-                                className="p-1.5 text-red-600 hover:text-red-800 hover:bg-red-50 rounded"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </td>
-                        )}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* Seva Bookings */}
-            <div className="bg-white border border-stone-200 rounded shadow-sm overflow-hidden">
-              <div className="px-6 py-4 border-b border-stone-200 flex flex-wrap items-center justify-between gap-4">
-                <div>
-                  <h2 className="text-lg font-serif font-bold text-[#1A1A1A]">Seva Bookings</h2>
-                  <div className="text-xs text-stone-500">
-                    Total Sevas: <strong className="text-emerald-700 font-mono">₹ {fmt(svTot)}</strong> ({sevas.length} bookings)
-                  </div>
-                </div>
-                <div className="flex items-center gap-2.5 flex-wrap">
-                  <input
-                    type="text"
-                    placeholder="🔍 Search seva, resident, flat…"
-                    value={svSearch}
-                    onChange={e => setSvSearch(e.target.value)}
-                    className="border border-stone-300 rounded px-3 py-1.5 text-xs bg-stone-50 focus:bg-white outline-none focus:border-[#991B1B] w-64"
-                  />
-                  {isAdmin && (
-                    <button
-                      onClick={() => setSvModal({ open: true, item: null })}
-                      className="bg-[#991B1B] text-white hover:bg-[#7F1D1D] text-xs font-bold uppercase tracking-wider px-3.5 py-1.5 rounded inline-flex items-center gap-1.5 transition-colors"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>Add Booking</span>
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse text-sm">
-                  <thead>
-                    <tr className="bg-[#FDF8F3] border-b border-stone-200 text-[10px] font-bold text-stone-500 uppercase tracking-[0.15em]">
-                      <th className="py-3 px-4">Token No</th>
-                      <th className="py-3 px-4">Seva Name</th>
-                      <th className="py-3 px-4">Resident Name</th>
-                      <th className="py-3 px-4">Flat No</th>
-                      <th className="py-3 px-4 text-right">Amount (₹)</th>
-                      <th className="py-3 px-4">Date</th>
-                      <th className="py-3 px-4 text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-stone-100">
-                    {sevas
-                      .filter(
-                        v =>
-                          v.seva.toLowerCase().includes(svSearch.toLowerCase()) ||
-                          v.name.toLowerCase().includes(svSearch.toLowerCase()) ||
-                          (v.flat || '').toLowerCase().includes(svSearch.toLowerCase())
-                      )
-                      .map(v => (
-                        <tr key={v.id} className="hover:bg-stone-50/60 transition-colors">
-                          <td className="py-3 px-4 font-mono font-bold text-stone-900">{v.tokNo}</td>
-                          <td className="py-3 px-4 font-semibold text-stone-900">{v.seva}</td>
-                          <td className="py-3 px-4 text-stone-800">{v.name}</td>
-                          <td className="py-3 px-4">
-                            <span className="bg-stone-100 text-stone-700 text-xs font-medium px-2 py-0.5 rounded">
-                              {v.flat}
-                            </span>
-                          </td>
-                          <td className="py-3 px-4 font-mono text-right font-bold text-emerald-700">₹ {fmt(v.amt)}</td>
-                          <td className="py-3 px-4 text-stone-600 text-xs">{fmtDate(v.date)}</td>
-                          <td className="py-3 px-4 text-right">
-                            <div className="inline-flex gap-1.5 justify-end">
-                              <button
-                                onClick={() => handlePrintReceipt(v, true)}
-                                className="bg-stone-100 hover:bg-stone-200 text-stone-800 text-xs font-medium px-2.5 py-1 rounded inline-flex items-center gap-1 transition-colors"
-                              >
-                                <Printer className="w-3 h-3 text-[#991B1B]" />
-                                <span>Receipt</span>
-                              </button>
-                              <button
-                                onClick={() => shareWhatsAppSeva(v)}
-                                className="bg-[#25D366] hover:bg-[#20bd5a] text-white p-1.5 rounded transition-colors"
-                              >
-                                <PhoneCall className="w-3 h-3" />
-                              </button>
-                              {isAdmin && (
-                                <>
-                                  <button
-                                    onClick={() => setSvModal({ open: true, item: v })}
-                                    className="p-1.5 text-stone-600 hover:text-stone-900 hover:bg-stone-100 rounded"
-                                  >
-                                    <Edit2 className="w-3.5 h-3.5" />
-                                  </button>
-                                  <button
-                                    onClick={() => {
-                                      if (confirm('Delete this seva booking?')) {
-                                        handleDeleteSeva(v.id);
-                                      }
-                                    }}
-                                    className="p-1.5 text-red-600 hover:text-red-800 hover:bg-red-50 rounded"
-                                  >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                  </button>
-                                </>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* TAB 6: SETTINGS (ADMIN ONLY) */}
-        {activeTab === 'settings' && isAdmin && (
-          <div className="space-y-6">
-            {/* Organization Settings */}
-            <div className="bg-white border border-stone-200 rounded p-6 shadow-sm">
-              <h2 className="text-lg font-serif font-bold text-[#1A1A1A] mb-4 pb-2 border-b border-stone-100">
-                Organization &amp; Event Details
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-stone-600 mb-1">
-                    Organization Name
-                  </label>
-                  <input
-                    type="text"
-                    value={settings.org}
-                    onChange={e => handleSaveSettings({ ...settings, org: e.target.value })}
-                    className="w-full border border-stone-300 rounded px-3 py-2 text-sm outline-none focus:border-[#991B1B]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-stone-600 mb-1">
-                    Event Location
-                  </label>
-                  <input
-                    type="text"
-                    value={settings.location}
-                    onChange={e => handleSaveSettings({ ...settings, location: e.target.value })}
-                    className="w-full border border-stone-300 rounded px-3 py-2 text-sm outline-none focus:border-[#991B1B]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-stone-600 mb-1">
-                    UPI ID (for Receipts QR)
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. society@upi"
-                    value={settings.upi}
-                    onChange={e => handleSaveSettings({ ...settings, upi: e.target.value })}
-                    className="w-full border border-stone-300 rounded px-3 py-2 text-sm outline-none focus:border-[#991B1B]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-stone-600 mb-1">
-                    UPI Payee Name
-                  </label>
-                  <input
-                    type="text"
-                    value={settings.payee}
-                    onChange={e => handleSaveSettings({ ...settings, payee: e.target.value })}
-                    className="w-full border border-stone-300 rounded px-3 py-2 text-sm outline-none focus:border-[#991B1B]"
-                  />
-                </div>
-                <div className="md:col-span-2">
-                  <label className="block text-xs font-bold uppercase tracking-wider text-stone-600 mb-1">
-                    Logo
-                  </label>
-                  <label className="border border-dashed border-stone-300 rounded p-4 text-center cursor-pointer hover:border-[#991B1B] block bg-stone-50">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={e => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          const reader = new FileReader();
-                          reader.onload = evt => {
-                            handleSaveSettings({ ...settings, logo: evt.target?.result as string });
-                          };
-                          reader.readAsDataURL(file);
-                        }
-                      }}
-                      className="hidden"
-                    />
-                    {settings.logo ? (
-                      <img src={settings.logo} alt="Logo" className="max-h-20 mx-auto object-contain mb-2" />
-                    ) : null}
-                    <p className="text-xs text-stone-500 font-medium">
-                      {settings.logo ? 'Click to change logo' : 'Click to upload event logo (PNG/JPG)'}
-                    </p>
-                  </label>
-                </div>
-              </div>
-            </div>
-
-            {/* Admin Password */}
-            <div className="bg-white border border-stone-200 rounded p-6 shadow-sm">
-              <h2 className="text-lg font-serif font-bold text-[#1A1A1A] mb-4 pb-2 border-b border-stone-100">
-                Admin Security Password
-              </h2>
-              <form
-                onSubmit={async e => {
-                  e.preventDefault();
-                  const p1 = (e.currentTarget.elements.namedItem('p1') as HTMLInputElement).value;
-                  const p2 = (e.currentTarget.elements.namedItem('p2') as HTMLInputElement).value;
-                  if (!p1) return alert('Enter a password.');
-                  if (p1 !== p2) return alert('Passwords do not match.');
-                  const hash = await sha256(p1);
-                  handleSaveSettings({ ...settings, adminHash: hash });
-                  alert('Password updated!');
-                  (e.target as HTMLFormElement).reset();
-                }}
-                className="grid grid-cols-1 md:grid-cols-2 gap-4"
+            {/* Tab 4: Settings (Admin Only) */}
+            {isAdmin && (
+              <button
+                onClick={() => setActiveTab('settings')}
+                className={`px-3.5 py-2 rounded-t font-semibold transition-all inline-flex items-center gap-2 cursor-pointer border-b-2 whitespace-nowrap ${
+                  activeTab === 'settings'
+                    ? 'bg-[#FDFBF7] text-[#991B1B] border-amber-400 shadow-xs'
+                    : 'text-white/85 hover:text-white hover:bg-red-900/50 border-transparent'
+                }`}
               >
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-stone-600 mb-1">
-                    New Password
-                  </label>
-                  <input
-                    name="p1"
-                    type="password"
-                    placeholder="Enter new password"
-                    className="w-full border border-stone-300 rounded px-3 py-2 text-sm outline-none focus:border-[#991B1B]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-stone-600 mb-1">
-                    Confirm Password
-                  </label>
-                  <input
-                    name="p2"
-                    type="password"
-                    placeholder="Confirm new password"
-                    className="w-full border border-stone-300 rounded px-3 py-2 text-sm outline-none focus:border-[#991B1B]"
-                  />
-                </div>
-                <div className="md:col-span-2">
-                  <button
-                    type="submit"
-                    className="bg-stone-900 text-white hover:bg-stone-800 text-xs font-bold uppercase tracking-wider px-4 py-2 rounded transition-colors"
-                  >
-                    Update Password
-                  </button>
-                </div>
-              </form>
-            </div>
+                <Settings className="w-4 h-4" />
+                <span>Settings</span>
+              </button>
+            )}
+          </div>
+        </div>
 
-            {/* Data Management & Danger Zone */}
-            <div className="bg-white border border-stone-200 rounded p-6 shadow-sm">
-              <h2 className="text-lg font-serif font-bold text-[#1A1A1A] mb-4 pb-2 border-b border-stone-100">
-                Data Synchronization &amp; Backup
-              </h2>
-              <div className="flex flex-wrap gap-3 mb-6">
-                <button
-                  onClick={handleExportExcel}
-                  className="bg-emerald-700 text-white hover:bg-emerald-800 text-xs font-bold uppercase tracking-wider px-4 py-2.5 rounded transition-colors"
-                >
-                  Export All Sheets to Excel
-                </button>
-                <button
-                  onClick={handleSaveHTML}
-                  className="bg-[#991B1B] text-white hover:bg-[#7F1D1D] text-xs font-bold uppercase tracking-wider px-4 py-2.5 rounded transition-colors"
-                >
-                  Download Standalone HTML
-                </button>
-              </div>
+        {/* 3. FLOATING SUB-LEVEL NAVIGATION TABS (Inside sticky header: continuously floats while scrolling through data) */}
+        {activeTab === 'income' && (
+          <div className="bg-[#F8EFE5] border-t border-red-800/40 border-b border-stone-300 shadow-md overflow-x-auto no-scrollbar">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2 flex items-center gap-1.5 sm:gap-2">
+              {/* Sub-tab 1: Voluntary Contributions Resident */}
+              <button
+                onClick={() => setActiveIncomeSubTab('donations')}
+                className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                  activeIncomeSubTab === 'donations'
+                    ? 'bg-[#991B1B] text-white shadow-xs'
+                    : 'bg-white text-stone-700 hover:bg-stone-200 border border-stone-300'
+                }`}
+              >
+                <span>Voluntary Contributions Resident</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                  activeIncomeSubTab === 'donations' ? 'bg-white/25 text-white' : 'bg-stone-100 text-stone-600'
+                }`}>
+                  {contributions.length}
+                </span>
+              </button>
 
-              <div className="border border-red-200 bg-red-50/40 rounded p-4">
-                <h3 className="text-sm font-bold text-red-800 mb-1 flex items-center gap-1.5">
-                  <AlertTriangle className="w-4 h-4 text-red-600" />
-                  <span>Danger Zone</span>
-                </h3>
-                <p className="text-xs text-stone-600 mb-3">
-                  Permanently wipe all records from your local storage. Cannot be undone.
-                </p>
+              {/* Sub-tab 2: Sponsorship (Hidden for Volunteers) */}
+              {userRole !== 'volunteer' && (
                 <button
-                  onClick={async () => {
-                    const ans = prompt('Type DELETE to permanently clear all data:');
-                    if (ans === 'DELETE') {
-                      localStorage.clear();
-                      setExpenses([]);
-                      setContributions([]);
-                      setSponsors([]);
-                      setSevas([]);
-                      try {
-                        await cloudClearAllData();
-                      } catch (err) {
-                        console.warn('Cloud clear warning', err);
-                      }
-                      alert('All data reset.');
-                    }
-                  }}
-                  className="bg-red-600 text-white hover:bg-red-700 text-xs font-bold uppercase tracking-wider px-3.5 py-2 rounded transition-colors"
+                  onClick={() => setActiveIncomeSubTab('sponsorship')}
+                  className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                    activeIncomeSubTab === 'sponsorship'
+                      ? 'bg-[#991B1B] text-white shadow-xs'
+                      : 'bg-white text-stone-700 hover:bg-stone-200 border border-stone-300'
+                  }`}
                 >
-                  Clear All Data
+                  <span>Sponsorship</span>
+                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                    activeIncomeSubTab === 'sponsorship' ? 'bg-white/25 text-white' : 'bg-stone-100 text-stone-600'
+                  }`}>
+                    {sponsors.length}
+                  </span>
                 </button>
-              </div>
+              )}
+
+              {/* Sub-tab 3: Education Fest (Hidden for Volunteers) */}
+              {userRole !== 'volunteer' && (
+                <button
+                  onClick={() => setActiveIncomeSubTab('stalls')}
+                  className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                    activeIncomeSubTab === 'stalls'
+                      ? 'bg-[#991B1B] text-white shadow-xs'
+                      : 'bg-white text-stone-700 hover:bg-stone-200 border border-stone-300'
+                  }`}
+                >
+                  <span>EDUCATION FEST</span>
+                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                    activeIncomeSubTab === 'stalls' ? 'bg-white/25 text-white' : 'bg-stone-100 text-stone-600'
+                  }`}>
+                    {commercialStalls.length}
+                  </span>
+                </button>
+              )}
+
+              {/* Sub-tab 4: sevas */}
+              <button
+                onClick={() => setActiveIncomeSubTab('sevas')}
+                className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                  activeIncomeSubTab === 'sevas'
+                    ? 'bg-[#991B1B] text-white shadow-xs'
+                    : 'bg-white text-stone-700 hover:bg-stone-200 border border-stone-300'
+                }`}
+              >
+                <span>Sevas</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                  activeIncomeSubTab === 'sevas' ? 'bg-white/25 text-white' : 'bg-stone-100 text-stone-600'
+                }`}>
+                  {sevas.length}
+                </span>
+              </button>
+
+              {/* Sub-tab 5: Hundi */}
+              <button
+                onClick={() => setActiveIncomeSubTab('hundi')}
+                className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                  activeIncomeSubTab === 'hundi'
+                    ? 'bg-[#991B1B] text-white shadow-xs'
+                    : 'bg-white text-stone-700 hover:bg-stone-200 border border-stone-300'
+                }`}
+              >
+                <span>Hundi</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                  activeIncomeSubTab === 'hundi' ? 'bg-white/25 text-white' : 'bg-stone-100 text-stone-600'
+                }`}>
+                  {hundi.length}
+                </span>
+              </button>
+
+              {/* Sub-tab 6: Auctions */}
+              <button
+                onClick={() => setActiveIncomeSubTab('auctions')}
+                className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                  activeIncomeSubTab === 'auctions'
+                    ? 'bg-[#991B1B] text-white shadow-xs'
+                    : 'bg-white text-stone-700 hover:bg-stone-200 border border-stone-300'
+                }`}
+              >
+                <span>Auctions</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                  activeIncomeSubTab === 'auctions' ? 'bg-white/25 text-white' : 'bg-stone-100 text-stone-600'
+                }`}>
+                  {auctions.length}
+                </span>
+              </button>
             </div>
           </div>
+        )}
+      </header>
+
+      {/* 4. MAIN BODY CONTAINER */}
+      <main id="mainAppContent" className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 pt-6">
+        {/* TAB 1: Income & Expenditure Statement */}
+        {activeTab === 'statement' && (
+          <StatementView
+            expenses={expenses}
+            contributions={contributions}
+            sponsors={sponsors}
+            commercialStalls={commercialStalls}
+            sevas={sevas}
+            hundi={hundi}
+            auctions={auctions}
+            settings={settings}
+            userRole={userRole || undefined}
+            onShareWhatsApp={shareWhatsAppSummary}
+            onExportExcel={handleExportExcel}
+            onPrint={triggerDirectPrint}
+          />
+        )}
+
+        {/* TAB 2: Income(receipts) with sub-tabs */}
+        {activeTab === 'income' && (
+          <div>
+            {activeIncomeSubTab === 'donations' && (
+              <DonationsView
+                contributions={contributions}
+                isAdmin={isAdmin}
+                settings={settings}
+                onSave={handleSaveContribution}
+                onDelete={handleDeleteContribution}
+                onBulkImport={handleBulkImportContributions}
+                onPrintReceipt={c => {
+                  setPrintData({ type: 'receipt', subType: 'contribution', item: c });
+                  setReceiptModalOpen(true);
+                }}
+                onOpenReceiptPortal={() => {
+                  window.history.pushState({}, '', '/receipts');
+                  setIsReceiptPortal(true);
+                }}
+                onUpdateSettings={handleSaveSettings}
+              />
+            )}
+
+            {activeIncomeSubTab === 'sponsorship' && userRole !== 'volunteer' && (
+              <SponsorshipView
+                sponsors={sponsors}
+                isAdmin={isAdmin}
+                onSave={handleSaveSponsor}
+                onDelete={handleDeleteSponsor}
+                onPrintInvoice={s => {
+                  setPrintData({ type: 'invoice', subType: 'sponsor', item: s });
+                  setReceiptModalOpen(true);
+                }}
+              />
+            )}
+
+            {activeIncomeSubTab === 'stalls' && userRole !== 'volunteer' && (
+              <CommercialStallsView
+                stalls={commercialStalls}
+                isAdmin={isAdmin}
+                onSave={handleSaveCommercialStall}
+                onDelete={handleDeleteCommercialStall}
+                onPrintInvoice={s => {
+                  setPrintData({ type: 'invoice', subType: 'stall', item: s });
+                  setReceiptModalOpen(true);
+                }}
+              />
+            )}
+
+            {activeIncomeSubTab === 'sevas' && (
+              <SevasView
+                sevas={sevas}
+                catalogue={sevaCatalogue}
+                isAdmin={isAdmin}
+                onSaveBooking={handleSaveSeva}
+                onDeleteBooking={handleDeleteSeva}
+                onSaveCatalogue={handleSaveSevaCatalogue}
+                onDeleteCatalogue={handleDeleteSevaCatalogue}
+                onPrintReceipt={v => {
+                  setPrintData({ type: 'receipt', subType: 'seva', item: { ...v, isSeva: true } });
+                  setReceiptModalOpen(true);
+                }}
+              />
+            )}
+
+            {activeIncomeSubTab === 'hundi' && (
+              <HundiView
+                hundi={hundi}
+                isAdmin={isAdmin}
+                onSave={handleSaveHundi}
+                onDelete={handleDeleteHundi}
+              />
+            )}
+
+            {activeIncomeSubTab === 'auctions' && (
+              <AuctionsView
+                auctions={auctions}
+                isAdmin={isAdmin}
+                onSave={handleSaveAuction}
+                onDelete={handleDeleteAuction}
+                onPrintInvoice={a => {
+                  setPrintData({ type: 'invoice', subType: 'auction', item: a });
+                  setReceiptModalOpen(true);
+                }}
+              />
+            )}
+          </div>
+        )}
+
+        {/* TAB 3: Expenditure(payments) */}
+        {activeTab === 'expenditure' && (
+          <ExpenditureView
+            expenses={expenses}
+            isAdmin={isAdmin}
+            onSave={handleSaveExpense}
+            onDelete={handleDeleteExpense}
+          />
+        )}
+
+        {/* TAB 4: Settings (Admin Only) */}
+        {activeTab === 'settings' && (
+          <SettingsView
+            settings={settings}
+            isAdmin={isAdmin}
+            onSaveSettings={handleSaveSettings}
+            onExportExcel={handleExportExcel}
+            onSaveHTML={handleSaveHTML}
+            onClearAllData={async () => {
+              try {
+                localStorage.clear();
+              } catch {}
+              setExpenses([]);
+              setContributions([]);
+              setSponsors([]);
+              setCommercialStalls([]);
+              setSevas([]);
+              setHundi([]);
+              setAuctions([]);
+              setCounters({});
+              countersRef.current = {};
+              try {
+                await cloudClearAllData();
+              } catch (err) {
+                console.warn('Cloud clear warning', err);
+              }
+              alert('All data reset in Firebase.');
+            }}
+          />
         )}
       </main>
 
-      {/* MODALS */}
-      {/* 1. Universal Share Modal */}
-      {shareModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg border border-stone-200 shadow-2xl max-w-md w-full p-6 space-y-4">
-            <div className="flex items-center justify-between border-b border-stone-200 pb-3">
-              <h3 className="text-lg font-serif font-bold text-[#991B1B] flex items-center gap-2">
-                <Share2 className="w-5 h-5" />
-                <span>Universal Mobile Snapshot</span>
-              </h3>
-              <button
-                onClick={() => setShareModalOpen(false)}
-                className="text-stone-400 hover:text-stone-700 text-xl font-bold leading-none"
-              >
-                ×
-              </button>
-            </div>
+      {/* 5. OFFICIAL RECEIPT & INVOICE PREVIEW MODAL */}
+      <ReceiptInvoiceModal
+        open={receiptModalOpen}
+        printData={printData}
+        settings={settings}
+        isGeneratingPdf={isGeneratingPdf}
+        onClose={() => setReceiptModalOpen(false)}
+        onDirectPrint={triggerDirectPrint}
+        onDownloadPdf={handleDownloadReceiptPDF}
+        onShareWhatsApp={handleShareReceiptPDFWhatsApp}
+        modalQrRef={modalQrRef}
+      />
 
-            {/* Direct File Share (Works 100% on iOS and Android) */}
-            <div className="bg-emerald-50 border border-emerald-200 rounded p-4 space-y-2">
-              <div className="text-xs font-bold text-emerald-900 uppercase tracking-wider flex items-center gap-1.5">
-                <CheckCircle2 className="w-4 h-4 text-emerald-700" />
-                <span>Zero Server • 100% Offline Compatible</span>
-              </div>
-              <p className="text-xs text-emerald-800 leading-relaxed">
-                Send a self-contained snapshot directly to residents via WhatsApp, AirDrop, or Drive without URL length restrictions.
-              </p>
-              <button
-                onClick={handleShareSnapshotFile}
-                className="w-full bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold uppercase tracking-wider py-2.5 rounded shadow-sm transition-colors mt-2"
-              >
-                📤 Send / Share Snapshot File
-              </button>
-            </div>
-
-            {/* Live QR Code Scanner */}
-            <div className="bg-stone-50 border border-stone-200 rounded p-4 text-center space-y-2">
-              <div className="text-[11px] font-bold uppercase tracking-wider text-stone-700">
-                📷 Scan with Phone Camera (Instant Live View)
-              </div>
-              <div className="inline-block p-2 bg-white rounded border border-stone-300 shadow-xs">
-                <div ref={shareQrRef} />
-              </div>
-            </div>
-
-            {/* Web Link */}
-            <div>
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-stone-500 mb-1">
-                Web Link
-              </label>
-              <textarea
-                value={shareUrl}
-                readOnly
-                rows={2}
-                onClick={e => (e.target as HTMLTextAreaElement).select()}
-                className="w-full text-xs font-mono bg-stone-50 border border-stone-200 rounded p-2 text-stone-600 outline-none resize-none"
-              />
-            </div>
-
-            <div className="flex justify-end gap-2 pt-2 border-t border-stone-100">
-              <button
-                onClick={() => setShareModalOpen(false)}
-                className="bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-bold uppercase tracking-wider px-4 py-2 rounded"
-              >
-                Close
-              </button>
-              <button
-                onClick={handleCopyLink}
-                className="bg-[#991B1B] hover:bg-[#7F1D1D] text-white text-xs font-bold uppercase tracking-wider px-4 py-2 rounded inline-flex items-center gap-1.5"
-              >
-                <Copy className="w-3.5 h-3.5" />
-                <span>{copiedLink ? '✓ Copied' : 'Copy Link'}</span>
-              </button>
-            </div>
-          </div>
+      {/* 6. REAL-TIME CLOUD SYNC TOAST NOTIFICATION */}
+      {syncToast && (
+        <div className="fixed bottom-4 right-4 z-50 bg-stone-900/95 text-white text-xs px-4 py-3 rounded-xl shadow-2xl border border-amber-500/40 flex items-center gap-2.5 backdrop-blur-md">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span className="font-medium">{syncToast}</span>
         </div>
       )}
-
-      {/* 2. Expense Modal */}
-      {expModal.open && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <form
-            onSubmit={e => {
-              e.preventDefault();
-              const form = e.currentTarget;
-              const item = (form.elements.namedItem('item') as HTMLInputElement).value.trim();
-              const est = parseFloat((form.elements.namedItem('est') as HTMLInputElement).value) || 0;
-              const adv = parseFloat((form.elements.namedItem('adv') as HTMLInputElement).value) || 0;
-              const bal = parseFloat((form.elements.namedItem('bal') as HTMLInputElement).value) || 0;
-              if (!item) return alert('Enter an item description.');
-
-              const row: Expense = {
-                id: expModal.item?.id || Date.now().toString(),
-                item,
-                est,
-                adv,
-                bal,
-                act: adv + bal
-              };
-
-              handleSaveExpense(row);
-              setExpModal({ open: false });
-            }}
-            className="bg-white rounded-lg border border-stone-200 shadow-2xl max-w-md w-full p-6 space-y-4"
-          >
-            <div className="flex items-center justify-between border-b border-stone-200 pb-3">
-              <h3 className="text-lg font-serif font-bold text-[#991B1B]">
-                {expModal.item ? 'Edit Expense' : 'Add Expense'}
-              </h3>
-              <button
-                type="button"
-                onClick={() => setExpModal({ open: false })}
-                className="text-stone-400 hover:text-stone-700 text-xl font-bold leading-none"
-              >
-                ×
-              </button>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-stone-600 mb-1">
-                Item / Description *
-              </label>
-              <input
-                name="item"
-                defaultValue={expModal.item?.item || ''}
-                placeholder="e.g. Flower Decoration"
-                required
-                className="w-full border border-stone-300 rounded px-3 py-2 text-sm outline-none focus:border-[#991B1B]"
-              />
-            </div>
-
-            <div className="grid grid-cols-3 gap-3">
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-stone-600 mb-1">
-                  Estimated (₹)
-                </label>
-                <input
-                  name="est"
-                  type="number"
-                  step="0.01"
-                  defaultValue={expModal.item?.est || ''}
-                  className="w-full border border-stone-300 rounded px-3 py-2 text-sm outline-none focus:border-[#991B1B]"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-stone-600 mb-1">
-                  Advance (₹)
-                </label>
-                <input
-                  name="adv"
-                  type="number"
-                  step="0.01"
-                  defaultValue={expModal.item?.adv || ''}
-                  className="w-full border border-stone-300 rounded px-3 py-2 text-sm outline-none focus:border-[#991B1B]"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-stone-600 mb-1">
-                  Balance (₹)
-                </label>
-                <input
-                  name="bal"
-                  type="number"
-                  step="0.01"
-                  defaultValue={expModal.item?.bal || ''}
-                  className="w-full border border-stone-300 rounded px-3 py-2 text-sm outline-none focus:border-[#991B1B]"
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2 pt-3 border-t border-stone-100">
-              <button
-                type="button"
-                onClick={() => setExpModal({ open: false })}
-                className="bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-bold uppercase tracking-wider px-4 py-2 rounded"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="bg-[#991B1B] hover:bg-[#7F1D1D] text-white text-xs font-bold uppercase tracking-wider px-4 py-2 rounded"
-              >
-                Save Expense
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {/* 3. Contribution Modal */}
-      {ctModal.open && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <form
-            onSubmit={e => {
-              e.preventDefault();
-              const form = e.currentTarget;
-              const name = (form.elements.namedItem('name') as HTMLInputElement).value.trim();
-              const flat = (form.elements.namedItem('flat') as HTMLInputElement).value.trim();
-              const amt = parseFloat((form.elements.namedItem('amt') as HTMLInputElement).value);
-              const date = (form.elements.namedItem('date') as HTMLInputElement).value;
-              const pay = (form.elements.namedItem('pay') as HTMLSelectElement).value;
-              const txn = (form.elements.namedItem('txn') as HTMLInputElement).value.trim();
-              const notes = (form.elements.namedItem('notes') as HTMLTextAreaElement).value.trim();
-
-              if (!name || !flat || !amt || !date) return alert('Please fill in required fields.');
-
-              const row: Contribution = {
-                id: ctModal.item?.id || Date.now().toString(),
-                rcptNo: ctModal.item?.rcptNo || getNextNum('eg_rc_num', 'GE-2026-'),
-                name,
-                flat,
-                amt,
-                date,
-                pay,
-                txn,
-                notes
-              };
-
-              handleSaveContribution(row);
-              setCtModal({ open: false });
-            }}
-            className="bg-white rounded-lg border border-stone-200 shadow-2xl max-w-lg w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto"
-          >
-            <div className="flex items-center justify-between border-b border-stone-200 pb-3">
-              <h3 className="text-lg font-serif font-bold text-[#991B1B]">
-                {ctModal.item ? 'Edit Contribution' : 'Add Contribution'}
-              </h3>
-              <button
-                type="button"
-                onClick={() => setCtModal({ open: false })}
-                className="text-stone-400 hover:text-stone-700 text-xl font-bold leading-none"
-              >
-                ×
-              </button>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-stone-600 mb-1">
-                  Contributor Name *
-                </label>
-                <input
-                  name="name"
-                  defaultValue={ctModal.item?.name || ''}
-                  required
-                  placeholder="Full name"
-                  className="w-full border border-stone-300 rounded px-3 py-2 text-sm outline-none focus:border-[#991B1B]"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-stone-600 mb-1">
-                  Flat Number *
-                </label>
-                <input
-                  name="flat"
-                  defaultValue={ctModal.item?.flat || ''}
-                  required
-                  placeholder="e.g. B-1254"
-                  className="w-full border border-stone-300 rounded px-3 py-2 text-sm outline-none focus:border-[#991B1B]"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-stone-600 mb-1">
-                  Amount (₹) *
-                </label>
-                <input
-                  name="amt"
-                  type="number"
-                  step="1"
-                  min="1"
-                  defaultValue={ctModal.item?.amt || ''}
-                  required
-                  placeholder="e.g. 1000"
-                  className="w-full border border-stone-300 rounded px-3 py-2 text-sm outline-none focus:border-[#991B1B]"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-stone-600 mb-1">
-                  Date *
-                </label>
-                <input
-                  name="date"
-                  type="date"
-                  defaultValue={ctModal.item?.date || today()}
-                  required
-                  className="w-full border border-stone-300 rounded px-3 py-2 text-sm outline-none focus:border-[#991B1B]"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-stone-600 mb-1">
-                  Payment Mode
-                </label>
-                <select
-                  name="pay"
-                  defaultValue={ctModal.item?.pay || 'UPI'}
-                  className="w-full border border-stone-300 rounded px-3 py-2 text-sm outline-none focus:border-[#991B1B]"
-                >
-                  <option>UPI</option>
-                  <option>Bank Transfer</option>
-                  <option>Cash</option>
-                  <option>Other</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-stone-600 mb-1">
-                  Transaction Ref ID
-                </label>
-                <input
-                  name="txn"
-                  defaultValue={ctModal.item?.txn || ''}
-                  placeholder="UPI Ref / Txn ID"
-                  className="w-full border border-stone-300 rounded px-3 py-2 text-sm outline-none focus:border-[#991B1B]"
-                />
-              </div>
-              <div className="col-span-2">
-                <label className="block text-xs font-bold uppercase tracking-wider text-stone-600 mb-1">
-                  Notes (Optional)
-                </label>
-                <textarea
-                  name="notes"
-                  defaultValue={ctModal.item?.notes || ''}
-                  placeholder="Additional notes..."
-                  className="w-full border border-stone-300 rounded px-3 py-2 text-sm outline-none focus:border-[#991B1B]"
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2 pt-3 border-t border-stone-100">
-              <button
-                type="button"
-                onClick={() => setCtModal({ open: false })}
-                className="bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-bold uppercase tracking-wider px-4 py-2 rounded"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="bg-[#991B1B] hover:bg-[#7F1D1D] text-white text-xs font-bold uppercase tracking-wider px-4 py-2 rounded"
-              >
-                Save Contribution
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {/* 4. Sponsor Modal */}
-      {spModal.open && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <form
-            onSubmit={e => {
-              e.preventDefault();
-              const form = e.currentTarget;
-              const det = (form.elements.namedItem('det') as HTMLTextAreaElement).value.trim();
-              const est = parseFloat((form.elements.namedItem('est') as HTMLInputElement).value) || 0;
-              const act = parseFloat((form.elements.namedItem('act') as HTMLInputElement).value) || 0;
-              if (!det) return alert('Enter sponsor details.');
-
-              const row: Sponsor = {
-                id: spModal.item?.id || Date.now().toString(),
-                invNo: spModal.item?.invNo || getNextNum('eg_sp_num', 'SP-2026-'),
-                det,
-                est,
-                act
-              };
-
-              handleSaveSponsor(row);
-              setSpModal({ open: false });
-            }}
-            className="bg-white rounded-lg border border-stone-200 shadow-2xl max-w-md w-full p-6 space-y-4"
-          >
-            <div className="flex items-center justify-between border-b border-stone-200 pb-3">
-              <h3 className="text-lg font-serif font-bold text-[#991B1B]">
-                {spModal.item ? 'Edit Sponsor' : 'Add Sponsor'}
-              </h3>
-              <button
-                type="button"
-                onClick={() => setSpModal({ open: false })}
-                className="text-stone-400 hover:text-stone-700 text-xl font-bold leading-none"
-              >
-                ×
-              </button>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-stone-600 mb-1">
-                Sponsor Details *
-              </label>
-              <textarea
-                name="det"
-                defaultValue={spModal.item?.det || ''}
-                required
-                placeholder="Company / Sponsor name, contact person, etc."
-                className="w-full border border-stone-300 rounded px-3 py-2 text-sm outline-none focus:border-[#991B1B]"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-stone-600 mb-1">
-                  Estimated (₹)
-                </label>
-                <input
-                  name="est"
-                  type="number"
-                  step="0.01"
-                  defaultValue={spModal.item?.est || ''}
-                  className="w-full border border-stone-300 rounded px-3 py-2 text-sm outline-none focus:border-[#991B1B]"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-stone-600 mb-1">
-                  Actual Amount (₹)
-                </label>
-                <input
-                  name="act"
-                  type="number"
-                  step="0.01"
-                  defaultValue={spModal.item?.act || ''}
-                  className="w-full border border-stone-300 rounded px-3 py-2 text-sm outline-none focus:border-[#991B1B]"
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2 pt-3 border-t border-stone-100">
-              <button
-                type="button"
-                onClick={() => setSpModal({ open: false })}
-                className="bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-bold uppercase tracking-wider px-4 py-2 rounded"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="bg-[#991B1B] hover:bg-[#7F1D1D] text-white text-xs font-bold uppercase tracking-wider px-4 py-2 rounded"
-              >
-                Save Sponsor
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {/* 5. Seva Booking Modal */}
-      {svModal.open && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <form
-            onSubmit={e => {
-              e.preventDefault();
-              const form = e.currentTarget;
-              const sel = (form.elements.namedItem('sevaSelect') as HTMLSelectElement).value;
-              const custom = (form.elements.namedItem('sevaCustom') as HTMLInputElement)?.value.trim();
-              const seva = sel === '__other__' ? custom : sel;
-              const name = (form.elements.namedItem('name') as HTMLInputElement).value.trim();
-              const flat = (form.elements.namedItem('flat') as HTMLInputElement).value.trim();
-              const amt = parseFloat((form.elements.namedItem('amt') as HTMLInputElement).value);
-              const date = (form.elements.namedItem('date') as HTMLInputElement).value;
-
-              if (!seva || !name || !flat || !amt || !date) return alert('Please fill in required fields.');
-
-              const row: SevaBooking = {
-                id: svModal.item?.id || Date.now().toString(),
-                tokNo: svModal.item?.tokNo || getNextNum('eg_sv_num', 'SV-2026-'),
-                seva,
-                name,
-                flat,
-                amt,
-                date
-              };
-
-              handleSaveSeva(row);
-              setSvModal({ open: false });
-            }}
-            className="bg-white rounded-lg border border-stone-200 shadow-2xl max-w-md w-full p-6 space-y-4"
-          >
-            <div className="flex items-center justify-between border-b border-stone-200 pb-3">
-              <h3 className="text-lg font-serif font-bold text-[#991B1B]">
-                {svModal.item ? 'Edit Seva Booking' : 'Add Seva Booking'}
-              </h3>
-              <button
-                type="button"
-                onClick={() => setSvModal({ open: false })}
-                className="text-stone-400 hover:text-stone-700 text-xl font-bold leading-none"
-              >
-                ×
-              </button>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-stone-600 mb-1">
-                Seva Name *
-              </label>
-              <select
-                name="sevaSelect"
-                defaultValue={svModal.item?.seva || ''}
-                onChange={e => {
-                  const val = e.target.value;
-                  const customInput = document.getElementById('sevaCustomInput') as HTMLInputElement;
-                  const amtInput = document.getElementById('sevaAmtInput') as HTMLInputElement;
-                  if (customInput) customInput.style.display = val === '__other__' ? 'block' : 'none';
-                  if (val && val !== '__other__') {
-                    const match = sevaCatalogue.find(s => s.name === val);
-                    if (match && amtInput) amtInput.value = String(match.amt);
-                  }
-                }}
-                className="w-full border border-stone-300 rounded px-3 py-2 text-sm outline-none focus:border-[#991B1B]"
-              >
-                <option value="">-- Select a Seva --</option>
-                {sevaCatalogue.map(sc => (
-                  <option key={sc.id} value={sc.name}>
-                    {sc.name} — ₹{fmt(sc.amt)}
-                  </option>
-                ))}
-                <option value="__other__">Other (custom)…</option>
-              </select>
-              <input
-                id="sevaCustomInput"
-                name="sevaCustom"
-                placeholder="Enter custom seva name"
-                style={{ display: 'none' }}
-                className="w-full border border-stone-300 rounded px-3 py-2 text-sm outline-none focus:border-[#991B1B] mt-2"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-stone-600 mb-1">
-                  Resident Name *
-                </label>
-                <input
-                  name="name"
-                  defaultValue={svModal.item?.name || ''}
-                  required
-                  placeholder="Full name"
-                  className="w-full border border-stone-300 rounded px-3 py-2 text-sm outline-none focus:border-[#991B1B]"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-stone-600 mb-1">
-                  Flat Number *
-                </label>
-                <input
-                  name="flat"
-                  defaultValue={svModal.item?.flat || ''}
-                  required
-                  placeholder="e.g. A-101"
-                  className="w-full border border-stone-300 rounded px-3 py-2 text-sm outline-none focus:border-[#991B1B]"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-stone-600 mb-1">
-                  Amount (₹) *
-                </label>
-                <input
-                  id="sevaAmtInput"
-                  name="amt"
-                  type="number"
-                  step="1"
-                  min="1"
-                  defaultValue={svModal.item?.amt || ''}
-                  required
-                  placeholder="e.g. 500"
-                  className="w-full border border-stone-300 rounded px-3 py-2 text-sm outline-none focus:border-[#991B1B]"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-stone-600 mb-1">
-                  Date *
-                </label>
-                <input
-                  name="date"
-                  type="date"
-                  defaultValue={svModal.item?.date || today()}
-                  required
-                  className="w-full border border-stone-300 rounded px-3 py-2 text-sm outline-none focus:border-[#991B1B]"
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2 pt-3 border-t border-stone-100">
-              <button
-                type="button"
-                onClick={() => setSvModal({ open: false })}
-                className="bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-bold uppercase tracking-wider px-4 py-2 rounded"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="bg-[#991B1B] hover:bg-[#7F1D1D] text-white text-xs font-bold uppercase tracking-wider px-4 py-2 rounded"
-              >
-                Save Booking
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {/* 6. Seva Catalogue Item Modal */}
-      {scModal.open && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <form
-            onSubmit={e => {
-              e.preventDefault();
-              const form = e.currentTarget;
-              const name = (form.elements.namedItem('name') as HTMLInputElement).value.trim();
-              const amt = parseFloat((form.elements.namedItem('amt') as HTMLInputElement).value) || 0;
-              if (!name) return alert('Enter a seva name.');
-
-              const row: SevaCatalogueItem = {
-                id: scModal.item?.id || Date.now().toString(),
-                name,
-                amt
-              };
-
-              handleSaveSevaCatalogue(row);
-              setScModal({ open: false });
-            }}
-            className="bg-white rounded-lg border border-stone-200 shadow-2xl max-w-md w-full p-6 space-y-4"
-          >
-            <div className="flex items-center justify-between border-b border-stone-200 pb-3">
-              <h3 className="text-lg font-serif font-bold text-[#991B1B]">
-                {scModal.item ? 'Edit Catalogue Seva' : 'Add Catalogue Seva'}
-              </h3>
-              <button
-                type="button"
-                onClick={() => setScModal({ open: false })}
-                className="text-stone-400 hover:text-stone-700 text-xl font-bold leading-none"
-              >
-                ×
-              </button>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-stone-600 mb-1">
-                Seva Name *
-              </label>
-              <input
-                name="name"
-                defaultValue={scModal.item?.name || ''}
-                required
-                placeholder="e.g. Flower Seva"
-                className="w-full border border-stone-300 rounded px-3 py-2 text-sm outline-none focus:border-[#991B1B]"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-stone-600 mb-1">
-                Suggested Amount (₹)
-              </label>
-              <input
-                name="amt"
-                type="number"
-                defaultValue={scModal.item?.amt || ''}
-                placeholder="0"
-                className="w-full border border-stone-300 rounded px-3 py-2 text-sm outline-none focus:border-[#991B1B]"
-              />
-            </div>
-
-            <div className="flex justify-end gap-2 pt-3 border-t border-stone-100">
-              <button
-                type="button"
-                onClick={() => setScModal({ open: false })}
-                className="bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-bold uppercase tracking-wider px-4 py-2 rounded"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="bg-[#991B1B] hover:bg-[#7F1D1D] text-white text-xs font-bold uppercase tracking-wider px-4 py-2 rounded"
-              >
-                Save Catalogue Item
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {/* PRINT CONTAINER (PRINT MEDIA ONLY) */}
-      <div id="billContainer" className="bill-container">
-        {printData?.type === 'receipt' && (
-          <div className="receipt max-w-2xl mx-auto p-8 bg-white border-2 border-[#991B1B] font-sans">
-            <div className="flex items-center gap-4 border-b-2 border-[#991B1B] pb-4 mb-4">
-              {settings.logo && (
-                <img src={settings.logo} alt="Logo" className="w-16 h-16 object-contain" />
-              )}
-              <div className="flex-1 text-center">
-                <h2 className="text-2xl font-serif font-black text-[#991B1B]">
-                  {settings.org || 'Brigade Eldorado'}
-                </h2>
-                <h3 className="text-sm font-bold text-stone-800">3rd Year Ganeshotsava</h3>
-                <p className="text-xs text-stone-500">14th September – 18th September 2026</p>
-                <p className="text-xs text-stone-500">{settings.location}</p>
-              </div>
-            </div>
-
-            <div className="flex justify-between text-xs py-2 border-b border-stone-200 mb-3">
-              <span><strong>Receipt / Token No:</strong> {printData.item.rcptNo || printData.item.tokNo}</span>
-              <span><strong>Date:</strong> {fmtDate(printData.item.date)}</span>
-            </div>
-
-            <div className="space-y-2 text-xs py-2">
-              <div className="flex">
-                <span className="w-1/3 font-bold uppercase tracking-wider text-stone-600">Name</span>
-                <span className="w-2/3 font-semibold">{printData.item.name}</span>
-              </div>
-              <div className="flex">
-                <span className="w-1/3 font-bold uppercase tracking-wider text-stone-600">Flat / Unit</span>
-                <span className="w-2/3">{printData.item.flat}</span>
-              </div>
-              <div className="flex">
-                <span className="w-1/3 font-bold uppercase tracking-wider text-stone-600">Type</span>
-                <span className="w-2/3">
-                  {printData.item.isSeva ? `Seva Booking (${printData.item.seva})` : 'Resident Contribution'}
-                </span>
-              </div>
-              {printData.item.pay && (
-                <div className="flex">
-                  <span className="w-1/3 font-bold uppercase tracking-wider text-stone-600">Payment Mode</span>
-                  <span className="w-2/3">{printData.item.pay} {printData.item.txn && `(Ref: ${printData.item.txn})`}</span>
-                </div>
-              )}
-            </div>
-
-            <div className="my-6 p-4 text-center bg-amber-50/50 border border-amber-200 rounded">
-              <div className="text-[10px] font-bold uppercase tracking-widest text-stone-600">Amount Received</div>
-              <div className="text-3xl font-mono font-bold text-[#991B1B] my-1">
-                ₹ {fmt(printData.item.amt)}
-              </div>
-              <div className="text-xs italic text-stone-600">{numWords(printData.item.amt)}</div>
-            </div>
-
-            {settings.upi && (
-              <div className="text-center my-4">
-                <div ref={rcpQrRef} className="inline-block p-2 border border-stone-300 rounded" />
-                <div className="text-[10px] text-stone-500 mt-1">Scan to pay via UPI</div>
-              </div>
-            )}
-
-            <div className="text-[10px] text-stone-500 border-t border-stone-200 pt-3 mt-4 leading-relaxed">
-              <strong>Disclaimer:</strong> Funds collected are held in a dedicated account solely for Ganeshotsava 2026 celebration expenses. All contributions are voluntary.
-            </div>
-            <div className="text-center text-xs text-stone-600 border-t border-stone-200 pt-3 mt-4">
-              Thank you for your generous contribution and support 🙏<br />
-              <strong>Ganapati Bappa Morya!</strong>
-            </div>
-          </div>
-        )}
-
-        {printData?.type === 'invoice' && (
-          <div className="invoice max-w-2xl mx-auto p-8 bg-white border border-stone-300 font-sans">
-            <div className="flex justify-between items-start border-b-2 border-[#991B1B] pb-4 mb-6">
-              <div>
-                <h2 className="text-2xl font-serif font-black text-[#991B1B]">
-                  {settings.org || 'Brigade Eldorado'}
-                </h2>
-                <p className="text-xs text-stone-500">3rd Year Ganeshotsava (14th – 18th Sept 2026)</p>
-                <p className="text-xs text-stone-500">{settings.location}</p>
-              </div>
-              <div className="text-right">
-                <div className="text-sm font-bold text-[#991B1B] uppercase tracking-wider">Sponsorship Invoice</div>
-                <div className="text-xs mt-1"><strong>Invoice No:</strong> {printData.item.invNo}</div>
-                <div className="text-xs text-stone-600"><strong>Date:</strong> {new Date().toLocaleDateString('en-IN')}</div>
-              </div>
-            </div>
-
-            <div className="bg-stone-50 border border-stone-200 rounded p-4 mb-6">
-              <div className="text-[10px] font-bold uppercase tracking-wider text-stone-500 mb-1">
-                Sponsor Details
-              </div>
-              <div className="text-sm font-semibold whitespace-pre-line text-stone-900">
-                {printData.item.det}
-              </div>
-            </div>
-
-            <table className="w-full text-left border-collapse text-xs mb-4">
-              <thead>
-                <tr className="bg-[#991B1B] text-white uppercase text-[10px] tracking-wider">
-                  <th className="p-2.5">#</th>
-                  <th className="p-2.5">Description</th>
-                  <th className="p-2.5 text-right">Amount (₹)</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr className="border-b border-stone-200">
-                  <td className="p-2.5">1</td>
-                  <td className="p-2.5">Sponsorship Contribution — Ganeshotsava 2026</td>
-                  <td className="p-2.5 text-right font-mono font-bold">₹ {fmt(printData.item.act)}</td>
-                </tr>
-              </tbody>
-              <tfoot>
-                <tr className="font-bold border-t-2 border-[#991B1B] text-sm">
-                  <td colSpan={2} className="p-2.5">Total Amount</td>
-                  <td className="p-2.5 text-right font-mono text-[#991B1B]">₹ {fmt(printData.item.act)}</td>
-                </tr>
-              </tfoot>
-            </table>
-
-            <div className="text-right text-xs italic text-stone-500 mb-6">
-              {numWords(printData.item.act)}
-            </div>
-
-            <div className="bg-amber-50 border border-amber-200 rounded p-4 text-xs text-stone-700 mb-8">
-              <strong>Thank you for your generous partnership &amp; sponsorship! 🙏</strong><br />
-              Your support makes this celebration vibrant for all resident families.<br />
-              <em>Ganapati Bappa Morya!</em>
-            </div>
-
-            <div className="flex justify-between items-end border-t border-stone-200 pt-4 text-xs text-stone-600">
-              <div>
-                Brigade Eldorado Residents Association<br />
-                Ganeshotsava Committee 2026
-              </div>
-              <div className="text-right">
-                <div className="w-36 border-t border-stone-900 mb-1 ml-auto mt-6" />
-                Authorized Signatory
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
     </div>
   );
 }
+
 export default App;
+

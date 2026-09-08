@@ -1,0 +1,165 @@
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 1000' width='800' height='1000'>
+  <defs>
+    <linearGradient id='woodGrad' x1='0%' y1='0%' x2='100%' y2='100%'>
+      <stop offset='0%' stop-color='#8B4513'/>
+      <stop offset='50%' stop-color='#A0522D'/>
+      <stop offset='100%' stop-color='#5C2E0B'/>
+    </linearGradient>
+    <linearGradient id='goldGrad' x1='0%' y1='0%' x2='100%' y2='100%'>
+      <stop offset='0%' stop-color='#FFD700'/>
+      <stop offset='50%' stop-color='#FFA500'/>
+      <stop offset='100%' stop-color='#B8860B'/>
+    </linearGradient>
+    <linearGradient id='archGrad' x1='0%' y1='0%' x2='0%' y2='100%'>
+      <stop offset='0%' stop-color='#2A164D'/>
+      <stop offset='100%' stop-color='#1A0B2E'/>
+    </linearGradient>
+  </defs>
+
+  <!-- Temple Background & Ceiling -->
+  <rect width='800' height='1000' fill='#2B1810'/>
+  
+  <!-- Carved Wooden Pillars -->
+  <rect x='60' y='220' width='90' height='550' rx='8' fill='url(#woodGrad)' stroke='#3D1F0E' stroke-width='4'/>
+  <rect x='650' y='220' width='90' height='550' rx='8' fill='url(#woodGrad)' stroke='#3D1F0E' stroke-width='4'/>
+
+  <!-- Left & Right Royal Peacock Arch Panels -->
+  <rect x='30' y='280' width='150' height='450' rx='12' fill='url(#archGrad)' stroke='#B8860B' stroke-width='2'/>
+  <rect x='620' y='280' width='150' height='450' rx='12' fill='url(#archGrad)' stroke='#B8860B' stroke-width='2'/>
+
+  <!-- Left Text: OM GANESHAYA NAMAH -->
+  <g transform='translate(105, 500)'>
+    <polygon points='0,-55 55,0 0,55 -55,0' fill='none' stroke='#FFD700' stroke-width='2' stroke-dasharray='3 2'/>
+    <text x='0' y='-10' font-family='serif' font-size='15' font-weight='bold' fill='#FFD700' text-anchor='middle'>OM</text>
+    <text x='0' y='10' font-family='serif' font-size='13' font-weight='bold' fill='#FFD700' text-anchor='middle'>GANESHAYA</text>
+    <text x='0' y='28' font-family='serif' font-size='13' font-weight='bold' fill='#FFD700' text-anchor='middle'>NAMAH</text>
+  </g>
+
+  <!-- Right Text: ॐ श्री श्री गणेशाय -->
+  <g transform='translate(695, 500)'>
+    <polygon points='0,-55 55,0 0,55 -55,0' fill='none' stroke='#FFD700' stroke-width='2' stroke-dasharray='3 2'/>
+    <text x='0' y='-8' font-family='serif' font-size='22' font-weight='bold' fill='#FFD700' text-anchor='middle'>ॐ</text>
+    <text x='0' y='14' font-family='serif' font-size='14' font-weight='bold' fill='#FFD700' text-anchor='middle'>श्री श्री</text>
+    <text x='0' y='32' font-family='serif' font-size='14' font-weight='bold' fill='#FFD700' text-anchor='middle'>गणेशाय</text>
+  </g>
+
+  <!-- Central Grand Temple Carved Arch (Gopuram / Mandir Arch) -->
+  <path d='M150 780 L150 380 Q400 150 650 380 L650 780 Z' fill='#EED9B3' stroke='#8B4513' stroke-width='6'/>
+  <path d='M180 780 L180 400 Q400 200 620 400 L620 780 Z' fill='#F7EAD0' stroke='#A0522D' stroke-width='3'/>
+
+  <!-- Ornate Chandelier in Temple Roof -->
+  <g transform='translate(400, 160)'>
+    <line x1='0' y1='-160' x2='0' y2='0' stroke='#FFD700' stroke-width='3'/>
+    <ellipse cx='0' cy='20' rx='40' ry='15' fill='url(#goldGrad)'/>
+    <polygon points='-40,20 0,70 40,20' fill='#FFD700' opacity='0.7'/>
+    <circle cx='0' cy='75' r='8' fill='#FFF'/>
+  </g>
+
+  <!-- Hanging Deepas (Oil Lamps) on Sides -->
+  <g transform='translate(170, 270)'>
+    <line x1='0' y1='-100' x2='0' y2='0' stroke='#FFD700' stroke-width='2'/>
+    <ellipse cx='0' cy='20' rx='25' ry='10' fill='url(#goldGrad)'/>
+    <path d='M-15 20 Q0 0 15 20 Z' fill='#FF4500'/>
+    <circle cx='0' cy='5' r='5' fill='#FFD700'/>
+  </g>
+  <g transform='translate(630, 270)'>
+    <line x1='0' y1='-100' x2='0' y2='0' stroke='#FFD700' stroke-width='2'/>
+    <ellipse cx='0' cy='20' rx='25' ry='10' fill='url(#goldGrad)'/>
+    <path d='M-15 20 Q0 0 15 20 Z' fill='#FF4500'/>
+    <circle cx='0' cy='5' r='5' fill='#FFD700'/>
+  </g>
+
+  <!-- Holy Nandi / Cow on Devotee Right (Viewer Left) -->
+  <g transform='translate(230, 680)'>
+    <!-- Cow Body & Head -->
+    <ellipse cx='20' cy='20' rx='60' ry='45' fill='#E8E2D9' stroke='#A89F91' stroke-width='2'/>
+    <ellipse cx='-25' cy='-15' rx='35' ry='30' fill='#F5EFEB' stroke='#A89F91' stroke-width='2'/>
+    <path d='M-45 -35 Q-55 -60 -40 -65 Q-30 -55 -35 -35 Z' fill='#D1C7BD'/>
+    <ellipse cx='-45' cy='-10' rx='18' ry='15' fill='#E8B4B8'/>
+    <circle cx='-35' cy='-20' r='5' fill='#2B1810'/>
+  </g>
+
+  <!-- Royal Mayur (Peacock) on Devotee Left (Viewer Right) -->
+  <g transform='translate(570, 660)'>
+    <!-- Peacock Feathers Plume -->
+    <ellipse cx='30' cy='0' rx='50' ry='70' fill='#124E78' stroke='#2E8B57' stroke-width='3'/>
+    <ellipse cx='30' cy='0' rx='35' ry='50' fill='#008080'/>
+    <circle cx='30' cy='-20' r='12' fill='#FFD700'/>
+    <circle cx='30' cy='-20' r='6' fill='#000080'/>
+    <!-- Peacock Body & Neck -->
+    <ellipse cx='-10' cy='15' rx='25' ry='35' fill='#0B4F6C'/>
+    <path d='M-15 0 Q-25 -40 -10 -50 Q-5 -35 -10 0' fill='#005F73'/>
+    <circle cx='-8' cy='-50' r='8' fill='#0A9396'/>
+  </g>
+
+  <!-- Divine Lord Ganesha Idol (Center) -->
+  <!-- Golden Crown (Mukut) -->
+  <path d='M400 370 L425 435 L455 450 L430 485 L370 485 L345 450 L375 435 Z' fill='url(#goldGrad)' stroke='#B8860B' stroke-width='3'/>
+  <circle cx='400' cy='360' r='10' fill='#FF4500'/>
+  <circle cx='400' cy='400' r='8' fill='#FFF'/>
+  
+  <!-- Divine Ears (Supakarana) -->
+  <path d='M355 490 C290 480 240 515 240 570 C240 615 275 645 335 635 C330 605 335 560 360 525 Z' fill='#FFF1E6' stroke='#E29578' stroke-width='3'/>
+  <path d='M445 490 C510 480 560 515 560 570 C560 615 525 645 465 635 C470 605 465 560 440 525 Z' fill='#FFF1E6' stroke='#E29578' stroke-width='3'/>
+  <!-- Ear inner shading -->
+  <path d='M330 515 C280 510 260 540 260 575 C260 600 285 620 320 615' fill='none' stroke='#FFB4A2' stroke-width='6'/>
+  <path d='M470 515 C520 510 540 540 540 575 C540 600 515 620 480 615' fill='none' stroke='#FFB4A2' stroke-width='6'/>
+
+  <!-- Divine Head & Temporal Globes -->
+  <path d='M355 490 C355 530 370 555 400 555 C430 555 445 530 445 490 Z' fill='#FFF1E6' stroke='#E29578' stroke-width='2'/>
+  
+  <!-- Tilak (Trishul Namam + Red Bindu) -->
+  <path d='M392 495 C392 525 396 538 400 545 C404 538 408 525 408 495 Z' fill='#FFD700'/>
+  <circle cx='400' cy='520' r='5' fill='#D90429'/>
+  <line x1='382' y1='505' x2='398' y2='538' stroke='#FFD700' stroke-width='3'/>
+  <line x1='418' y1='505' x2='402' y2='538' stroke='#FFD700' stroke-width='3'/>
+
+  <!-- Divine Eyes -->
+  <ellipse cx='370' cy='540' rx='12' ry='7' fill='#FFF' stroke='#333' stroke-width='1.5'/>
+  <circle cx='372' cy='540' r='4' fill='#2B1810'/>
+  <ellipse cx='430' cy='540' rx='12' ry='7' fill='#FFF' stroke='#333' stroke-width='1.5'/>
+  <circle cx='428' cy='540' r='4' fill='#2B1810'/>
+
+  <!-- Curved Trunk (Vakratunda) with Golden Modak -->
+  <path d='M390 555 C390 605 385 655 420 685 C455 715 495 690 495 660 C495 635 470 635 465 650 C460 660 445 660 435 650 C420 630 422 600 420 555 Z' fill='#FFF1E6' stroke='#E29578' stroke-width='3'/>
+  <path d='M470 645 Q482 630 495 645 Q482 660 470 645 Z' fill='url(#goldGrad)' stroke='#B8860B' stroke-width='1.5'/>
+
+  <!-- Divine Torso & Golden Peethambara (Silken Yellow Dhoti) -->
+  <!-- Blue Shawl / Angavastram -->
+  <path d='M330 630 C300 660 290 730 330 780 C360 780 390 730 410 680 Z' fill='#1D3557' stroke='#457B9D' stroke-width='2'/>
+  <!-- Golden Body & Big Belly (Lambodara) -->
+  <ellipse cx='400' cy='690' rx='80' ry='75' fill='url(#goldGrad)' stroke='#B8860B' stroke-width='3'/>
+  <path d='M350 635 Q400 720 450 785' fill='none' stroke='#FFF' stroke-width='4' stroke-dasharray='6 4'/>
+
+  <!-- Abhaya Mudra (Right Hand Blessing) -->
+  <g transform='translate(290, 620)'>
+    <ellipse cx='20' cy='20' rx='22' ry='28' fill='#FFF1E6' stroke='#E29578' stroke-width='2'/>
+    <text x='20' y='26' font-size='16' font-weight='bold' fill='#D90429' text-anchor='middle'>ॐ</text>
+  </g>
+
+  <!-- Left Hand holding Modak Bowl -->
+  <g transform='translate(480, 640)'>
+    <ellipse cx='25' cy='20' rx='24' ry='15' fill='url(#goldGrad)'/>
+    <circle cx='18' cy='12' r='6' fill='#FFF'/>
+    <circle cx='28' cy='10' r='7' fill='#FFF'/>
+    <circle cx='36' cy='14' r='6' fill='#FFF'/>
+  </g>
+
+  <!-- Temple Marble Altar / Platform -->
+  <rect x='100' y='780' width='600' height='70' rx='6' fill='#EDE8DF' stroke='#D0C7B8' stroke-width='4'/>
+  <rect x='70' y='850' width='660' height='120' fill='#D6CEC2' stroke='#B8AE9C' stroke-width='3'/>
+
+  <!-- Flower Garlands, Fruits & Puja Thali on Altar -->
+  <!-- Garlands -->
+  <path d='M150 790 Q400 840 650 790' fill='none' stroke='#FF9F1C' stroke-width='16' stroke-linecap='round'/>
+  <path d='M170 805 Q400 855 630 805' fill='none' stroke='#E71D36' stroke-width='10' stroke-linecap='round'/>
+  <path d='M200 820 Q400 865 600 820' fill='none' stroke='#2EC4B6' stroke-width='8' stroke-linecap='round'/>
+
+  <!-- Brass Puja Urli & Fruits in Front -->
+  <ellipse cx='200' cy='900' rx='45' ry='20' fill='url(#goldGrad)' stroke='#8B4513' stroke-width='2'/>
+  <ellipse cx='400' cy='880' rx='65' ry='25' fill='url(#goldGrad)' stroke='#8B4513' stroke-width='3'/>
+  <ellipse cx='600' cy='900' rx='45' ry='20' fill='url(#goldGrad)' stroke='#8B4513' stroke-width='2'/>
+
+  <!-- Sacred Chant at Bottom -->
+  <text x='400' y='960' font-family='serif' font-size='22' font-weight='bold' letter-spacing='4' fill='#5C2E0B' text-anchor='middle'>|| श्री गणेशाय नमः ||</text>
+</svg>

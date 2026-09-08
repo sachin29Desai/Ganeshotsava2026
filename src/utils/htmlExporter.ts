@@ -342,7 +342,7 @@ tr:hover td{background:#FAFAF9}
   <div id="sevasTab" class="section">
     <div class="card">
       <div class="card-hdr">
-        <h2>Available Sevas Catalogue</h2>
+        <h2>Available Sevas</h2>
         <div id="sevaCatToolbar"></div>
       </div>
       <div class="table-wrap">

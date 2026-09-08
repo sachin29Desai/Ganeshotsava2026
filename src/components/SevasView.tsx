@@ -57,7 +57,7 @@ export const SevasView: React.FC<SevasViewProps> = ({
       <div className="bg-white border border-stone-200 rounded-lg shadow-sm overflow-hidden">
         <div className="px-6 py-4 border-b border-stone-200 flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-serif font-bold text-[#1A1A1A]">Available Sevas Catalogue</h2>
+            <h2 className="text-lg font-serif font-bold text-[#1A1A1A]">Available Sevas</h2>
             <p className="text-xs text-stone-500">Preset devotional offerings with suggested voluntary contribution amounts.</p>
           </div>
           {isAdmin && (

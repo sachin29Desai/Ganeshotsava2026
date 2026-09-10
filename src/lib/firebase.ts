@@ -1,5 +1,13 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import {
+  getAuth,
+  GoogleAuthProvider,
+  signInWithPopup,
+  signOut as firebaseSignOut,
+  onAuthStateChanged,
+  type User
+} from 'firebase/auth';
+import {
   initializeFirestore,
   persistentLocalCache,
   persistentMultipleTabManager,
@@ -95,6 +103,18 @@ try {
 }
 
 export const db = firestoreInstance;
+
+let authInstance;
+try {
+  authInstance = getAuth(app);
+} catch (e) {
+  console.warn('Firebase Auth initialize warning:', e);
+}
+export const auth = authInstance;
+export const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({ prompt: 'select_account' });
+export { signInWithPopup, firebaseSignOut, onAuthStateChanged };
+export type { User };
 
 export type SyncStatus = 'connecting' | 'connected' | 'offline' | 'synced' | 'saving' | 'error' | 'quota-limited';
 

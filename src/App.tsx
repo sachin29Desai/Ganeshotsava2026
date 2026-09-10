@@ -207,17 +207,32 @@ export function App() {
       return 'sevas';
     }
 
-    // 3. Eldorado Kannadigara Balaga Page (In Development Route: '/homepageindevelop')
+    // 3. Eldorado Kannadigara Balaga Page (In Development Route: '/homepageindevelop' and community routes)
     if (
       path === '/homepageindevelop' ||
       path.startsWith('/homepageindevelop') ||
       path === '/balaga' ||
+      path === '/events' ||
+      path.startsWith('/events') ||
+      path === '/gallery' ||
+      path === '/announcements' ||
+      path === '/archive' ||
+      path === '/about' ||
+      path === '/contact' ||
+      path === '/login' ||
       path.includes('homepageindevelop') ||
       params.get('view') === 'homepageindevelop' ||
       params.get('page') === 'homepageindevelop' ||
       params.get('route') === 'homepageindevelop' ||
       params.has('homepageindevelop') ||
-      hash === '#homepageindevelop'
+      hash === '#homepageindevelop' ||
+      hash.startsWith('#/events') ||
+      hash.startsWith('#/gallery') ||
+      hash.startsWith('#/announcements') ||
+      hash.startsWith('#/archive') ||
+      hash.startsWith('#/about') ||
+      hash.startsWith('#/contact') ||
+      hash.startsWith('#/login')
     ) {
       return 'homepageindevelop';
     }

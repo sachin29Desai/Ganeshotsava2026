@@ -9,11 +9,12 @@ import JSZip from 'jszip';
 export function getReceiptDocumentTitle(
   isReceipt: boolean,
   rawNum?: string | number,
-  rawFlat?: string | number
+  rawFlat?: string | number,
+  isSeva?: boolean
 ): string {
   const flatStr = String(rawFlat || '').trim();
   const numStr = String(rawNum || '').trim();
-  const typePart = isReceipt ? 'receipt' : 'invoice';
+  const typePart = isReceipt ? (isSeva ? 'seva_receipt' : 'receipt') : 'invoice';
 
   const cleanFlat = flatStr.replace(/^flat\s*[-:]?\s*/i, '').trim();
 
@@ -37,9 +38,10 @@ export function getReceiptDocumentTitle(
 export function getReceiptPdfFilename(
   isReceipt: boolean,
   rawNum?: string | number,
-  rawFlat?: string | number
+  rawFlat?: string | number,
+  isSeva?: boolean
 ): string {
-  const docTitle = getReceiptDocumentTitle(isReceipt, rawNum, rawFlat);
+  const docTitle = getReceiptDocumentTitle(isReceipt, rawNum, rawFlat, isSeva);
   return `${docTitle}.pdf`;
 }
 
@@ -473,16 +475,20 @@ export function triggerBulkDirectPrint(
  * - Ensures unique filename if multiple receipts have the same flat/name
  */
 export function getBulkIndividualReceiptFilename(
-  item: { flat?: string; name?: string; rcptNo?: string },
+  item: { flat?: string; name?: string; rcptNo?: string; tokNo?: string; seva?: string; recordType?: string },
   usedNamesSet?: Set<string>,
   suffixRcptNoIfDuplicate = true
 ): string {
   const flatStr = (item.flat || '').trim();
   const nameStr = (item.name || '').trim();
-  const rcptStr = (item.rcptNo || '').trim();
+  const rcptStr = (item.rcptNo || item.tokNo || '').trim();
+  const sevaStr = (item.seva || '').trim();
 
   // If flat name is present, use flat; if flat is empty, use the name
   let base = flatStr ? flatStr : (nameStr || rcptStr || 'Receipt');
+  if (sevaStr && (item.tokNo || item.recordType === 'seva')) {
+    base = `${base}_${sevaStr}`;
+  }
 
   // Clean and sanitize filename for operating systems
   base = base

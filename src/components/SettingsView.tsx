@@ -99,12 +99,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
   const copyRoleSharingText = () => {
     const origin = window.location.origin;
-    const text = `🪔 *${settings.org || 'Ganeshotsava 2026'} - Portal Access Guide*\n\n` +
+    const text = `🙏 *${settings.org || 'Ganeshotsava 2026'} - Portal Access Guide*\n\n` +
       `1️⃣ *Voluntary Devotee Receipts (Residents)*\n` +
-      `🔗 Link: ${origin}/receipts\n` +
+      `🔗 Link: ${origin}/ganeshotsava2026/receipts\n` +
       `🔑 Password: None needed! Search flat number or name & download official PDF receipt.\n\n` +
       `2️⃣ *Management Portal (Automatic Role Access)*\n` +
-      `🔗 Link: ${origin}\n` +
+      `🔗 Link: ${origin}/ganeshotsava2026\n` +
       `💡 Simply enter your password on the login screen — the system automatically directs you to your authorized role:\n` +
       `• *Super Admin*: Full access to add, edit, delete, export, and manage settings.\n` +
       `• *Sponsors*: View all data across statements, voluntary contributions, stalls, and expenses.\n` +
@@ -178,18 +178,34 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           </div>
           <div className="md:col-span-2">
             <label className="block text-xs font-bold uppercase tracking-wider text-stone-600 mb-1 flex items-center justify-between">
-              <span>Public Devotee Receipt Portal Short URL</span>
+              <span>Public Devotee Receipt Portal URL</span>
               <span className="text-[11px] text-emerald-700 font-medium">For WhatsApp groups &amp; noticeboards</span>
             </label>
             <input
               type="text"
-              placeholder="e.g. https://tinyurl.com/eldorado-receipts-2026"
+              placeholder="Leave blank for default: /receipts"
               value={settings.customReceiptPortalUrl || ''}
               onChange={e => onSaveSettings({ ...settings, customReceiptPortalUrl: e.target.value })}
               className="w-full border border-stone-300 rounded px-3 py-2 text-sm font-mono outline-none focus:border-[#991B1B]"
             />
             <p className="text-[11px] text-stone-500 mt-1">
-              A short, meaningful link that residents can easily read, click, or type. If empty, the system uses <code>https://tinyurl.com/eldorado-receipts-2026</code> or the direct <code>/receipts</code> path.
+              Optional custom URL for devotee receipts. If left blank, the system automatically uses the direct website path <code>/receipts</code>.
+            </p>
+          </div>
+          <div className="md:col-span-2">
+            <label className="block text-xs font-bold uppercase tracking-wider text-stone-600 mb-1 flex items-center justify-between">
+              <span>Public Devotee Seva Booking Portal URL</span>
+              <span className="text-[11px] text-amber-700 font-medium">Direct URL for seva offerings</span>
+            </label>
+            <input
+              type="text"
+              placeholder="Leave blank for default: /ganeshotsavasevas"
+              value={settings.customSevaPortalUrl || ''}
+              onChange={e => onSaveSettings({ ...settings, customSevaPortalUrl: e.target.value })}
+              className="w-full border border-stone-300 rounded px-3 py-2 text-sm font-mono outline-none focus:border-[#991B1B]"
+            />
+            <p className="text-[11px] text-stone-500 mt-1">
+              Direct website URL for resident devotees to book sevas and offerings. Default: <code>/ganeshotsavasevas</code> (same direct route as receipts <code>/receipts</code>, without any tiny url).
             </p>
           </div>
           <div className="md:col-span-2">
@@ -213,10 +229,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 className="hidden"
               />
               {settings.logo ? (
-                <img src={settings.logo} alt="Logo" className="max-h-20 mx-auto object-contain mb-2" />
-              ) : null}
+                <img src={settings.logo} alt="Logo" className="max-h-20 mx-auto object-contain mb-2" referrerPolicy="no-referrer" />
+              ) : (
+                <div className="mb-2">
+                  <img src="/lord_ganesha.svg" alt="Default Ganesha Logo" className="w-16 h-16 mx-auto object-contain" referrerPolicy="no-referrer" />
+                  <span className="text-[11px] text-amber-700 font-semibold block mt-1">Default deity visual: Lord Sri Ganesha</span>
+                </div>
+              )}
               <p className="text-xs text-stone-500 font-medium">
-                {settings.logo ? 'Click to change logo' : 'Click to upload event logo (PNG/JPG)'}
+                {settings.logo ? 'Click to change custom logo' : 'Click to upload custom event logo (PNG/JPG)'}
               </p>
             </label>
           </div>

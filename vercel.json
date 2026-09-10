@@ -1,6 +1,13 @@
 {
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
+  "redirects": [
+    {
+      "source": "/receipts",
+      "destination": "/ganeshotsava2026/receipts",
+      "permanent": false
+    }
+  ],
   "rewrites": [
     {
       "source": "/(.*)",

@@ -82,23 +82,35 @@
         "seva": { "type": "string" },
         "name": { "type": "string" },
         "flat": { "type": "string" },
-        "amt": { "type": "number" },
+        "amt": { "type": "number", "description": "Voluntary donation amount in rupees (optional/non-mandatory)" },
+        "qty": { "type": "number", "description": "Quantity or units sponsored by devotee (e.g. 10 kg, 2 bags)" },
+        "unit": { "type": "string", "description": "Unit of measurement (e.g. kg, Bags, Liters, Slots)" },
         "date": { "type": "string" },
         "notes": { "type": "string" },
+        "status": { "type": "string", "description": "Status: Booked or Confirmed" },
+        "phone": { "type": "string" },
+        "gothra": { "type": "string" },
+        "nakshatra": { "type": "string" },
+        "createdBy": { "type": "string" },
+        "confirmedBy": { "type": "string" },
+        "confirmedAt": { "type": "string" },
         "updatedAt": { "type": "string" }
       },
-      "required": ["id", "tokNo", "seva", "name", "amt"]
+      "required": ["id", "tokNo", "seva", "name"]
     },
     "SevaCatalogue": {
       "title": "SevaCatalogue",
-      "description": "Pooja and seva menu pricing catalogue",
+      "description": "Pooja, item and devotional seva offerings catalogue",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
         "name": { "type": "string" },
-        "amt": { "type": "number" }
+        "amt": { "type": "number", "description": "Suggested voluntary donation in rupees (optional/non-mandatory)" },
+        "unit": { "type": "string", "description": "Unit of measurement (e.g. kg, Bags, Liters, Tins, Slots)" },
+        "totalRequired": { "type": "number", "description": "Total quantity or units required for the festival" },
+        "desc": { "type": "string", "description": "Details or specifications of the seva" }
       },
-      "required": ["id", "name", "amt"]
+      "required": ["id", "name"]
     },
     "HundiCollection": {
       "title": "HundiCollection",

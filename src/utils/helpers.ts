@@ -1,13 +1,13 @@
 import { AppState, Expense, SevaCatalogueItem } from '../types';
 
 export const DEFAULT_SEVAS: SevaCatalogueItem[] = [
-  { id: 'ds1', name: 'Flower Seva', amt: 15000 },
-  { id: 'ds2', name: 'One Day Prasadam', amt: 20000 },
-  { id: 'ds3', name: 'Priest Fee', amt: 10000 },
-  { id: 'ds4', name: 'Pooja Items', amt: 15000 },
-  { id: 'ds5', name: 'Event Contributions', amt: 10000 },
-  { id: 'ds6', name: 'Transports', amt: 10000 },
-  { id: 'ds7', name: 'Dhol', amt: 75000 }
+  { id: 'ds1', name: 'Rice (Anna Prasadam)', amt: 0, unit: 'kg', totalRequired: 200, desc: 'Sona Masoori / Basmati rice for grand Mahaprasadam' },
+  { id: 'ds2', name: 'Pure Cow Ghee', amt: 0, unit: 'kg', totalRequired: 25, desc: 'Ghee for Deeparadhana, Homa and Modaka preparation' },
+  { id: 'ds3', name: 'Flower Garland Seva', amt: 15000, unit: 'Baskets', totalRequired: 5, desc: 'Daily fresh floral decoration for Ganesha' },
+  { id: 'ds4', name: 'Cooking Oil', amt: 0, unit: 'Tins (15L)', totalRequired: 8, desc: 'Refined oil for prasadam cooking' },
+  { id: 'ds5', name: 'Maha Pooja & Sankalpa Archana', amt: 1001, unit: 'Family Slots', totalRequired: 30, desc: 'Personalized sankalpa pooja with divine prasadam' },
+  { id: 'ds6', name: 'Modaka Naivedya (108 Modakas)', amt: 2500, unit: 'Sets', totalRequired: 10, desc: '108 holy modakas offered at evening Maha Mangalarathi' },
+  { id: 'ds7', name: 'One Day Maha Prasadam Sponsor', amt: 25000, unit: 'Day Sponsorship', totalRequired: 3, desc: 'Full-day community lunch sponsorship' }
 ];
 
 export const INITIAL_STATE: AppState = {

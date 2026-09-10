@@ -198,7 +198,7 @@ tr:hover td{background:#FAFAF9}
     <img id="headerLogo" class="header-logo" alt="Logo">
     <div>
       <div class="header-eyebrow">Brigade Eldorado Residents Association</div>
-      <h1>🪔 Ganeshotsava 2026</h1>
+      <h1>🌺 Ganeshotsava 2026</h1>
       <p>3rd Year Celebration • 14th September – 18th September 2026</p>
     </div>
   </div>
@@ -1426,10 +1426,10 @@ function doWhatsApp(type, id) {
   let msg = '';
   if (type === 'ct') {
     const r = dbLoad(K.ct).find(x => x.id === id); if (!r) return;
-    msg = \`🪔 *Ganeshotsava Contribution Receipt*\\n\\n*\${org}*\\n3rd Year Ganeshotsava\\n14th September – 18th September 2026\\n\\n📋 Receipt No: \${r.rcptNo}\\n📅 Date: \${fmtDate(r.date)}\\n👤 Contributor: \${r.name}\\n🏠 Flat: \${r.flat}\\n💳 Payment: \${r.pay || ''}\${r.txn ? ' — ' + r.txn : ''}\\n💰 Amount: ₹\${fmt(r.amt)}\\n    (\${numWords(r.amt)})\${r.notes ? '\\n📝 Notes: ' + r.notes : ''}\\n\\nThank you for your generous contribution and support 🙏\\n*Ganapati Bappa Morya!*\`;
+    msg = \`🙏 *Ganeshotsava Contribution Receipt*\\n\\n*\${org}*\\n3rd Year Ganeshotsava\\n14th September – 18th September 2026\\n\\n📋 Receipt No: \${r.rcptNo}\\n📅 Date: \${fmtDate(r.date)}\\n👤 Contributor: \${r.name}\\n🏠 Flat: \${r.flat}\\n💳 Payment: \${r.pay || ''}\${r.txn ? ' — ' + r.txn : ''}\\n💰 Amount: ₹\${fmt(r.amt)}\\n    (\${numWords(r.amt)})\${r.notes ? '\\n📝 Notes: ' + r.notes : ''}\\n\\nThank you for your generous contribution and support 🙏\\n*Ganapati Bappa Morya!*\`;
   } else if (type === 'sv') {
     const r = dbLoad(K.sv).find(x => x.id === id); if (!r) return;
-    msg = \`🙏 *Seva Booking Confirmation*\\n\\n*\${org}*\\n3rd Year Ganeshotsava\\n14th September – 18th September 2026\\n\\n🎟️ Token No: \${r.tokNo}\\n🪔 Seva: \${r.seva}\\n📅 Date: \${fmtDate(r.date)}\\n👤 Resident: \${r.name}\\n🏠 Flat: \${r.flat}\\n💰 Amount: ₹\${fmt(r.amt)}\\n    (\${numWords(r.amt)})\\n\\nThank you for your participation 🙏\\n*Ganapati Bappa Morya!*\`;
+    msg = \`🙏 *Seva Booking Confirmation*\\n\\n*\${org}*\\n3rd Year Ganeshotsava\\n14th September – 18th September 2026\\n\\n🎟️ Token No: \${r.tokNo}\\n🌺 Seva: \${r.seva}\\n📅 Date: \${fmtDate(r.date)}\\n👤 Resident: \${r.name}\\n🏠 Flat: \${r.flat}\\n💰 Amount: ₹\${fmt(r.amt)}\\n    (\${numWords(r.amt)})\\n\\nThank you for your participation 🙏\\n*Ganapati Bappa Morya!*\`;
   } else if (type === 'sp') {
     const r = dbLoad(K.sp).find(x => x.id === id); if (!r) return;
     msg = \`📄 *Sponsorship Invoice*\\n\\n*\${org}*\\n3rd Year Ganeshotsava\\n14th September – 18th September 2026\\n\\n🔖 Invoice No: \${r.invNo}\\n📅 Date: \${new Date().toLocaleDateString('en-IN')}\\n🏢 Sponsor: \${r.det}\\n💰 Amount: ₹\${fmt(r.act)}\\n    (\${numWords(r.act)})\\n\\nThank you for your generous sponsorship! 🙏\\n*Ganapati Bappa Morya!*\`;
@@ -1446,7 +1446,7 @@ function doWhatsAppReport() {
   const exAct = dbLoad(K.exp).reduce((s,r) => s + Number(r.act || 0), 0);
   const income = spAct + ctTot + svTot;
   const net = income - exAct;
-  const msg = \`📊 *Ganeshotsava 2026 — Budget Summary*\\n*\${org}*\\n\\n💰 *INCOME*\\n• Sponsor Contributions: ₹\${fmt(spAct)}\\n• Resident Contributions: ₹\${fmt(ctTot)}\\n• Seva Bookings: ₹\${fmt(svTot)}\\n▶ *Total Income: ₹\${fmt(income)}*\\n\\n📤 *EXPENDITURE*\\n• Expenses (Actual): ₹\${fmt(exAct)}\\n▶ *Total Expenditure: ₹\${fmt(exAct)}*\\n\\n\${net >= 0 ? '✅' : '⚠️'} *Net Balance: ₹\${fmt(Math.abs(net))}\${net < 0 ? ' (Deficit)' : ''}*\\n\\n_Ganapati Bappa Morya!_ 🪔\`;
+  const msg = \`📊 *Ganeshotsava 2026 — Budget Summary*\\n*\${org}*\\n\\n💰 *INCOME*\\n• Sponsor Contributions: ₹\${fmt(spAct)}\\n• Resident Contributions: ₹\${fmt(ctTot)}\\n• Seva Bookings: ₹\${fmt(svTot)}\\n▶ *Total Income: ₹\${fmt(income)}*\\n\\n📤 *EXPENDITURE*\\n• Expenses (Actual): ₹\${fmt(exAct)}\\n▶ *Total Expenditure: ₹\${fmt(exAct)}*\\n\\n\${net >= 0 ? '✅' : '⚠️'} *Net Balance: ₹\${fmt(Math.abs(net))}\${net < 0 ? ' (Deficit)' : ''}*\\n\\n_Ganapati Bappa Morya!_ 🙏🌺\`;
   waOpen(msg);
 }
 

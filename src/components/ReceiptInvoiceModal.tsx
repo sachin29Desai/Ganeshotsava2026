@@ -283,12 +283,17 @@ export const ReceiptInvoiceModal: React.FC<ReceiptInvoiceModalProps> = ({
             <div className="relative z-10">
               {/* Header */}
               <div className="flex items-center gap-3 sm:gap-4 border-b-2 border-[#991B1B] pb-4 mb-4">
-                {settings.logo && (
-                  <img src={settings.logo} alt="Logo" className="w-14 h-14 sm:w-16 sm:h-16 object-contain rounded shrink-0" />
-                )}
+                <img
+                  src={settings.logo || '/lord_ganesha.svg'}
+                  alt="Lord Sri Ganesha"
+                  className="w-14 h-14 sm:w-16 sm:h-16 object-contain rounded shrink-0"
+                  referrerPolicy="no-referrer"
+                />
                 <div className="flex-1 text-center">
-                  <div className="text-[10px] font-bold uppercase tracking-widest text-[#991B1B] mb-0.5">
-                    🪔 GANAPATI BAPPA MORYA 🪔
+                  <div className="text-[10px] font-bold uppercase tracking-widest text-[#991B1B] mb-0.5 inline-flex items-center justify-center gap-1.5">
+                    <img src="/lord_ganesha.svg" alt="" className="w-3.5 h-3.5 object-contain inline" referrerPolicy="no-referrer" />
+                    <span>GANAPATI BAPPA MORYA</span>
+                    <img src="/lord_ganesha.svg" alt="" className="w-3.5 h-3.5 object-contain inline" referrerPolicy="no-referrer" />
                   </div>
                   <h2 className="text-xl sm:text-2xl font-serif font-black text-[#991B1B] leading-tight">
                     {settings.org || 'Brigade Eldorado Residents Association'}
@@ -318,7 +323,7 @@ export const ReceiptInvoiceModal: React.FC<ReceiptInvoiceModalProps> = ({
                   <div className="space-y-2 text-xs py-2">
                     <div className="flex">
                       <span className="w-1/3 font-bold uppercase tracking-wider text-stone-600">
-                        {item.isSeva ? 'Devotee / Resident' : 'Contributor'}
+                        {item.isSeva || subType === 'seva' ? 'Devotee / Resident' : 'Contributor'}
                       </span>
                       <span className="w-2/3 font-bold text-stone-900">{item.name}</span>
                     </div>
@@ -330,10 +335,30 @@ export const ReceiptInvoiceModal: React.FC<ReceiptInvoiceModalProps> = ({
                     )}
                     <div className="flex">
                       <span className="w-1/3 font-bold uppercase tracking-wider text-stone-600">Type</span>
-                      <span className="w-2/3 font-medium">
-                        {item.isSeva ? `Seva Offering (${item.seva})` : 'Voluntary Resident Contribution'}
+                      <span className="w-2/3 font-medium text-stone-900">
+                        {item.isSeva || subType === 'seva' ? `Devotional Seva Offering (${item.seva})` : 'Voluntary Resident Contribution'}
                       </span>
                     </div>
+                    {(item.isSeva || subType === 'seva') && (item.qty || item.unit) && (
+                      <div className="flex">
+                        <span className="w-1/3 font-bold uppercase tracking-wider text-stone-600">Quantity</span>
+                        <span className="w-2/3 font-semibold text-stone-900">
+                          {item.qty || 1} {item.unit || ''}
+                        </span>
+                      </div>
+                    )}
+                    {(item.isSeva || subType === 'seva') && item.status && (
+                      <div className="flex">
+                        <span className="w-1/3 font-bold uppercase tracking-wider text-stone-600">Booking Status</span>
+                        <span className="w-2/3 font-bold">
+                          {item.status === 'Confirmed' ? (
+                            <span className="text-emerald-700">✓ Confirmed by Committee</span>
+                          ) : (
+                            <span className="text-amber-700">⏳ Booked (To be confirmed)</span>
+                          )}
+                        </span>
+                      </div>
+                    )}
                     {item.pay && (
                       <div className="flex">
                         <span className="w-1/3 font-bold uppercase tracking-wider text-stone-600">Payment Mode</span>
@@ -344,18 +369,32 @@ export const ReceiptInvoiceModal: React.FC<ReceiptInvoiceModalProps> = ({
                     )}
                     {item.notes && (
                       <div className="flex">
-                        <span className="w-1/3 font-bold uppercase tracking-wider text-stone-600">Notes</span>
+                        <span className="w-1/3 font-bold uppercase tracking-wider text-stone-600">Notes / Sankalpa</span>
                         <span className="w-2/3 italic text-stone-700">{item.notes}</span>
                       </div>
                     )}
                   </div>
 
                   <div className="my-5 p-4 text-center bg-amber-50/60 border border-amber-200 rounded">
-                    <div className="text-[10px] font-bold uppercase tracking-widest text-stone-600">Amount Received</div>
-                    <div className="text-2xl sm:text-3xl font-mono font-bold text-[#991B1B] my-1">
-                      ₹ {fmt(item.amt)}
+                    <div className="text-[10px] font-bold uppercase tracking-widest text-stone-600">
+                      {(item.isSeva || subType === 'seva') && (!item.amt || Number(item.amt) === 0)
+                        ? 'Contribution / Offering'
+                        : 'Amount Received'}
                     </div>
-                    <div className="text-xs italic text-stone-600 capitalize">{numWords(item.amt)}</div>
+                    {(item.isSeva || subType === 'seva') && (!item.amt || Number(item.amt) === 0) ? (
+                      <div className="text-xl sm:text-2xl font-serif font-bold text-[#991B1B] my-1">
+                        In-Kind Material Offering
+                      </div>
+                    ) : (
+                      <>
+                        <div className="text-2xl sm:text-3xl font-mono font-bold text-[#991B1B] my-1">
+                          ₹ {fmt(item.amt)}
+                        </div>
+                        <div className="text-xs italic text-stone-600 capitalize">
+                          {numWords(item.amt)} Rupees Only
+                        </div>
+                      </>
+                    )}
                   </div>
 
                   {settings.upi && (
@@ -366,7 +405,10 @@ export const ReceiptInvoiceModal: React.FC<ReceiptInvoiceModalProps> = ({
                   )}
 
                   <div className="text-[10px] text-stone-500 border-t border-stone-200 pt-3 mt-3 leading-relaxed">
-                    <strong>Disclaimer:</strong> Funds collected are held in a dedicated account solely for Ganeshotsava 2026 celebration expenses. All contributions are voluntary.
+                    <strong>Disclaimer:</strong>{' '}
+                    {item.isSeva || subType === 'seva'
+                      ? 'Devotional seva offering registered for Ganeshotsava 2026 celebrations. May Lord Sri Ganesha bestow health, happiness, and prosperity.'
+                      : 'Funds collected are held in a dedicated account solely for Ganeshotsava 2026 celebration expenses. All contributions are voluntary.'}
                   </div>
 
                   <DigitalSignatureBlock refCode={`GNS2026-SAMITHI-${item.rcptNo || item.tokNo || 'VAL'}`} />

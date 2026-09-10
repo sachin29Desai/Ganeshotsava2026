@@ -18,7 +18,8 @@ import {
   LogOut,
   Crown,
   Briefcase,
-  Users2
+  Users2,
+  Home
 } from 'lucide-react';
 import {
   Expense,
@@ -69,7 +70,10 @@ import {
   cloudBulkImportContributions,
   cloudClearAllData,
   fetchFreshDataFromServer,
-  SyncStatus
+  SyncStatus,
+  loadLocalSnapshotBackup,
+  saveLocalSnapshotBackup,
+  isQuotaExceededError
 } from './lib/firebase';
 
 import { StatementView } from './components/StatementView';
@@ -84,6 +88,9 @@ import { SettingsView } from './components/SettingsView';
 import { ReceiptInvoiceModal, PrintData } from './components/ReceiptInvoiceModal';
 import { PublicReceiptPortal } from './components/PublicReceiptPortal';
 import { CommitteeAuthGate } from './components/CommitteeAuthGate';
+import { CommunityHomeView } from './components/CommunityHomeView';
+import { PublicSevaPortal } from './components/PublicSevaPortal';
+import { AdminGateForBalaga } from './components/AdminGateForBalaga';
 import {
   getReceiptDocumentTitle,
   getReceiptPdfFilename,
@@ -103,39 +110,19 @@ declare global {
 }
 
 export function App() {
-  // Purge any historical on-device localStorage items so NO application data is stored on the device
-  useEffect(() => {
-    try {
-      const keysToRemove = [
-        'eg_expenses',
-        'eg_contributions',
-        'eg_sponsors',
-        'eg_commercial_stalls',
-        'eg_sevas',
-        'eg_seva_catalogue',
-        'eg_hundi',
-        'eg_auctions',
-        'eg_settings',
-        'eg_rc_num',
-        'eg_sp_num',
-        'eg_cs_num',
-        'eg_sv_num',
-        'eg_auc_num'
-      ];
-      keysToRemove.forEach(k => localStorage.removeItem(k));
-    } catch {}
-  }, []);
+  // Load resilient offline ledger backup so user data and public receipts are never empty
+  const initialLocalState = loadLocalSnapshotBackup();
 
-  // --- Live Application State (Purely sourced from Firebase) ---
-  const [expenses, setExpenses] = useState<Expense[]>(() => window.__E__?.expenses || []);
-  const [contributions, setContributions] = useState<Contribution[]>(() => window.__E__?.contributions || []);
-  const [sponsors, setSponsors] = useState<Sponsor[]>(() => window.__E__?.sponsors || []);
-  const [commercialStalls, setCommercialStalls] = useState<CommercialStall[]>(() => window.__E__?.commercialStalls || []);
-  const [sevas, setSevas] = useState<SevaBooking[]>(() => window.__E__?.sevas || []);
-  const [sevaCatalogue, setSevaCatalogue] = useState<SevaCatalogueItem[]>(() => window.__E__?.sevaCatalogue || DEFAULT_SEVAS);
-  const [hundi, setHundi] = useState<HundiCollection[]>(() => window.__E__?.hundi || []);
-  const [auctions, setAuctions] = useState<AuctionItem[]>(() => window.__E__?.auctions || []);
-  const [settings, setSettings] = useState<AppSettings>(() => window.__E__?.settings || INITIAL_STATE.settings);
+  // --- Live Application State (Cached first, continuously synchronized with Firestore) ---
+  const [expenses, setExpenses] = useState<Expense[]>(() => window.__E__?.expenses || initialLocalState?.expenses || INITIAL_STATE.expenses);
+  const [contributions, setContributions] = useState<Contribution[]>(() => window.__E__?.contributions || initialLocalState?.contributions || INITIAL_STATE.contributions);
+  const [sponsors, setSponsors] = useState<Sponsor[]>(() => window.__E__?.sponsors || initialLocalState?.sponsors || INITIAL_STATE.sponsors || []);
+  const [commercialStalls, setCommercialStalls] = useState<CommercialStall[]>(() => window.__E__?.commercialStalls || initialLocalState?.commercialStalls || INITIAL_STATE.commercialStalls || []);
+  const [sevas, setSevas] = useState<SevaBooking[]>(() => window.__E__?.sevas || initialLocalState?.sevas || INITIAL_STATE.sevas || []);
+  const [sevaCatalogue, setSevaCatalogue] = useState<SevaCatalogueItem[]>(() => window.__E__?.sevaCatalogue || initialLocalState?.sevaCatalogue || DEFAULT_SEVAS);
+  const [hundi, setHundi] = useState<HundiCollection[]>(() => window.__E__?.hundi || initialLocalState?.hundi || []);
+  const [auctions, setAuctions] = useState<AuctionItem[]>(() => window.__E__?.auctions || initialLocalState?.auctions || []);
+  const [settings, setSettings] = useState<AppSettings>(() => window.__E__?.settings || initialLocalState?.settings || INITIAL_STATE.settings);
 
   // In-memory counters synced with Firestore metadata/counters
   const [counters, setCounters] = useState<{
@@ -144,7 +131,7 @@ export function App() {
     cs?: string | null;
     sv?: string | null;
     auc?: string | null;
-  }>({});
+  }>(() => window.__E__?.counters || initialLocalState?.counters || INITIAL_STATE.counters || {});
   const countersRef = useRef<{
     rc?: string | null;
     sp?: string | null;
@@ -163,15 +150,30 @@ export function App() {
   // Sub-level under 'income': 'donations' | 'sponsorship' | 'stalls' | 'sevas' | 'hundi' | 'auctions'
   const [activeIncomeSubTab, setActiveIncomeSubTab] = useState<'donations' | 'sponsorship' | 'stalls' | 'sevas' | 'hundi' | 'auctions'>('donations');
 
-  // Dedicated Isolated Public Devotee Receipt Portal check
-  const checkIsReceiptPortal = () => {
-    if (typeof window === 'undefined') return false;
+  // --- Community Routing Architecture ---
+  // 'ganeshotsava': Sri Ganeshotsava 2026 Festival Portal (Default Landing Page '/')
+  // 'homepageindevelop': Eldorado Kannadigara Balaga Celebrations Page ('/homepageindevelop' - Restricted to Admin)
+  // 'receipts': Isolated Public Devotee Receipts Search & Download ('/ganeshotsava2026/receipts')
+  // 'sevas': Isolated Public Devotee Seva Booking & Offerings Portal ('/ganeshotsava2026/sevas')
+  type AppRoute = 'ganeshotsava' | 'homepageindevelop' | 'receipts' | 'sevas';
+
+  const getInitialRoute = (): AppRoute => {
+    if (typeof window === 'undefined') return 'ganeshotsava';
     const path = (window.location.pathname || '').toLowerCase().replace(/\/+$/, '');
-    const isPathMatch = path === '/receipts' || path === '/receipt' || path === '/portal' || path === '/download';
     const params = new URLSearchParams(window.location.search);
     const hash = window.location.hash.toLowerCase();
-    return (
-      isPathMatch ||
+
+    // 1. Receipts portal check (/receipts, /ganeshotsava2026/receipts)
+    if (
+      path === '/receipts' ||
+      path === '/ganeshotsava2026/receipts' ||
+      path === '/ganeshotsavareceipts' ||
+      path === '/receipt' ||
+      path === '/portal' ||
+      path === '/download' ||
+      path.endsWith('/receipts') ||
+      path.endsWith('/receipt') ||
+      path.includes('/receipts') ||
       params.get('view') === 'receipts' ||
       params.get('portal') === 'receipts' ||
       params.has('receipt-portal') ||
@@ -179,14 +181,76 @@ export function App() {
       hash === '#receipt-portal' ||
       hash === '#receipts' ||
       hash === '#receipt'
-    );
+    ) {
+      return 'receipts';
+    }
+
+    // 2. Sevas booking public portal check (/ganeshotsavasevas, /sevas, /ganeshotsava2026/sevas)
+    if (
+      path === '/ganeshotsavasevas' ||
+      path === '/ganeshotsava2026/sevas' ||
+      path === '/sevas' ||
+      path === '/seva' ||
+      path.endsWith('/ganeshotsavasevas') ||
+      path.endsWith('/sevas') ||
+      path.includes('ganeshotsavasevas') ||
+      path.includes('/sevas') ||
+      params.get('view') === 'sevas' ||
+      params.get('portal') === 'sevas' ||
+      params.has('sevas') ||
+      params.has('seva') ||
+      params.has('ganeshotsavasevas') ||
+      hash === '#ganeshotsavasevas' ||
+      hash === '#sevas' ||
+      hash === '#seva'
+    ) {
+      return 'sevas';
+    }
+
+    // 3. Eldorado Kannadigara Balaga Page (In Development Route: '/homepageindevelop')
+    if (
+      path === '/homepageindevelop' ||
+      path.startsWith('/homepageindevelop') ||
+      path === '/balaga' ||
+      path.includes('homepageindevelop') ||
+      params.get('view') === 'homepageindevelop' ||
+      params.get('page') === 'homepageindevelop' ||
+      params.get('route') === 'homepageindevelop' ||
+      params.has('homepageindevelop') ||
+      hash === '#homepageindevelop'
+    ) {
+      return 'homepageindevelop';
+    }
+
+    // 4. Default Landing Page: Sri Ganeshotsava 2026 ('/' or any other route)
+    return 'ganeshotsava';
   };
 
-  const [isReceiptPortal, setIsReceiptPortal] = useState<boolean>(checkIsReceiptPortal);
+  const [currentRoute, setCurrentRoute] = useState<AppRoute>(getInitialRoute);
+
+  const navigateToGaneshotsava = () => {
+    window.history.pushState({}, '', '/');
+    setCurrentRoute('ganeshotsava');
+  };
+
+  const navigateToBalagaInDev = () => {
+    window.history.pushState({}, '', '/homepageindevelop');
+    setCurrentRoute('homepageindevelop');
+  };
+
+  const navigateToReceipts = () => {
+    window.history.pushState({}, '', '/receipts');
+    setCurrentRoute('receipts');
+  };
+
+  const navigateToSevas = () => {
+    window.history.pushState({}, '', '/ganeshotsavasevas');
+    setCurrentRoute('sevas');
+  };
 
   useEffect(() => {
     const handleUrlChange = () => {
-      setIsReceiptPortal(checkIsReceiptPortal());
+      setCurrentRoute(getInitialRoute());
     };
     window.addEventListener('popstate', handleUrlChange);
     window.addEventListener('hashchange', handleUrlChange);
@@ -305,10 +369,19 @@ export function App() {
         setTimeout(() => setSyncToast(null), 3000);
       }
     } catch (err: any) {
-      console.error('Failed to fetch direct server data:', err);
-      if (manual) {
-        setSyncToast(err?.message || 'Failed to refresh data');
-        setTimeout(() => setSyncToast(null), 3000);
+      if (isQuotaExceededError(err)) {
+        console.warn('Firestore server read quota reached. Running in offline cache mode.');
+        setSyncStatus('quota-limited');
+        if (manual) {
+          setSyncToast('Daily cloud read quota reached. Running smoothly on offline cache.');
+          setTimeout(() => setSyncToast(null), 3500);
+        }
+      } else {
+        console.warn('Failed to fetch direct server data:', err?.message || err);
+        if (manual) {
+          setSyncToast(err?.message || 'Failed to refresh data');
+          setTimeout(() => setSyncToast(null), 3000);
+        }
       }
     } finally {
       setIsRefreshing(false);
@@ -375,8 +448,10 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    // Zero on-device storage. Live state is saved and synced exclusively to Firebase.
-    window.__E__ = getCurrentState();
+    // Keep in-memory window reference and persistent offline ledger backup updated
+    const currentSnapshot = getCurrentState();
+    window.__E__ = currentSnapshot;
+    saveLocalSnapshotBackup(currentSnapshot);
 
     if (isAdmin && activeFileHandle) {
       clearTimeout(autoSaveTimerRef.current);
@@ -580,16 +655,24 @@ export function App() {
       if (n > cur) {
         countersRef.current = { ...countersRef.current, sv: String(n) };
         setCounters(prev => ({ ...prev, sv: String(n) }));
+        cloudSaveCounters({ sv: String(n) }).catch(() => {});
       }
     }
     hasUnsavedChangesRef.current = true;
     setHasUnsavedChanges(true);
+    // Realtime persistence for public devotee bookings and admin modifications
+    cloudSaveSeva(row).catch(err => {
+      console.warn('Live seva booking cloud sync queued:', err);
+    });
   };
 
   const handleDeleteSeva = (id: string) => {
     setSevas(prev => prev.filter(x => x.id !== id));
     hasUnsavedChangesRef.current = true;
     setHasUnsavedChanges(true);
+    cloudDeleteSeva(id).catch(err => {
+      console.warn('Live seva booking cloud delete queued:', err);
+    });
   };
 
   const handleSaveHundi = (row: HundiCollection) => {
@@ -653,12 +736,18 @@ export function App() {
     });
     hasUnsavedChangesRef.current = true;
     setHasUnsavedChanges(true);
+    cloudSaveSevaCatalogueItem(row).catch(err => {
+      console.warn('Seva catalogue cloud sync queued:', err);
+    });
   };
 
   const handleDeleteSevaCatalogue = (id: string) => {
     setSevaCatalogue(prev => prev.filter(x => x.id !== id));
     hasUnsavedChangesRef.current = true;
     setHasUnsavedChanges(true);
+    cloudDeleteSevaCatalogueItem(id).catch(err => {
+      console.warn('Seva catalogue cloud delete queued:', err);
+    });
   };
 
   const handleSaveSettings = (cfg: AppSettings) => {
@@ -782,9 +871,9 @@ export function App() {
     let msg = '';
     if (isRcpt) {
       if (printData.item.isSeva || printData.subType === 'seva') {
-        msg = `🙏 *Seva Booking Official Receipt — PDF Attached*\n\n*${settings.org || 'Brigade Eldorado Residents Association'}*\n3rd Year Ganeshotsava (14th – 18th Sept 2026)\n\n🎟️ Token No: ${printData.item.tokNo}\n🪔 Seva: ${printData.item.seva}\n📅 Date: ${fmtDate(printData.item.date)}\n👤 Devotee: ${printData.item.name}\n🏠 Flat: ${printData.item.flat}\n💰 Amount: ₹${fmt(printData.item.amt)} (${numWords(printData.item.amt)})\n\n📄 *Official PDF receipt with Digital Signature & Watermark is attached.*\n\nThank you for your seva and devotional support 🙏\n*Ganapati Bappa Morya!*`;
+        msg = `🙏 *Seva Booking Official Receipt — PDF Attached*\n\n*${settings.org || 'Brigade Eldorado Residents Association'}*\n3rd Year Ganeshotsava (14th – 18th Sept 2026)\n\n🎟️ Token No: ${printData.item.tokNo}\n🌺 Seva: ${printData.item.seva}\n📅 Date: ${fmtDate(printData.item.date)}\n👤 Devotee: ${printData.item.name}\n🏠 Flat: ${printData.item.flat}\n💰 Amount: ₹${fmt(printData.item.amt)} (${numWords(printData.item.amt)})\n\n📄 *Official PDF receipt with Digital Signature & Watermark is attached.*\n\nThank you for your seva and devotional support 🙏\n*Ganapati Bappa Morya!*`;
       } else {
-        msg = `🪔 *Voluntary Resident Contribution Receipt — PDF Attached*\n\n*${settings.org || 'Brigade Eldorado Residents Association'}*\n3rd Year Ganeshotsava (14th – 18th Sept 2026)\n\n📋 Receipt No: ${printData.item.rcptNo}\n📅 Date: ${fmtDate(printData.item.date)}\n👤 Contributor: ${printData.item.name}\n🏠 Flat: ${printData.item.flat}\n💳 Payment: ${printData.item.pay || 'UPI'}${printData.item.txn ? ' (Ref: ' + printData.item.txn + ')' : ''}\n💰 Amount: ₹${fmt(printData.item.amt)} (${numWords(printData.item.amt)})${printData.item.notes ? '\n📝 Notes: ' + printData.item.notes : ''}\n\n📄 *Official PDF receipt with Digital Signature & Watermark is attached.*\n\nThank you for your generous contribution 🙏\n*Ganapati Bappa Morya!*`;
+        msg = `🙏 *Voluntary Resident Contribution Receipt — PDF Attached*\n\n*${settings.org || 'Brigade Eldorado Residents Association'}*\n3rd Year Ganeshotsava (14th – 18th Sept 2026)\n\n📋 Receipt No: ${printData.item.rcptNo}\n📅 Date: ${fmtDate(printData.item.date)}\n👤 Contributor: ${printData.item.name}\n🏠 Flat: ${printData.item.flat}\n💳 Payment: ${printData.item.pay || 'UPI'}${printData.item.txn ? ' (Ref: ' + printData.item.txn + ')' : ''}\n💰 Amount: ₹${fmt(printData.item.amt)} (${numWords(printData.item.amt)})${printData.item.notes ? '\n📝 Notes: ' + printData.item.notes : ''}\n\n📄 *Official PDF receipt with Digital Signature & Watermark is attached.*\n\nThank you for your generous contribution 🙏\n*Ganapati Bappa Morya!*`;
       }
     } else {
       const typeLabel = printData.subType === 'stall' ? 'Commercial Stall Invoice' : printData.subType === 'auction' ? 'Auction Winning Bid Invoice' : 'Sponsorship Invoice';
@@ -857,7 +946,7 @@ export function App() {
   };
 
   const shareWhatsAppSummary = () => {
-    const msg = `📊 *Ganeshotsava 2026 — Income & Expenditure Statement*\n*${settings.org || 'Brigade Eldorado'}*\n\n💰 *INCOME (RECEIPTS)*\n• Voluntary Contributions: ₹${fmt(ctTot)}\n• Sponsorship: ₹${fmt(spAct)}\n• Commercial Stalls: ₹${fmt(csAct)}\n• Seva Bookings: ₹${fmt(svTot)}\n• Hundi Collection: ₹${fmt(hundiTot)}\n• Auctions: ₹${fmt(aucTot)}\n▶ *Total Income: ₹${fmt(totalIncome)}*\n\n📤 *EXPENDITURE (PAYMENTS)*\n• Actual Incurred: ₹${fmt(exAct)}\n▶ *Total Expenditure: ₹${fmt(exAct)}*\n\n${netBalance >= 0 ? '✅' : '⚠️'} *Net Surplus/(Deficit): ₹${fmt(Math.abs(netBalance))}${netBalance < 0 ? ' (Deficit)' : ' (Surplus)'}*\n\n_Ganapati Bappa Morya!_ 🪔`;
+    const msg = `📊 *Ganeshotsava 2026 — Income & Expenditure Statement*\n*${settings.org || 'Brigade Eldorado'}*\n\n💰 *INCOME (RECEIPTS)*\n• Voluntary Contributions: ₹${fmt(ctTot)}\n• Sponsorship: ₹${fmt(spAct)}\n• Commercial Stalls: ₹${fmt(csAct)}\n• Seva Bookings: ₹${fmt(svTot)}\n• Hundi Collection: ₹${fmt(hundiTot)}\n• Auctions: ₹${fmt(aucTot)}\n▶ *Total Income: ₹${fmt(totalIncome)}*\n\n📤 *EXPENDITURE (PAYMENTS)*\n• Actual Incurred: ₹${fmt(exAct)}\n▶ *Total Expenditure: ₹${fmt(exAct)}*\n\n${netBalance >= 0 ? '✅' : '⚠️'} *Net Surplus/(Deficit): ₹${fmt(Math.abs(netBalance))}${netBalance < 0 ? ' (Deficit)' : ' (Surplus)'}*\n\n_Ganapati Bappa Morya!_ 🙏🌺`;
     openWhatsApp(msg);
   };
 
@@ -1191,47 +1280,90 @@ export function App() {
     input.click();
   };
 
-  // If visiting the public receipt portal link, render ONLY the isolated receipt search and download page.
+  // 1. PUBLIC DEVOTEE RECEIPTS PORTAL ('/ganeshotsava2026/receipts')
   // Completely public and accessible by ANY resident/devotee without password!
-  if (isReceiptPortal) {
+  if (currentRoute === 'receipts') {
     return (
       <PublicReceiptPortal
         contributions={contributions}
+        sevas={sevas}
         settings={settings}
+        onBackToHome={navigateToGaneshotsava}
         onBackToApp={
           isAuthenticated
-            ? () => {
-                const url = new URL(window.location.href);
-                url.searchParams.delete('view');
-                url.searchParams.delete('portal');
-                url.searchParams.delete('receipt-portal');
-                url.searchParams.delete('receipts');
-                url.searchParams.delete('q');
-                url.searchParams.delete('flat');
-                url.searchParams.delete('name');
-                url.searchParams.delete('rcpt');
-                url.pathname = '/';
-                url.hash = '';
-                window.history.pushState({}, '', '/');
-                setIsReceiptPortal(false);
-              }
+            ? navigateToGaneshotsava
             : undefined
         }
       />
     );
   }
 
-  // If visiting the root or main application link without /receipts, and NOT yet authenticated,
-  // require Committee Authentication before showing ANY financial data, statements, or expenses!
+  // 2. PUBLIC DEVOTEE SEVAS PORTAL ('/ganeshotsava2026/sevas')
+  // Allows devotees and community residents to view seva catalogue, book sevas, and view bookings
+  if (currentRoute === 'sevas') {
+    return (
+      <PublicSevaPortal
+        sevas={sevas}
+        catalogue={sevaCatalogue}
+        settings={settings}
+        isAdmin={isAdmin}
+        onSaveBooking={handleSaveSeva}
+        onDeleteBooking={handleDeleteSeva}
+        onSaveCatalogue={handleSaveSevaCatalogue}
+        onDeleteCatalogue={handleDeleteSevaCatalogue}
+        onNavigateToGaneshotsava={navigateToGaneshotsava}
+        onNavigateToReceipts={navigateToReceipts}
+        onAdminLoginSuccess={() => {
+          setIsAuthenticated(true);
+          setIsAdmin(true);
+          setUserRole('admin');
+          sessionStorage.setItem('eg_committee_auth', 'true');
+          sessionStorage.setItem('eg_user_role', 'admin');
+        }}
+        onUpdateSettings={handleSaveSettings}
+      />
+    );
+  }
+
+  // 3. ELDORADO KANNADIGARA BALAGA PAGE (IN DEVELOPMENT: '/homepageindevelop')
+  // Requirement: "the balaga page should only be visible to admin"
+  if (currentRoute === 'homepageindevelop') {
+    if (!isAuthenticated || !isAdmin) {
+      return (
+        <AdminGateForBalaga
+          settings={settings}
+          onSuccess={() => {
+            setIsAuthenticated(true);
+            setIsAdmin(true);
+            setUserRole('admin');
+            sessionStorage.setItem('eg_committee_auth', 'true');
+            sessionStorage.setItem('eg_user_role', 'admin');
+          }}
+          onBackToGaneshotsava={navigateToGaneshotsava}
+          onGoToReceipts={navigateToReceipts}
+        />
+      );
+    }
+
+    return (
+      <CommunityHomeView
+        settings={settings}
+        contributions={contributions}
+        onNavigateToGaneshotsava={navigateToGaneshotsava}
+        onNavigateToReceipts={navigateToReceipts}
+      />
+    );
+  }
+
+  // 4. GANESHOTSAVA 2026 FESTIVAL PORTAL (Default Landing Page '/')
+  // If not authenticated, require Committee Authentication before showing financial data, statements, or expenses!
   if (!isAuthenticated) {
     return (
       <CommitteeAuthGate
         settings={settings}
         onSuccess={handleLoginSuccess}
-        onGoToReceiptPortal={() => {
-          window.history.pushState({}, '', '/receipts');
-          setIsReceiptPortal(true);
-        }}
+        onGoToReceiptPortal={navigateToReceipts}
+        onGoToSevaPortal={navigateToSevas}
         onSaveSettings={handleSaveSettings}
       />
     );
@@ -1249,10 +1381,16 @@ export function App() {
                 src={settings.logo}
                 alt="Logo"
                 className="w-10 h-10 object-contain rounded bg-white/10 p-0.5 border border-white/20"
+                referrerPolicy="no-referrer"
               />
             ) : (
-              <div className="w-10 h-10 rounded-full bg-amber-400 text-[#991B1B] flex items-center justify-center font-bold font-serif text-xl shadow-inner select-none shrink-0">
-                🪔
+              <div className="w-10 h-10 rounded-full bg-amber-400 text-[#991B1B] flex items-center justify-center p-0.5 shadow-inner shrink-0 overflow-hidden border border-amber-300">
+                <img
+                  src="/lord_ganesha.svg"
+                  alt="Lord Sri Ganesha"
+                  className="w-full h-full object-contain rounded-full"
+                  referrerPolicy="no-referrer"
+                />
               </div>
             )}
             <div>
@@ -1301,6 +1439,17 @@ export function App() {
               <span>{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
             </button>
 
+            {/* Offline Cache Mode Indicator */}
+            {syncStatus === 'quota-limited' && (
+              <span
+                className="px-2.5 py-1 rounded-full font-bold uppercase tracking-wider inline-flex items-center gap-1.5 text-[11px] bg-amber-400/20 text-amber-200 border border-amber-300/40 shadow-xs"
+                title="Daily Firestore read limit reached. Seamlessly running in resilient offline cache mode."
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                <span>Offline Cache Mode</span>
+              </span>
+            )}
+
             {/* Save Button (Admin Only) */}
             {isAdmin && (
               <button
@@ -1318,17 +1467,37 @@ export function App() {
               </button>
             )}
 
-            {/* Direct Devotee Portal Quick Switch */}
+            {/* Eldorado Kannadigara Balaga Page (In Dev - strictly Admin only) */}
+            {isAdmin && (
+              <button
+                onClick={navigateToBalagaInDev}
+                className="px-2.5 py-1 rounded-full font-bold uppercase tracking-wider inline-flex items-center gap-1.5 transition-colors cursor-pointer text-[11px] bg-white/10 text-white hover:bg-white/20 border border-white/20 shadow-xs"
+                title="Open Eldorado Kannadigara Balaga Page (/homepageindevelop - Admin Only)"
+              >
+                <Sparkles className="w-3 h-3 text-amber-300" />
+                <span className="hidden sm:inline">Balaga Page</span>
+                <span className="text-[9px] bg-amber-400 text-stone-950 font-bold px-1 rounded">Admin</span>
+              </button>
+            )}
+
+            {/* Direct Devotee Sevas Booking Portal Quick Switch */}
             <button
-              onClick={() => {
-                window.history.pushState({}, '', '/receipts');
-                setIsReceiptPortal(true);
-              }}
+              onClick={navigateToSevas}
+              className="px-2.5 py-1 rounded-full font-bold uppercase tracking-wider inline-flex items-center gap-1.5 transition-colors cursor-pointer text-[11px] bg-white/10 text-white hover:bg-white/20 border border-white/20 shadow-xs"
+              title="Open Public Devotee Seva Booking Portal (/ganeshotsava2026/sevas)"
+            >
+              <Sparkles className="w-3 h-3 text-amber-300" />
+              <span className="hidden sm:inline">Seva Portal</span>
+            </button>
+
+            {/* Direct Devotee Receipt Portal Quick Switch */}
+            <button
+              onClick={navigateToReceipts}
               className="px-2.5 py-1 rounded-full font-bold uppercase tracking-wider inline-flex items-center gap-1.5 transition-colors cursor-pointer text-[11px] bg-amber-400 text-stone-950 hover:bg-amber-300 shadow-xs"
               title="Open Public Devotee Receipt Portal"
             >
               <FileText className="w-3 h-3 text-[#991B1B]" />
-              <span>Devotee Portal</span>
+              <span>Devotee Receipts</span>
             </button>
 
             {/* Lock / Logout Button */}
@@ -1521,6 +1690,23 @@ export function App() {
           </div>
         )}
       </header>
+ 
+      {/* Quota-Limited Notification Banner */}
+      {syncStatus === 'quota-limited' && (
+        <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 text-xs text-amber-900 shadow-2xs">
+          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse flex-shrink-0" />
+              <span>
+                <strong>Offline Ledger Active:</strong> Cloud daily read limit reached. All community records, calculations, devotee receipt downloads, and updates remain fully active and saved in your browser.
+              </span>
+            </div>
+            <span className="text-[11px] font-semibold text-amber-800 bg-amber-100/90 px-2 py-0.5 rounded self-start sm:self-auto whitespace-nowrap">
+              Cloud Quota Resets Daily
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* 4. MAIN BODY CONTAINER */}
       <main id="mainAppContent" className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 pt-6">
@@ -1557,10 +1743,7 @@ export function App() {
                   setPrintData({ type: 'receipt', subType: 'contribution', item: c });
                   setReceiptModalOpen(true);
                 }}
-                onOpenReceiptPortal={() => {
-                  window.history.pushState({}, '', '/receipts');
-                  setIsReceiptPortal(true);
-                }}
+                onOpenReceiptPortal={navigateToReceipts}
                 onUpdateSettings={handleSaveSettings}
               />
             )}
@@ -1596,10 +1779,13 @@ export function App() {
                 sevas={sevas}
                 catalogue={sevaCatalogue}
                 isAdmin={isAdmin}
+                settings={settings}
                 onSaveBooking={handleSaveSeva}
                 onDeleteBooking={handleDeleteSeva}
                 onSaveCatalogue={handleSaveSevaCatalogue}
                 onDeleteCatalogue={handleDeleteSevaCatalogue}
+                onOpenPublicSevaPortal={navigateToSevas}
+                onUpdateSettings={handleSaveSettings}
                 onPrintReceipt={v => {
                   setPrintData({ type: 'receipt', subType: 'seva', item: { ...v, isSeva: true } });
                   setReceiptModalOpen(true);

@@ -64,15 +64,27 @@ export interface SevaBooking {
   seva: string;
   name: string;
   flat: string;
-  amt: number;
+  amt?: number; // Non-mandatory voluntary amount (0 or omitted if in-kind donation like Rice/Ghee)
+  qty?: number; // Quantity or units booked by sponsor (e.g. 10 kg, 2 bags, 1 slot. Defaults to 1)
+  unit?: string; // Unit of measurement (e.g. "kg", "Bags", "Liters", "Tins", etc.)
   date: string;
   notes?: string;
+  status?: 'Booked' | 'Confirmed';
+  phone?: string;
+  gothra?: string;
+  nakshatra?: string;
+  createdBy?: 'admin' | 'public' | string;
+  confirmedBy?: string;
+  confirmedAt?: string;
 }
 
 export interface SevaCatalogueItem {
   id: string;
-  name: string;
-  amt: number;
+  name: string; // e.g. "Rice", "Flower Seva", "Pure Ghee", "Maha Pooja"
+  amt?: number; // Non-mandatory suggested contribution amount (can be 0 or omitted)
+  unit?: string; // Unit / measure: e.g. "kg", "Bags", "Liters", "Tins", "Packets", "Slots"
+  totalRequired?: number; // Total required quantity/units (e.g. 50 kg, 10 tins, etc.)
+  desc?: string; // Notes / description of the offering
 }
 
 export interface HundiCollection {
@@ -97,6 +109,8 @@ export interface AuctionItem {
 export type UserRole = 'admin' | 'sponsor' | 'volunteer';
 
 export interface AppSettings {
+  festival?: string;
+  dates?: string;
   org: string;
   location: string;
   upi: string;
@@ -106,6 +120,7 @@ export interface AppSettings {
   sponsorHash?: string;
   volunteerHash?: string;
   customReceiptPortalUrl?: string;
+  customSevaPortalUrl?: string;
 }
 
 export interface AppState {

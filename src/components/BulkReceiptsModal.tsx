@@ -726,16 +726,17 @@ const ReceiptCard: React.FC<ReceiptCardProps> = ({ item, settings, qrCodeDataUrl
       <div className="relative z-10">
         {/* Header */}
         <div className={`flex items-center gap-3 sm:gap-4 border-b-2 border-[#991B1B] ${compact ? 'pb-2.5 mb-2.5' : 'pb-4 mb-4'}`}>
-          {settings.logo && (
-            <img
-              src={settings.logo}
-              alt="Logo"
-              className={`${compact ? 'w-12 h-12' : 'w-14 h-14 sm:w-16 sm:h-16'} object-contain rounded shrink-0`}
-            />
-          )}
+          <img
+            src={settings.logo || '/lord_ganesha.svg'}
+            alt="Lord Sri Ganesha"
+            className={`${compact ? 'w-12 h-12' : 'w-14 h-14 sm:w-16 sm:h-16'} object-contain rounded shrink-0`}
+            referrerPolicy="no-referrer"
+          />
           <div className="flex-1 text-center">
-            <div className="text-[10px] font-bold uppercase tracking-widest text-[#991B1B] mb-0.5">
-              🪔 GANAPATI BAPPA MORYA 🪔
+            <div className="text-[10px] font-bold uppercase tracking-widest text-[#991B1B] mb-0.5 inline-flex items-center justify-center gap-1.5">
+              <img src="/lord_ganesha.svg" alt="" className="w-3.5 h-3.5 object-contain inline" referrerPolicy="no-referrer" />
+              <span>GANAPATI BAPPA MORYA</span>
+              <img src="/lord_ganesha.svg" alt="" className="w-3.5 h-3.5 object-contain inline" referrerPolicy="no-referrer" />
             </div>
             <h2
               className={`${compact ? 'text-lg sm:text-xl' : 'text-xl sm:text-2xl'} font-serif font-black text-[#991B1B] leading-tight`}

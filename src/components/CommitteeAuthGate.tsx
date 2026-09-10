@@ -6,6 +6,8 @@ import {
   AlertCircle,
   FileText,
   ArrowRight,
+  ArrowLeft,
+  Home,
   Sparkles,
   KeyRound,
   ShieldCheck
@@ -17,6 +19,8 @@ interface CommitteeAuthGateProps {
   settings: AppSettings;
   onSuccess: (role: UserRole) => void;
   onGoToReceiptPortal: () => void;
+  onGoToSevaPortal?: () => void;
+  onBackToHome?: () => void;
   onSaveSettings?: (newSettings: AppSettings) => void;
 }
 
@@ -28,7 +32,9 @@ const DEFAULT_VOLUNTEER_HASH = '1916dd5824e8d6a9a0d3904631bf922f9c2c87f25b6bb0a4
 export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
   settings,
   onSuccess,
-  onGoToReceiptPortal
+  onGoToReceiptPortal,
+  onGoToSevaPortal,
+  onBackToHome
 }) => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -98,10 +104,16 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
                 src={settings.logo}
                 alt="Logo"
                 className="w-9 h-9 object-contain rounded bg-white/10 p-0.5 border border-white/20"
+                referrerPolicy="no-referrer"
               />
             ) : (
-              <div className="w-9 h-9 rounded-full bg-amber-400 text-[#991B1B] flex items-center justify-center font-bold text-lg shadow-inner select-none shrink-0">
-                🪔
+              <div className="w-9 h-9 rounded-full bg-amber-400 text-[#991B1B] flex items-center justify-center p-0.5 shadow-inner shrink-0 overflow-hidden border border-amber-300">
+                <img
+                  src="/lord_ganesha.svg"
+                  alt="Lord Sri Ganesha"
+                  className="w-full h-full object-contain rounded-full"
+                  referrerPolicy="no-referrer"
+                />
               </div>
             )}
             <div>
@@ -114,16 +126,43 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={onGoToReceiptPortal}
-            className="bg-amber-400 hover:bg-amber-300 text-[#7F1D1D] font-bold text-xs px-3 py-1.5 rounded-lg inline-flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs shrink-0"
-            title="Open the public receipt portal for devotees"
-          >
-            <FileText className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Devotee Receipts</span>
-            <span>→</span>
-          </button>
+          <div className="flex items-center gap-2">
+            {onGoToSevaPortal && (
+              <button
+                type="button"
+                onClick={onGoToSevaPortal}
+                className="bg-white/10 hover:bg-white/20 text-white font-semibold text-xs px-2.5 py-1.5 rounded-lg inline-flex items-center gap-1.5 transition-colors cursor-pointer border border-white/20 shrink-0"
+                title="Book Devotional Sevas for Sri Ganeshotsava 2026"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                <span className="hidden sm:inline">Devotee Sevas</span>
+                <span className="text-[9px] bg-amber-400 text-stone-950 font-bold px-1 rounded">Open</span>
+              </button>
+            )}
+
+            {onBackToHome && (
+              <button
+                type="button"
+                onClick={onBackToHome}
+                className="bg-white/10 hover:bg-white/20 text-white font-semibold text-xs px-3 py-1.5 rounded-lg inline-flex items-center gap-1.5 transition-colors cursor-pointer border border-white/20 shrink-0"
+                title="Return to Community Celebrations Home"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Celebrations Home</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={onGoToReceiptPortal}
+              className="bg-amber-400 hover:bg-amber-300 text-[#7F1D1D] font-bold text-xs px-3 py-1.5 rounded-lg inline-flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs shrink-0"
+              title="Open the public receipt portal for devotees"
+            >
+              <FileText className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Devotee Receipts</span>
+              <span>→</span>
+            </button>
+          </div>
         </div>
       </header>
 
@@ -134,8 +173,13 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
           <div className="bg-white border border-stone-200 rounded-2xl shadow-xl overflow-hidden">
             {/* Header / Welcoming Banner */}
             <div className="bg-gradient-to-r from-[#7F1D1D] via-[#991B1B] to-[#7F1D1D] text-white p-6 text-center border-b-2 border-amber-400 relative">
-              <div className="w-14 h-14 rounded-full bg-amber-400 text-[#991B1B] flex items-center justify-center mx-auto mb-3 shadow-lg ring-4 ring-white/20">
-                <Lock className="w-7 h-7 text-[#991B1B]" />
+              <div className="w-16 h-16 rounded-full bg-amber-400 text-[#991B1B] flex items-center justify-center mx-auto mb-3 shadow-lg ring-4 ring-amber-300/30 overflow-hidden p-1 border-2 border-amber-300">
+                <img
+                  src="/lord_ganesha.svg"
+                  alt="Lord Sri Ganesha"
+                  className="w-full h-full object-contain rounded-full"
+                  referrerPolicy="no-referrer"
+                />
               </div>
               <h2 className="text-xl sm:text-2xl font-serif font-black tracking-wide leading-snug">
                 Welcome to El Dorado Ganeshotsava 2026
@@ -201,28 +245,40 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
           </div>
 
           {/* Devotee Redirection Card */}
-          <div className="bg-amber-50/90 border border-amber-300 rounded-2xl p-4 sm:p-5 text-center space-y-2.5 shadow-xs">
+          <div className="bg-amber-50/90 border border-amber-300 rounded-2xl p-4 sm:p-5 text-center space-y-3 shadow-xs">
             <div className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-950 bg-amber-200/80 px-2.5 py-1 rounded-full">
               <Sparkles className="w-3.5 h-3.5 text-amber-700" />
               <span>Devotee &amp; Resident Self-Service</span>
             </div>
             <div>
               <h3 className="text-sm font-serif font-bold text-stone-900">
-                Looking to Download Your Voluntary Contribution Receipt?
+                Devotee Receipts &amp; Devotional Seva Bookings
               </h3>
               <p className="text-xs text-stone-600 mt-1 max-w-sm mx-auto leading-relaxed">
-                Residents do <strong>not</strong> need any password. Click below to search your flat number or name and download your official receipt.
+                Residents do <strong>not</strong> need any committee password. Download your contribution receipts or book devotional sevas directly:
               </p>
             </div>
-            <button
-              type="button"
-              onClick={onGoToReceiptPortal}
-              className="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-stone-950 font-bold text-xs py-2.5 px-4 rounded-xl inline-flex items-center justify-center gap-2 shadow-xs transition-all cursor-pointer"
-            >
-              <FileText className="w-4 h-4" />
-              <span>Public Devotee Receipt Portal</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+              <button
+                type="button"
+                onClick={onGoToReceiptPortal}
+                className="w-full bg-amber-400 hover:bg-amber-300 text-[#7F1D1D] font-bold text-xs py-2.5 px-3 rounded-xl inline-flex items-center justify-center gap-1.5 shadow-xs transition-all cursor-pointer"
+              >
+                <FileText className="w-4 h-4 text-[#991B1B]" />
+                <span>Devotee Receipts</span>
+              </button>
+
+              {onGoToSevaPortal && (
+                <button
+                  type="button"
+                  onClick={onGoToSevaPortal}
+                  className="w-full bg-[#991B1B] hover:bg-[#7F1D1D] text-white font-bold text-xs py-2.5 px-3 rounded-xl inline-flex items-center justify-center gap-1.5 shadow-xs transition-all cursor-pointer"
+                >
+                  <Sparkles className="w-4 h-4 text-amber-300" />
+                  <span>Book Sevas</span>
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </main>

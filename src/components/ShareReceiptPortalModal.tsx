@@ -36,30 +36,24 @@ export const ShareReceiptPortalModal: React.FC<ShareReceiptPortalModalProps> = (
   const qrContainerRef = useRef<HTMLDivElement>(null);
   const [copiedType, setCopiedType] = useState<'short' | 'direct' | null>(null);
 
-  // Clean full app path (e.g., https://domain.run.app/receipts)
+  // Clean direct website receipt path (website/receipts)
   const cleanDirectUrl = typeof window !== 'undefined'
     ? `${window.location.origin}/receipts`
-    : '';
+    : '/receipts';
 
-  // Recommended default short link already created for this festival app
-  const DEFAULT_SHORT_LINK = 'https://tinyurl.com/eldorado-receipts-2026';
-
-  // Active short link: custom from settings, or fallback default
-  const activeShortUrl = settings.customReceiptPortalUrl || DEFAULT_SHORT_LINK;
+  // Active link: custom from settings, or direct website path /receipts
+  const primaryShareUrl = settings.customReceiptPortalUrl || cleanDirectUrl;
 
   // Custom link editor state
   const [isEditingCustom, setIsEditingCustom] = useState(false);
-  const [customInput, setCustomInput] = useState(activeShortUrl);
+  const [customInput, setCustomInput] = useState(primaryShareUrl);
   const [aliasInput, setAliasInput] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  // Which link to use for QR and default share: short URL preferred
-  const primaryShareUrl = activeShortUrl;
-
   useEffect(() => {
-    setCustomInput(activeShortUrl);
-  }, [activeShortUrl]);
+    setCustomInput(primaryShareUrl);
+  }, [primaryShareUrl]);
 
   useEffect(() => {
     if (!open) return;
@@ -110,21 +104,18 @@ export const ShareReceiptPortalModal: React.FC<ShareReceiptPortalModalProps> = (
 
   const handleSaveCustomLink = () => {
     let clean = customInput.trim();
-    if (!clean) {
-      clean = DEFAULT_SHORT_LINK;
-    }
-    if (!clean.startsWith('http://') && !clean.startsWith('https://')) {
+    if (clean && !clean.startsWith('http://') && !clean.startsWith('https://')) {
       clean = 'https://' + clean;
     }
 
     if (onUpdateSettings) {
       onUpdateSettings({
         ...settings,
-        customReceiptPortalUrl: clean
+        customReceiptPortalUrl: clean || ''
       });
       setStatusMessage({
         type: 'success',
-        text: 'Short URL updated and saved! Devotees and WhatsApp messages will now use this short link.'
+        text: 'Receipt portal URL updated and saved!'
       });
       setTimeout(() => setStatusMessage(null), 4000);
       setIsEditingCustom(false);
@@ -179,7 +170,7 @@ export const ShareReceiptPortalModal: React.FC<ShareReceiptPortalModalProps> = (
   };
 
   const handleShareWhatsApp = () => {
-    const text = `🙏 *Ganeshotsava 2026 — Official Devotee Receipt Portal*\n*${settings.org || 'Brigade Eldorado Residents Association'}*\n\nDear Devotees & Residents,\nYou can now search and download your official Ganesh Festival voluntary contribution receipt directly on your phone or computer:\n\n👉 *Click here to download your receipt:*\n${primaryShareUrl}\n\nSimply enter your *Flat Number* (e.g. A-101) or *Name* to get your signed official PDF receipt.\n\n*Ganapati Bappa Morya!* 🌺🪔`;
+    const text = `🙏 *Ganeshotsava 2026 — Official Devotee Receipt Portal*\n*${settings.org || 'Brigade Eldorado Residents Association'}*\n\nDear Devotees & Residents,\nYou can now search and download your official Ganesh Festival voluntary contribution receipt directly on your phone or computer:\n\n👉 *Click here to download your receipt:*\n${primaryShareUrl}\n\nSimply enter your *Flat Number* (e.g. A-101) or *Name* to get your signed official PDF receipt.\n\n*Ganapati Bappa Morya!* 🌺🙏`;
     window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
   };
 
@@ -198,8 +189,13 @@ export const ShareReceiptPortalModal: React.FC<ShareReceiptPortalModalProps> = (
         {/* Header */}
         <div className="bg-gradient-to-r from-[#7F1D1D] via-[#991B1B] to-[#7F1D1D] text-white p-4 sm:px-6 sm:py-5 flex items-center justify-between border-b-2 border-amber-400">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-full bg-amber-400 text-[#991B1B] flex items-center justify-center font-bold text-lg shadow-inner">
-              🪔
+            <div className="w-9 h-9 rounded-full bg-amber-400 text-[#991B1B] flex items-center justify-center p-0.5 shadow-inner shrink-0 overflow-hidden border border-amber-300">
+              <img
+                src="/lord_ganesha.svg"
+                alt="Lord Sri Ganesha"
+                className="w-full h-full object-contain rounded-full"
+                referrerPolicy="no-referrer"
+              />
             </div>
             <div>
               <h3 className="text-sm sm:text-base font-serif font-black tracking-wide leading-tight">

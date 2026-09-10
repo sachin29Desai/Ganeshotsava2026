@@ -1,6 +1,8 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import {
   initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
   memoryLocalCache,
   getFirestore,
   collection,
@@ -10,7 +12,10 @@ import {
   onSnapshot,
   writeBatch,
   getDocs,
+  getDocsFromCache,
   getDocsFromServer,
+  getDoc,
+  getDocFromCache,
   getDocFromServer,
   DocumentData,
   Unsubscribe
@@ -27,7 +32,7 @@ import {
   AppSettings,
   AppState
 } from '../types';
-import { DEFAULT_SEVAS } from '../utils/helpers';
+import { DEFAULT_SEVAS, INITIAL_STATE } from '../utils/helpers';
 import firebaseConfigData from '../../firebase-applet-config.json';
 
 const firebaseConfig = {
@@ -42,7 +47,7 @@ const firebaseConfig = {
 // Initialize Firebase App
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 
-// Initialize Firestore with custom database ID and auto-detecting long polling fallback
+// Initialize Firestore with custom database ID, multi-tab persistent cache, and auto-detecting long polling fallback
 const customDbId =
   firebaseConfigData.firestoreDatabaseId && firebaseConfigData.firestoreDatabaseId !== '(default)'
     ? firebaseConfigData.firestoreDatabaseId
@@ -53,19 +58,45 @@ try {
   firestoreInstance = initializeFirestore(
     app,
     {
-      localCache: memoryLocalCache(),
+      localCache: persistentLocalCache({
+        tabManager: persistentMultipleTabManager()
+      }),
       experimentalAutoDetectLongPolling: true,
       ignoreUndefinedProperties: true
     },
     customDbId
   );
 } catch {
-  firestoreInstance = getFirestore(app, customDbId);
+  try {
+    firestoreInstance = initializeFirestore(
+      app,
+      {
+        localCache: persistentLocalCache(),
+        experimentalAutoDetectLongPolling: true,
+        ignoreUndefinedProperties: true
+      },
+      customDbId
+    );
+  } catch {
+    try {
+      firestoreInstance = initializeFirestore(
+        app,
+        {
+          localCache: memoryLocalCache(),
+          experimentalAutoDetectLongPolling: true,
+          ignoreUndefinedProperties: true
+        },
+        customDbId
+      );
+    } catch {
+      firestoreInstance = getFirestore(app, customDbId);
+    }
+  }
 }
 
 export const db = firestoreInstance;
 
-export type SyncStatus = 'connecting' | 'connected' | 'offline' | 'synced' | 'saving' | 'error';
+export type SyncStatus = 'connecting' | 'connected' | 'offline' | 'synced' | 'saving' | 'error' | 'quota-limited';
 
 export interface FirestoreListeners {
   onExpenses?: (expenses: Expense[]) => void;
@@ -83,8 +114,135 @@ export interface FirestoreListeners {
 
 let isSeeded = false;
 
+const SNAPSHOT_CACHE_KEY = 'eg_ganeshotsava_ledger_cache_v1';
+
 /**
- * Fetch fresh data directly from Firestore servers (bypassing any stale local client cache)
+ * Checks if an error is due to Firestore Free Tier daily read/write quota exhaustion
+ */
+export function isQuotaExceededError(err: any): boolean {
+  if (!err) return false;
+  const msg = (err.message || (typeof err === 'string' ? err : JSON.stringify(err))).toLowerCase();
+  const code = (err.code || '').toLowerCase();
+  return (
+    code === 'resource-exhausted' ||
+    code.includes('resource-exhausted') ||
+    code.includes('quota') ||
+    msg.includes('quota') ||
+    msg.includes('quota limit exceeded') ||
+    msg.includes('read units') ||
+    msg.includes('free tier database')
+  );
+}
+
+/**
+ * Stores a resilient ledger snapshot in local storage so all features remain instant
+ * and fully functional even when daily cloud quotas are exhausted or offline.
+ */
+export function saveLocalSnapshotBackup(data: Partial<AppState | ServerDataResult>): void {
+  try {
+    if (typeof window === 'undefined' || !window.localStorage) return;
+    const existingStr = window.localStorage.getItem(SNAPSHOT_CACHE_KEY);
+    const existing = existingStr ? JSON.parse(existingStr) : {};
+    const merged = {
+      ...existing,
+      ...data,
+      lastCachedAt: new Date().toISOString()
+    };
+    window.localStorage.setItem(SNAPSHOT_CACHE_KEY, JSON.stringify(merged));
+  } catch (e) {
+    console.warn('Unable to write local ledger snapshot backup:', e);
+  }
+}
+
+/**
+ * Retrieves the cached ledger snapshot from local storage.
+ */
+export function loadLocalSnapshotBackup(): AppState | null {
+  try {
+    if (typeof window === 'undefined' || !window.localStorage) return null;
+    const str = window.localStorage.getItem(SNAPSHOT_CACHE_KEY);
+    if (!str) return null;
+    const parsed = JSON.parse(str);
+    if (parsed && (parsed.expenses || parsed.contributions || parsed.settings)) {
+      return parsed as AppState;
+    }
+  } catch (e) {
+    console.warn('Unable to read local ledger snapshot backup:', e);
+  }
+  return null;
+}
+
+/**
+ * Safely fetches a collection from Firestore with transparent fallback to
+ * local IndexedDB cache, local snapshot backup, and default initial records.
+ * Never throws unhandled quota exceptions.
+ */
+async function fetchCollectionSafely<T>(colName: string, defaultItems: T[] = []): Promise<T[]> {
+  // 1. Try standard getDocs (uses server or local IndexedDB cache seamlessly)
+  try {
+    const snap = await getDocs(collection(db, colName));
+    const items: T[] = [];
+    snap.forEach((d) => items.push({ id: d.id, ...d.data() } as T));
+    if (items.length > 0) return items;
+  } catch (err: any) {
+    if (isQuotaExceededError(err)) {
+      console.warn(`Firestore free daily read quota reached for '${colName}'. Falling back to offline cache.`);
+    } else {
+      console.warn(`Error querying Firestore collection '${colName}':`, err?.message || err);
+    }
+  }
+
+  // 2. Fallback: Try reading from local Firestore IndexedDB cache explicitly
+  try {
+    const cacheSnap = await getDocsFromCache(collection(db, colName));
+    const items: T[] = [];
+    cacheSnap.forEach((d) => items.push({ id: d.id, ...d.data() } as T));
+    if (items.length > 0) return items;
+  } catch {
+    // Cache may be empty or not yet warmed
+  }
+
+  // 3. Fallback: Try reading from localStorage snapshot backup
+  const localBackup = loadLocalSnapshotBackup();
+  if (localBackup && Array.isArray((localBackup as any)[colName]) && (localBackup as any)[colName].length > 0) {
+    return (localBackup as any)[colName];
+  }
+
+  // 4. Fallback: Use initial default data
+  return defaultItems;
+}
+
+/**
+ * Safely fetches a document from Firestore with fallback to local cache
+ */
+async function fetchDocSafely<T>(colName: string, docId: string, defaultDoc: T | null = null): Promise<T | null> {
+  try {
+    const snap = await getDoc(doc(db, colName, docId));
+    if (snap.exists()) return snap.data() as T;
+  } catch (err: any) {
+    if (isQuotaExceededError(err)) {
+      console.warn(`Firestore free daily read quota reached for '${colName}/${docId}'. Falling back to offline cache.`);
+    }
+  }
+
+  try {
+    const cacheSnap = await getDocFromCache(doc(db, colName, docId));
+    if (cacheSnap.exists()) return cacheSnap.data() as T;
+  } catch {
+    // ignore
+  }
+
+  const localBackup = loadLocalSnapshotBackup();
+  if (localBackup) {
+    if (colName === 'settings' && docId === 'config' && localBackup.settings) return localBackup.settings as T;
+    if (colName === 'metadata' && docId === 'counters' && localBackup.counters) return localBackup.counters as T;
+  }
+
+  return defaultDoc;
+}
+
+/**
+ * Fetch fresh data directly from Firestore or local persistent cache without throwing quota errors
  */
 export interface ServerDataResult {
   expenses: Expense[];
@@ -101,57 +259,34 @@ export interface ServerDataResult {
 
 export async function fetchFreshDataFromServer(): Promise<ServerDataResult> {
   const [
-    expSnap,
-    ctSnap,
-    spSnap,
-    csSnap,
-    svSnap,
-    scSnap,
-    hundiSnap,
-    aucSnap,
-    settingsSnap,
-    countersSnap
+    expenses,
+    contributions,
+    sponsors,
+    commercialStalls,
+    sevas,
+    sevaCatalogue,
+    hundi,
+    auctions,
+    settings,
+    counters
   ] = await Promise.all([
-    getDocsFromServer(collection(db, 'expenses')).catch(() => getDocs(collection(db, 'expenses'))),
-    getDocsFromServer(collection(db, 'contributions')).catch(() => getDocs(collection(db, 'contributions'))),
-    getDocsFromServer(collection(db, 'sponsors')).catch(() => getDocs(collection(db, 'sponsors'))),
-    getDocsFromServer(collection(db, 'commercialStalls')).catch(() => getDocs(collection(db, 'commercialStalls'))),
-    getDocsFromServer(collection(db, 'sevas')).catch(() => getDocs(collection(db, 'sevas'))),
-    getDocsFromServer(collection(db, 'sevaCatalogue')).catch(() => getDocs(collection(db, 'sevaCatalogue'))),
-    getDocsFromServer(collection(db, 'hundi')).catch(() => getDocs(collection(db, 'hundi'))),
-    getDocsFromServer(collection(db, 'auctions')).catch(() => getDocs(collection(db, 'auctions'))),
-    getDocFromServer(doc(db, 'settings', 'config')).catch(() => null),
-    getDocFromServer(doc(db, 'metadata', 'counters')).catch(() => null)
+    fetchCollectionSafely<Expense>('expenses', INITIAL_STATE.expenses),
+    fetchCollectionSafely<Contribution>('contributions', INITIAL_STATE.contributions),
+    fetchCollectionSafely<Sponsor>('sponsors', INITIAL_STATE.sponsors || []),
+    fetchCollectionSafely<CommercialStall>('commercialStalls', INITIAL_STATE.commercialStalls || []),
+    fetchCollectionSafely<SevaBooking>('sevas', INITIAL_STATE.sevas || []),
+    fetchCollectionSafely<SevaCatalogueItem>('sevaCatalogue', DEFAULT_SEVAS),
+    fetchCollectionSafely<HundiCollection>('hundi', []),
+    fetchCollectionSafely<AuctionItem>('auctions', []),
+    fetchDocSafely<AppSettings>('settings', 'config', INITIAL_STATE.settings),
+    fetchDocSafely<{ rc?: string | null; sp?: string | null; cs?: string | null; sv?: string | null; auc?: string | null }>(
+      'metadata',
+      'counters',
+      INITIAL_STATE.counters
+    )
   ]);
 
-  const expenses: Expense[] = [];
-  expSnap.forEach((d) => expenses.push({ id: d.id, ...d.data() } as Expense));
-
-  const contributions: Contribution[] = [];
-  ctSnap.forEach((d) => contributions.push({ id: d.id, ...d.data() } as Contribution));
-
-  const sponsors: Sponsor[] = [];
-  spSnap.forEach((d) => sponsors.push({ id: d.id, ...d.data() } as Sponsor));
-
-  const commercialStalls: CommercialStall[] = [];
-  csSnap.forEach((d) => commercialStalls.push({ id: d.id, ...d.data() } as CommercialStall));
-
-  const sevas: SevaBooking[] = [];
-  svSnap.forEach((d) => sevas.push({ id: d.id, ...d.data() } as SevaBooking));
-
-  const sevaCatalogue: SevaCatalogueItem[] = [];
-  scSnap.forEach((d) => sevaCatalogue.push({ id: d.id, ...d.data() } as SevaCatalogueItem));
-
-  const hundi: HundiCollection[] = [];
-  hundiSnap.forEach((d) => hundi.push({ id: d.id, ...d.data() } as HundiCollection));
-
-  const auctions: AuctionItem[] = [];
-  aucSnap.forEach((d) => auctions.push({ id: d.id, ...d.data() } as AuctionItem));
-
-  const settings = settingsSnap && settingsSnap.exists() ? (settingsSnap.data() as AppSettings) : undefined;
-  const counters = countersSnap && countersSnap.exists() ? (countersSnap.data() as any) : undefined;
-
-  return {
+  const result: ServerDataResult = {
     expenses,
     contributions,
     sponsors,
@@ -160,9 +295,14 @@ export async function fetchFreshDataFromServer(): Promise<ServerDataResult> {
     sevaCatalogue: sevaCatalogue.length > 0 ? sevaCatalogue : DEFAULT_SEVAS,
     hundi,
     auctions,
-    settings,
-    counters
+    settings: settings || INITIAL_STATE.settings,
+    counters: counters || INITIAL_STATE.counters
   };
+
+  // Keep local snapshot backup up to date
+  saveLocalSnapshotBackup(result);
+
+  return result;
 }
 
 /**
@@ -172,6 +312,16 @@ export function initFirestoreSync(listeners: FirestoreListeners, initialState?: 
   listeners.onStatusChange?.('connecting');
   const unsubscribes: Unsubscribe[] = [];
 
+  const handleSnapshotError = (colName: string, err: any) => {
+    if (isQuotaExceededError(err)) {
+      console.warn(`Firestore read quota reached on '${colName}'. Falling back to local offline cache.`);
+      listeners.onStatusChange?.('quota-limited', 'Daily free cloud read quota reached. Running in offline cache mode.');
+    } else {
+      console.warn(`${colName} listener warning:`, err?.message || err);
+      listeners.onStatusChange?.('offline', err?.message);
+    }
+  };
+
   try {
     // 1. Expenses Collection Listener
     const unsubExp = onSnapshot(
@@ -180,12 +330,10 @@ export function initFirestoreSync(listeners: FirestoreListeners, initialState?: 
         const items: Expense[] = [];
         snap.forEach((d) => items.push({ id: d.id, ...d.data() } as Expense));
         listeners.onExpenses?.(items);
+        saveLocalSnapshotBackup({ expenses: items });
         listeners.onStatusChange?.('synced');
       },
-      (err) => {
-        console.warn('Expenses listener warning:', err);
-        listeners.onStatusChange?.('offline', err.message);
-      }
+      (err) => handleSnapshotError('expenses', err)
     );
     unsubscribes.push(unsubExp);
 
@@ -196,12 +344,10 @@ export function initFirestoreSync(listeners: FirestoreListeners, initialState?: 
         const items: Contribution[] = [];
         snap.forEach((d) => items.push({ id: d.id, ...d.data() } as Contribution));
         listeners.onContributions?.(items);
+        saveLocalSnapshotBackup({ contributions: items });
         listeners.onStatusChange?.('synced');
       },
-      (err) => {
-        console.warn('Contributions listener warning:', err);
-        listeners.onStatusChange?.('offline', err.message);
-      }
+      (err) => handleSnapshotError('contributions', err)
     );
     unsubscribes.push(unsubCt);
 
@@ -212,12 +358,10 @@ export function initFirestoreSync(listeners: FirestoreListeners, initialState?: 
         const items: Sponsor[] = [];
         snap.forEach((d) => items.push({ id: d.id, ...d.data() } as Sponsor));
         listeners.onSponsors?.(items);
+        saveLocalSnapshotBackup({ sponsors: items });
         listeners.onStatusChange?.('synced');
       },
-      (err) => {
-        console.warn('Sponsors listener warning:', err);
-        listeners.onStatusChange?.('offline', err.message);
-      }
+      (err) => handleSnapshotError('sponsors', err)
     );
     unsubscribes.push(unsubSp);
 
@@ -228,11 +372,10 @@ export function initFirestoreSync(listeners: FirestoreListeners, initialState?: 
         const items: CommercialStall[] = [];
         snap.forEach((d) => items.push({ id: d.id, ...d.data() } as CommercialStall));
         listeners.onCommercialStalls?.(items);
+        saveLocalSnapshotBackup({ commercialStalls: items });
         listeners.onStatusChange?.('synced');
       },
-      (err) => {
-        console.warn('Commercial stalls listener warning:', err);
-      }
+      (err) => handleSnapshotError('commercialStalls', err)
     );
     unsubscribes.push(unsubStalls);
 
@@ -243,12 +386,10 @@ export function initFirestoreSync(listeners: FirestoreListeners, initialState?: 
         const items: SevaBooking[] = [];
         snap.forEach((d) => items.push({ id: d.id, ...d.data() } as SevaBooking));
         listeners.onSevas?.(items);
+        saveLocalSnapshotBackup({ sevas: items });
         listeners.onStatusChange?.('synced');
       },
-      (err) => {
-        console.warn('Sevas listener warning:', err);
-        listeners.onStatusChange?.('offline', err.message);
-      }
+      (err) => handleSnapshotError('sevas', err)
     );
     unsubscribes.push(unsubSv);
 
@@ -259,11 +400,10 @@ export function initFirestoreSync(listeners: FirestoreListeners, initialState?: 
         const items: HundiCollection[] = [];
         snap.forEach((d) => items.push({ id: d.id, ...d.data() } as HundiCollection));
         listeners.onHundi?.(items);
+        saveLocalSnapshotBackup({ hundi: items });
         listeners.onStatusChange?.('synced');
       },
-      (err) => {
-        console.warn('Hundi listener warning:', err);
-      }
+      (err) => handleSnapshotError('hundi', err)
     );
     unsubscribes.push(unsubHundi);
 
@@ -274,11 +414,10 @@ export function initFirestoreSync(listeners: FirestoreListeners, initialState?: 
         const items: AuctionItem[] = [];
         snap.forEach((d) => items.push({ id: d.id, ...d.data() } as AuctionItem));
         listeners.onAuctions?.(items);
+        saveLocalSnapshotBackup({ auctions: items });
         listeners.onStatusChange?.('synced');
       },
-      (err) => {
-        console.warn('Auctions listener warning:', err);
-      }
+      (err) => handleSnapshotError('auctions', err)
     );
     unsubscribes.push(unsubAuctions);
 
@@ -290,12 +429,11 @@ export function initFirestoreSync(listeners: FirestoreListeners, initialState?: 
         snap.forEach((d) => items.push({ id: d.id, ...d.data() } as SevaCatalogueItem));
         if (items.length > 0) {
           listeners.onSevaCatalogue?.(items);
+          saveLocalSnapshotBackup({ sevaCatalogue: items });
         }
         listeners.onStatusChange?.('synced');
       },
-      (err) => {
-        console.warn('Seva catalogue listener warning:', err);
-      }
+      (err) => handleSnapshotError('sevaCatalogue', err)
     );
     unsubscribes.push(unsubSc);
 
@@ -304,12 +442,12 @@ export function initFirestoreSync(listeners: FirestoreListeners, initialState?: 
       doc(db, 'settings', 'config'),
       (snap) => {
         if (snap.exists()) {
-          listeners.onSettings?.(snap.data() as AppSettings);
+          const s = snap.data() as AppSettings;
+          listeners.onSettings?.(s);
+          saveLocalSnapshotBackup({ settings: s });
         }
       },
-      (err) => {
-        console.warn('Settings listener warning:', err);
-      }
+      (err) => handleSnapshotError('settings', err)
     );
     unsubscribes.push(unsubSettings);
 
@@ -318,17 +456,22 @@ export function initFirestoreSync(listeners: FirestoreListeners, initialState?: 
       doc(db, 'metadata', 'counters'),
       (snap) => {
         if (snap.exists()) {
-          listeners.onCounters?.(snap.data() as { rc?: string; sp?: string; cs?: string; sv?: string; auc?: string });
+          const c = snap.data() as { rc?: string; sp?: string; cs?: string; sv?: string; auc?: string };
+          listeners.onCounters?.(c);
+          saveLocalSnapshotBackup({ counters: c });
         }
       },
-      (err) => {
-        console.warn('Counters listener warning:', err);
-      }
+      (err) => handleSnapshotError('counters', err)
     );
     unsubscribes.push(unsubCounters);
   } catch (err: any) {
-    console.warn('Firebase initialization error:', err);
-    listeners.onStatusChange?.('offline', err?.message);
+    if (isQuotaExceededError(err)) {
+      console.warn('Firebase real-time sync reached quota limits. Operating on local cache.');
+      listeners.onStatusChange?.('quota-limited', 'Daily cloud read quota reached. Running in offline cache mode.');
+    } else {
+      console.warn('Firebase initialization error:', err);
+      listeners.onStatusChange?.('offline', err?.message);
+    }
   }
 
   return () => {
@@ -396,8 +539,12 @@ export async function seedInitialDataIfEmpty(initialState: AppState) {
       await batch.commit();
       console.log('✅ Initial state synced to Firestore');
     }
-  } catch (err) {
-    console.warn('Seed check completed or skipped:', err);
+  } catch (err: any) {
+    if (isQuotaExceededError(err)) {
+      console.warn('Seed check bypassed because Firestore daily free quota was reached.');
+    } else {
+      console.warn('Seed check completed or skipped:', err?.message || err);
+    }
   }
 }
 
@@ -581,6 +728,9 @@ export async function cloudBulkImportContributions(contributions: Contribution[]
  * Saves and syncs all application data across all tabs to Firebase Firestore.
  */
 export async function cloudSyncAllData(state: AppState) {
+  // Always update local snapshot backup first so user changes are never lost
+  saveLocalSnapshotBackup(state);
+
   try {
     const collectionsToSync: Array<{ name: string; items: Array<{ id: string; [key: string]: any }> }> = [
       { name: 'expenses', items: state.expenses || [] },
@@ -594,20 +744,30 @@ export async function cloudSyncAllData(state: AppState) {
     ];
 
     for (const col of collectionsToSync) {
-      const snap = await getDocs(collection(db, col.name));
-      const currentIds = new Set(col.items.map((i) => i.id));
-      const toDelete = snap.docs.filter((d) => !currentIds.has(d.id));
+      let snap;
+      try {
+        snap = await getDocs(collection(db, col.name));
+      } catch (err: any) {
+        if (isQuotaExceededError(err)) {
+          console.warn(`Read quota exceeded during sync of '${col.name}'. Skipping delete detection and applying direct write.`);
+        }
+      }
 
       let batch = writeBatch(db);
       let opCount = 0;
 
-      for (const d of toDelete) {
-        batch.delete(d.ref);
-        opCount++;
-        if (opCount >= 400) {
-          await batch.commit();
-          batch = writeBatch(db);
-          opCount = 0;
+      if (snap) {
+        const currentIds = new Set(col.items.map((i) => i.id));
+        const toDelete = snap.docs.filter((d) => !currentIds.has(d.id));
+
+        for (const d of toDelete) {
+          batch.delete(d.ref);
+          opCount++;
+          if (opCount >= 400) {
+            await batch.commit();
+            batch = writeBatch(db);
+            opCount = 0;
+          }
         }
       }
 
@@ -633,7 +793,11 @@ export async function cloudSyncAllData(state: AppState) {
     if (state.counters) {
       await setDoc(doc(db, 'metadata', 'counters'), state.counters);
     }
-  } catch (err) {
+  } catch (err: any) {
+    if (isQuotaExceededError(err)) {
+      console.warn('Cloud write quota reached. Data safely secured in local offline ledger.');
+      throw new Error('Firestore free daily quota reached for today. Your changes have been securely saved to the local offline ledger.');
+    }
     console.error('Error syncing all data to Firestore:', err);
     throw err;
   }

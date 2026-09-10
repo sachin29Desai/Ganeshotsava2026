@@ -10,8 +10,8 @@ export function generateStandaloneHTML(state: AppState, isViewOnlySnapshot = fal
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>${state.settings.org || 'Brigade Eldorado'} — Ganeshotsava 2026${isViewOnlySnapshot ? ' (View Only Snapshot)' : ''}</title>
-<meta name="description" content="Brigade Eldorado Ganeshotsava 2026 Event Planner & Financial Ledger">
+<title>${state.settings.org || 'Eldorado'} — Ganeshotsava 2026${isViewOnlySnapshot ? ' (View Only Snapshot)' : ''}</title>
+<meta name="description" content="Eldorado Ganeshotsava 2026 Event Planner & Financial Ledger">
 <meta name="theme-color" content="#991b1b">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -197,7 +197,7 @@ tr:hover td{background:#FAFAF9}
   <div class="header-left">
     <img id="headerLogo" class="header-logo" alt="Logo">
     <div>
-      <div class="header-eyebrow">Brigade Eldorado Residents Association</div>
+      <div class="header-eyebrow">Eldorado Residents Association</div>
       <h1>🌺 Ganeshotsava 2026</h1>
       <p>3rd Year Celebration • 14th September – 18th September 2026</p>
     </div>
@@ -387,10 +387,10 @@ tr:hover td{background:#FAFAF9}
     <div class="card">
       <div class="card-hdr"><h2>Organization Settings</h2></div>
       <div class="settings-grid">
-        <div class="field"><label>Organization Name</label><input id="set_org" value="Brigade Eldorado"></div>
+        <div class="field"><label>Organization Name</label><input id="set_org" value="Eldorado"></div>
         <div class="field"><label>Event Location</label><input id="set_location" value="Amphitheatre, Brigade Eldorado"></div>
         <div class="field"><label>UPI ID</label><input id="set_upi" placeholder="yourname@upi"><small style="color:#78716C;font-size:11px">Generates instant UPI QR code on receipts</small></div>
-        <div class="field"><label>UPI Payee Name</label><input id="set_payee" value="Brigade Eldorado Ganeshotsava"></div>
+        <div class="field"><label>UPI Payee Name</label><input id="set_payee" value="Eldorado Ganeshotsava"></div>
         <div class="field full">
           <label>Event Logo</label>
           <div class="logo-upload" onclick="document.getElementById('logoFile').click()">
@@ -569,7 +569,7 @@ tr:hover td{background:#FAFAF9}
       <div class="rcp-top">
         <img id="rcpLogo" class="rcp-logo" style="display:none" alt="">
         <div class="rcp-heading">
-          <h2 id="rcpOrg">Brigade Eldorado</h2>
+          <h2 id="rcpOrg">Eldorado</h2>
           <h3>3rd Year Ganeshotsava</h3>
           <p>14th September – 18th September 2026</p>
           <p id="rcpLoc">Amphitheatre, Brigade Eldorado</p>
@@ -617,7 +617,7 @@ tr:hover td{background:#FAFAF9}
       <div class="inv-hdr">
         <div class="inv-brand">
           <img id="invLogo" style="width:64px;height:64px;object-fit:contain;display:none;margin-bottom:8px" alt="">
-          <h2 id="invOrg">Brigade Eldorado</h2>
+          <h2 id="invOrg">Eldorado</h2>
           <p>3rd Year Ganeshotsava</p>
           <p>14th September – 18th September 2026</p>
           <p id="invLoc">Amphitheatre, Brigade Eldorado</p>
@@ -636,7 +636,7 @@ tr:hover td{background:#FAFAF9}
         <thead><tr><th>#</th><th>Description</th><th style="text-align:right">Amount (₹)</th></tr></thead>
         <tbody><tr>
           <td>1</td>
-          <td>Sponsorship — Brigade Eldorado Ganeshotsava 2026</td>
+          <td>Sponsorship — Eldorado Ganeshotsava 2026</td>
           <td style="text-align:right" id="invAmt">0</td>
         </tr></tbody>
         <tfoot><tr class="inv-total-row">
@@ -694,8 +694,8 @@ const dbSave = (k, v) => {
 
 function cfgLoad() {
   const def = {
-    org: 'Brigade Eldorado', location: 'Amphitheatre, Brigade Eldorado',
-    upi: '', payee: 'Brigade Eldorado Ganeshotsava', logo: '', adminHash: ''
+    org: 'Eldorado', location: 'Amphitheatre, Brigade Eldorado',
+    upi: '', payee: 'Eldorado Ganeshotsava', logo: '', adminHash: ''
   };
   if (viewOnly && sharedData) return { ...def, org: sharedData.org || def.org, location: sharedData.location || def.location };
   try { return { ...def, ...JSON.parse(localStorage.getItem(K.cfg) || '{}') }; } catch { return def; }
@@ -1333,7 +1333,7 @@ async function shareSnapshotFile() {
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
     try {
       await navigator.share({
-        files: [file], title: 'Brigade Eldorado Ganeshotsava 2026', text: 'Here is the latest Ganeshotsava 2026 Budget & Contributions snapshot.'
+        files: [file], title: 'Eldorado Ganeshotsava 2026', text: 'Here is the latest Ganeshotsava 2026 Budget & Contributions snapshot.'
       });
       return;
     } catch(err){ if (err.name === 'AbortError') return; }
@@ -1422,7 +1422,7 @@ function waOpen(text) { window.open('https://wa.me/?text=' + encodeURIComponent(
 
 function doWhatsApp(type, id) {
   const cfg = cfgLoad();
-  const org = cfg.org || 'Brigade Eldorado';
+  const org = cfg.org || 'Eldorado';
   let msg = '';
   if (type === 'ct') {
     const r = dbLoad(K.ct).find(x => x.id === id); if (!r) return;
@@ -1439,7 +1439,7 @@ function doWhatsApp(type, id) {
 
 function doWhatsAppReport() {
   const cfg = cfgLoad();
-  const org = cfg.org || 'Brigade Eldorado';
+  const org = cfg.org || 'Eldorado';
   const spAct = dbLoad(K.sp).reduce((s,r) => s + Number(r.act || 0), 0);
   const ctTot = dbLoad(K.ct).reduce((s,r) => s + Number(r.amt || 0), 0);
   const svTot = dbLoad(K.sv).reduce((s,r) => s + Number(r.amt || 0), 0);
@@ -1479,7 +1479,7 @@ function doPrintReceipt(type, id) {
   if (!r) return;
   const logo = document.getElementById('rcpLogo');
   if (cfg.logo) { logo.src = cfg.logo; logo.style.display = ''; } else logo.style.display = 'none';
-  document.getElementById('rcpOrg').textContent = cfg.org || 'Brigade Eldorado';
+  document.getElementById('rcpOrg').textContent = cfg.org || 'Eldorado';
   document.getElementById('rcpLoc').textContent = cfg.location;
   if (type === 'ct') {
     document.getElementById('rcpNo').textContent = r.rcptNo;
@@ -1521,7 +1521,7 @@ function doPrintInvoice(id) {
   if (!r) return;
   const logo = document.getElementById('invLogo');
   if (cfg.logo) { logo.src = cfg.logo; logo.style.display = ''; } else logo.style.display = 'none';
-  document.getElementById('invOrg').textContent = cfg.org || 'Brigade Eldorado';
+  document.getElementById('invOrg').textContent = cfg.org || 'Eldorado';
   document.getElementById('invLoc').textContent = cfg.location;
   document.getElementById('invNo').textContent = r.invNo;
   document.getElementById('invDate').textContent = new Date().toLocaleDateString('en-IN', { day:'2-digit', month:'2-digit', year:'numeric' });
@@ -1562,10 +1562,10 @@ function saveSettings() {
 }
 
 function applySettingsToForm(cfg) {
-  document.getElementById('set_org').value = cfg.org || 'Brigade Eldorado';
+  document.getElementById('set_org').value = cfg.org || 'Eldorado';
   document.getElementById('set_location').value = cfg.location || 'Amphitheatre, Brigade Eldorado';
   document.getElementById('set_upi').value = cfg.upi || '';
-  document.getElementById('set_payee').value = cfg.payee || 'Brigade Eldorado Ganeshotsava';
+  document.getElementById('set_payee').value = cfg.payee || 'Eldorado Ganeshotsava';
   if (cfg.logo) {
     const lp = document.getElementById('logoPreview');
     lp.src = cfg.logo; lp.style.display = 'block';
@@ -1618,7 +1618,7 @@ function exportExcel() {
     ['─── EXPENDITURE ───', ''], ['Expenses (Actual)', exAct], ['Total Expenditure', exAct], ['Net Balance', net]
   ];
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rptRows), 'Budget Report');
-  XLSX.writeFile(wb, 'Brigade_Eldorado_Ganeshotsava_2026.xlsx');
+  XLSX.writeFile(wb, 'Eldorado_Ganeshotsava_2026.xlsx');
 }
 
 function importExcel(event) {

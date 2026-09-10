@@ -221,7 +221,7 @@ export const AdminGateForBalaga: React.FC<AdminGateForBalagaProps> = ({
 
       {/* Footer */}
       <footer className="border-t border-stone-200 py-3 text-center text-xs text-stone-500 bg-white">
-        Brigade El Dorado • Eldorado Kannadigara Balaga Committee • ಸಿರಿಗನ್ನಡಂ ಗೆಲ್ಗೆ!
+        Eldorado • Eldorado Kannadigara Balaga Committee • ಸಿರಿಗನ್ನಡಂ ಗೆಲ್ಗೆ!
       </footer>
     </div>
   );

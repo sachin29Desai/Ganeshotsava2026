@@ -25,7 +25,7 @@ import {
   Tag
 } from 'lucide-react';
 import { Contribution, SevaBooking, AppSettings } from '../types';
-import { fmt, fmtDate, numWords, today } from '../utils/helpers';
+import { fmt, fmtDate, numWords, today, cleanOrgName } from '../utils/helpers';
 import { GaneshaWatermark } from './GaneshaWatermark';
 import { DigitalSignatureBlock } from './ReceiptInvoiceModal';
 import {
@@ -308,9 +308,9 @@ export const PublicReceiptPortal: React.FC<PublicReceiptPortalProps> = ({
 
     let text = '';
     if (isSeva) {
-      text = `🙏 *Sri Ganeshotsava 2026 - Seva Token / Receipt*\n*${settings.org || 'Brigade Eldorado Residents Association'}*\n\n📜 *Token No:* ${item.rcptNo || '—'}\n🌺 *Seva Offering:* ${item.seva || 'Devotional Seva'}\n👤 *Devotee:* ${item.name}\n🏠 *Flat / Unit:* ${item.flat || '—'}\n${item.qty ? `📦 *Quantity:* ${item.qty} ${item.unit || ''}\n` : ''}${item.amt > 0 ? `💰 *Amount:* ₹${fmt(item.amt)} (${numWords(item.amt)} Rupees)\n` : '🌸 *Offering:* In-Kind Material Offering\n'}📅 *Date:* ${fmtDate(item.date)}\n✨ *Status:* ${item.status === 'Confirmed' ? '✓ Confirmed by Committee' : '⏳ Booked (To be confirmed)'}\n\n👉 *Download Official PDF Receipt Online:*\n${portalUrl}\n\n*May Lord Sri Ganesha Bless You & Your Family!* 🌺`;
+      text = `🙏 *Sri Ganeshotsava 2026 - Seva Token / Receipt*\n*${cleanOrgName(settings.org, 'Eldorado Residents Association')}*\n\n📜 *Token No:* ${item.rcptNo || '—'}\n🌺 *Seva Offering:* ${item.seva || 'Devotional Seva'}\n👤 *Devotee:* ${item.name}\n🏠 *Flat / Unit:* ${item.flat || '—'}\n${item.qty ? `📦 *Quantity:* ${item.qty} ${item.unit || ''}\n` : ''}${item.amt > 0 ? `💰 *Amount:* ₹${fmt(item.amt)} (${numWords(item.amt)} Rupees)\n` : '🌸 *Offering:* In-Kind Material Offering\n'}📅 *Date:* ${fmtDate(item.date)}\n✨ *Status:* ${item.status === 'Confirmed' ? '✓ Confirmed by Committee' : '⏳ Booked (To be confirmed)'}\n\n👉 *Download Official PDF Receipt Online:*\n${portalUrl}\n\n*May Lord Sri Ganesha Bless You & Your Family!* 🌺`;
     } else {
-      text = `🙏 *Sri Ganeshotsava 2026 - Voluntary Contribution Receipt*\n*${settings.org || 'Brigade Eldorado Residents Association'}*\n\n📜 *Receipt No:* ${item.rcptNo || '—'}\n👤 *Devotee:* ${item.name}\n🏠 *Flat / Unit:* ${item.flat || '—'}\n💰 *Amount:* ₹${fmt(item.amt)} (${numWords(item.amt)} Rupees)\n📅 *Date:* ${fmtDate(item.date)}\n\n👉 *Download Official PDF Receipt Online:*\n${portalUrl}\n\n*Ganapati Bappa Morya!* 🌺`;
+      text = `🙏 *Sri Ganeshotsava 2026 - Voluntary Contribution Receipt*\n*${cleanOrgName(settings.org, 'Eldorado Residents Association')}*\n\n📜 *Receipt No:* ${item.rcptNo || '—'}\n👤 *Devotee:* ${item.name}\n🏠 *Flat / Unit:* ${item.flat || '—'}\n💰 *Amount:* ₹${fmt(item.amt)} (${numWords(item.amt)} Rupees)\n📅 *Date:* ${fmtDate(item.date)}\n\n👉 *Download Official PDF Receipt Online:*\n${portalUrl}\n\n*Ganapati Bappa Morya!* 🌺`;
     }
 
     window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
@@ -353,7 +353,7 @@ export const PublicReceiptPortal: React.FC<PublicReceiptPortalProps> = ({
                   <span className="text-xs text-amber-200/90 font-serif">Ganeshotsava 2026</span>
                 </div>
                 <h1 className="text-lg sm:text-xl font-serif font-black tracking-wide leading-tight truncate mt-0.5">
-                  {settings.org || 'Brigade Eldorado Residents Association'}
+                  {cleanOrgName(settings.org, 'Eldorado Residents Association')}
                 </h1>
                 <p className="text-xs text-amber-100/80 truncate">
                   Voluntary Contribution &amp; Seva Booking Receipt Download
@@ -876,7 +876,7 @@ export const PublicReceiptPortal: React.FC<PublicReceiptPortalProps> = ({
                         <img src="/lord_ganesha.svg" alt="" className="w-3.5 h-3.5 object-contain inline" referrerPolicy="no-referrer" />
                       </div>
                       <h2 className="text-xl sm:text-2xl font-serif font-black text-[#991B1B] leading-tight">
-                        {settings.org || 'Brigade Eldorado Residents Association'}
+                        {cleanOrgName(settings.org, 'Eldorado Residents Association')}
                       </h2>
                       <h3 className="text-xs sm:text-sm font-bold text-stone-800">3rd Year Ganeshotsava 2026</h3>
                       <p className="text-[11px] text-stone-500">14th September – 18th September 2026</p>
@@ -1040,7 +1040,7 @@ export const PublicReceiptPortal: React.FC<PublicReceiptPortalProps> = ({
                     <img src="/lord_ganesha.svg" alt="" className="w-3.5 h-3.5 object-contain inline" referrerPolicy="no-referrer" />
                   </div>
                   <h2 className="text-2xl font-serif font-black text-[#991B1B] leading-tight">
-                    {settings.org || 'Brigade Eldorado Residents Association'}
+                    {cleanOrgName(settings.org, 'Eldorado Residents Association')}
                   </h2>
                   <h3 className="text-sm font-bold text-stone-800">3rd Year Ganeshotsava 2026</h3>
                   <p className="text-[11px] text-stone-500">14th September – 18th September 2026</p>

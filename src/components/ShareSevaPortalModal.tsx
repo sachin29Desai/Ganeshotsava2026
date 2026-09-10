@@ -15,6 +15,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { AppSettings } from '../types';
+import { cleanOrgName } from '../utils/helpers';
 
 interface ShareSevaPortalModalProps {
   open: boolean;
@@ -109,7 +110,7 @@ export const ShareSevaPortalModal: React.FC<ShareSevaPortalModalProps> = ({
     }
   };
 
-  const shareText = `🙏 *Sri Ganeshotsava 2026 - Devotional Seva Bookings*\n*${settings.org || 'Brigade El Dorado Residents'}*\n\nDear Devotees & Residents,\nDevotional Seva bookings are now open for Sri Ganeshotsava 2026! You can browse sevas, book offerings, and view your token status online:\n\n👉 *Click here to book your Seva:*\n${primaryShareUrl}\n\nNo login required. May Lord Sri Ganesha bless you and your family! 🌺`;
+  const shareText = `🙏 *Sri Ganeshotsava 2026 - Devotional Seva Bookings*\n*${cleanOrgName(settings.org, 'Eldorado Residents')}*\n\nDear Devotees & Residents,\nDevotional Seva bookings are now open for Sri Ganeshotsava 2026! You can browse sevas, book offerings, and view your token status online:\n\n👉 *Click here to book your Seva:*\n${primaryShareUrl}\n\nNo login required. May Lord Sri Ganesha bless you and your family! 🌺`;
   const whatsappShareUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`;
 
   return (
@@ -142,7 +143,7 @@ export const ShareSevaPortalModal: React.FC<ShareSevaPortalModalProps> = ({
               Devotee Seva Booking Portal
             </h3>
             <p className="text-xs text-stone-500 mt-0.5">
-              Direct website portal for Brigade El Dorado residents to browse and book sevas without committee login.
+              Direct website portal for Eldorado residents to browse and book sevas without committee login.
             </p>
           </div>
         </div>

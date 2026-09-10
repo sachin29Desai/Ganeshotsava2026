@@ -7,7 +7,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { Expense, Contribution, Sponsor, CommercialStall, SevaBooking, HundiCollection, AuctionItem, AppSettings, UserRole } from '../types';
-import { fmt, getExpenseActual } from '../utils/helpers';
+import { fmt, getExpenseActual, cleanOrgName } from '../utils/helpers';
 
 interface StatementViewProps {
   expenses: Expense[];
@@ -67,7 +67,7 @@ export const StatementView: React.FC<StatementViewProps> = ({
             Income &amp; Expenditure Statement
           </h2>
           <p className="text-xs text-stone-500 mt-0.5">
-            {settings.org || 'Brigade Eldorado Residents Association'} • {settings.location || 'Bengaluru'}
+            {cleanOrgName(settings.org, 'Eldorado Residents Association')} • {settings.location || 'Bengaluru'}
           </p>
         </div>
 

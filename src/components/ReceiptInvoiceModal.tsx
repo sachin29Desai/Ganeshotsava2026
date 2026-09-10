@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { Printer, PhoneCall, X, Download, Loader2, Upload, RotateCcw } from 'lucide-react';
 import { AppSettings } from '../types';
-import { fmt, fmtDate, numWords, today } from '../utils/helpers';
+import { fmt, fmtDate, numWords, today, cleanOrgName } from '../utils/helpers';
 import { GaneshaWatermark } from './GaneshaWatermark';
 
 export { GaneshaWatermark };
@@ -296,7 +296,7 @@ export const ReceiptInvoiceModal: React.FC<ReceiptInvoiceModalProps> = ({
                     <img src="/lord_ganesha.svg" alt="" className="w-3.5 h-3.5 object-contain inline" referrerPolicy="no-referrer" />
                   </div>
                   <h2 className="text-xl sm:text-2xl font-serif font-black text-[#991B1B] leading-tight">
-                    {settings.org || 'Brigade Eldorado Residents Association'}
+                    {cleanOrgName(settings.org, 'Eldorado Residents Association')}
                   </h2>
                   <h3 className="text-xs sm:text-sm font-bold text-stone-800">3rd Year Ganeshotsava 2026</h3>
                   <p className="text-[11px] text-stone-500">14th September – 18th September 2026</p>

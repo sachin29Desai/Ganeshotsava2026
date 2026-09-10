@@ -13,7 +13,7 @@ import {
   ShieldCheck
 } from 'lucide-react';
 import { AppSettings, UserRole } from '../types';
-import { sha256 } from '../utils/helpers';
+import { sha256, cleanOrgName } from '../utils/helpers';
 
 interface CommitteeAuthGateProps {
   settings: AppSettings;
@@ -118,7 +118,7 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
             )}
             <div>
               <h1 className="text-sm sm:text-base font-serif font-black tracking-wide leading-tight">
-                {settings.org || 'Brigade Eldorado Ganeshotsava 2026'}
+                {cleanOrgName(settings.org, 'Eldorado Ganeshotsava 2026')}
               </h1>
               <p className="text-[11px] text-amber-200/90 font-medium">
                 {settings.location || 'Festival Management Portal'}
@@ -285,7 +285,7 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
 
       {/* Footer */}
       <footer className="text-center text-xs text-stone-400 py-4 px-4 border-t border-stone-200/60 bg-white">
-        {settings.org || 'Brigade Eldorado Ganeshotsava 2026'} &bull; Ganeshotsava 2026
+        {cleanOrgName(settings.org, 'Eldorado Ganeshotsava 2026')} &bull; Ganeshotsava 2026
       </footer>
     </div>
   );

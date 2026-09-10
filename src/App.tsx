@@ -43,7 +43,8 @@ import {
   numWords,
   sha256,
   getExpenseBalance,
-  getExpenseActual
+  getExpenseActual,
+  cleanOrgName
 } from './utils/helpers';
 import { generateStandaloneHTML } from './utils/htmlExporter';
 import {
@@ -886,13 +887,13 @@ export function App() {
     let msg = '';
     if (isRcpt) {
       if (printData.item.isSeva || printData.subType === 'seva') {
-        msg = `🙏 *Seva Booking Official Receipt — PDF Attached*\n\n*${settings.org || 'Brigade Eldorado Residents Association'}*\n3rd Year Ganeshotsava (14th – 18th Sept 2026)\n\n🎟️ Token No: ${printData.item.tokNo}\n🌺 Seva: ${printData.item.seva}\n📅 Date: ${fmtDate(printData.item.date)}\n👤 Devotee: ${printData.item.name}\n🏠 Flat: ${printData.item.flat}\n💰 Amount: ₹${fmt(printData.item.amt)} (${numWords(printData.item.amt)})\n\n📄 *Official PDF receipt with Digital Signature & Watermark is attached.*\n\nThank you for your seva and devotional support 🙏\n*Ganapati Bappa Morya!*`;
+        msg = `🙏 *Seva Booking Official Receipt — PDF Attached*\n\n*${cleanOrgName(settings.org, 'Eldorado Residents Association')}*\n3rd Year Ganeshotsava (14th – 18th Sept 2026)\n\n🎟️ Token No: ${printData.item.tokNo}\n🌺 Seva: ${printData.item.seva}\n📅 Date: ${fmtDate(printData.item.date)}\n👤 Devotee: ${printData.item.name}\n🏠 Flat: ${printData.item.flat}\n💰 Amount: ₹${fmt(printData.item.amt)} (${numWords(printData.item.amt)})\n\n📄 *Official PDF receipt with Digital Signature & Watermark is attached.*\n\nThank you for your seva and devotional support 🙏\n*Ganapati Bappa Morya!*`;
       } else {
-        msg = `🙏 *Voluntary Resident Contribution Receipt — PDF Attached*\n\n*${settings.org || 'Brigade Eldorado Residents Association'}*\n3rd Year Ganeshotsava (14th – 18th Sept 2026)\n\n📋 Receipt No: ${printData.item.rcptNo}\n📅 Date: ${fmtDate(printData.item.date)}\n👤 Contributor: ${printData.item.name}\n🏠 Flat: ${printData.item.flat}\n💳 Payment: ${printData.item.pay || 'UPI'}${printData.item.txn ? ' (Ref: ' + printData.item.txn + ')' : ''}\n💰 Amount: ₹${fmt(printData.item.amt)} (${numWords(printData.item.amt)})${printData.item.notes ? '\n📝 Notes: ' + printData.item.notes : ''}\n\n📄 *Official PDF receipt with Digital Signature & Watermark is attached.*\n\nThank you for your generous contribution 🙏\n*Ganapati Bappa Morya!*`;
+        msg = `🙏 *Voluntary Resident Contribution Receipt — PDF Attached*\n\n*${cleanOrgName(settings.org, 'Eldorado Residents Association')}*\n3rd Year Ganeshotsava (14th – 18th Sept 2026)\n\n📋 Receipt No: ${printData.item.rcptNo}\n📅 Date: ${fmtDate(printData.item.date)}\n👤 Devotee: ${printData.item.name}\n🏠 Flat: ${printData.item.flat}\n💳 Payment: ${printData.item.pay || 'UPI'}${printData.item.txn ? ' (Ref: ' + printData.item.txn + ')' : ''}\n💰 Amount: ₹${fmt(printData.item.amt)} (${numWords(printData.item.amt)})${printData.item.notes ? '\n📝 Notes: ' + printData.item.notes : ''}\n\n📄 *Official PDF receipt with Digital Signature & Watermark is attached.*\n\nThank you for your generous contribution 🙏\n*Ganapati Bappa Morya!*`;
       }
     } else {
       const typeLabel = printData.subType === 'stall' ? 'Commercial Stall Invoice' : printData.subType === 'auction' ? 'Auction Winning Bid Invoice' : 'Sponsorship Invoice';
-      msg = `📄 *${typeLabel} — PDF Attached*\n\n*${settings.org || 'Brigade Eldorado Residents Association'}*\n3rd Year Ganeshotsava (14th – 18th Sept 2026)\n\n🔖 Invoice No: ${printData.item.invNo}\n📅 Date: ${new Date().toLocaleDateString('en-IN')}\n🏢 Particulars: ${printData.item.det}\n💰 Amount: ₹${fmt(printData.item.act || printData.item.amt)} (${numWords(printData.item.act || printData.item.amt)})\n\n📄 *Official Invoice PDF with Digital Signature & Watermark is attached.*\n\nThank you for your generous partnership & support! 🙏\n*Ganapati Bappa Morya!*`;
+      msg = `📄 *${typeLabel} — PDF Attached*\n\n*${cleanOrgName(settings.org, 'Eldorado Residents Association')}*\n3rd Year Ganeshotsava (14th – 18th Sept 2026)\n\n🔖 Invoice No: ${printData.item.invNo}\n📅 Date: ${new Date().toLocaleDateString('en-IN')}\n🏢 Particulars: ${printData.item.det}\n💰 Amount: ₹${fmt(printData.item.act || printData.item.amt)} (${numWords(printData.item.act || printData.item.amt)})\n\n📄 *Official Invoice PDF with Digital Signature & Watermark is attached.*\n\nThank you for your generous partnership & support! 🙏\n*Ganapati Bappa Morya!*`;
     }
 
     const element = document.getElementById('receipt-print-target');
@@ -961,7 +962,7 @@ export function App() {
   };
 
   const shareWhatsAppSummary = () => {
-    const msg = `📊 *Ganeshotsava 2026 — Income & Expenditure Statement*\n*${settings.org || 'Brigade Eldorado'}*\n\n💰 *INCOME (RECEIPTS)*\n• Voluntary Contributions: ₹${fmt(ctTot)}\n• Sponsorship: ₹${fmt(spAct)}\n• Commercial Stalls: ₹${fmt(csAct)}\n• Seva Bookings: ₹${fmt(svTot)}\n• Hundi Collection: ₹${fmt(hundiTot)}\n• Auctions: ₹${fmt(aucTot)}\n▶ *Total Income: ₹${fmt(totalIncome)}*\n\n📤 *EXPENDITURE (PAYMENTS)*\n• Actual Incurred: ₹${fmt(exAct)}\n▶ *Total Expenditure: ₹${fmt(exAct)}*\n\n${netBalance >= 0 ? '✅' : '⚠️'} *Net Surplus/(Deficit): ₹${fmt(Math.abs(netBalance))}${netBalance < 0 ? ' (Deficit)' : ' (Surplus)'}*\n\n_Ganapati Bappa Morya!_ 🙏🌺`;
+    const msg = `📊 *Ganeshotsava 2026 — Income & Expenditure Statement*\n*${cleanOrgName(settings.org, 'Eldorado')}*\n\n💰 *INCOME (RECEIPTS)*\n• Voluntary Contributions: ₹${fmt(ctTot)}\n• Sponsorship: ₹${fmt(spAct)}\n• Commercial Stalls: ₹${fmt(csAct)}\n• Seva Bookings: ₹${fmt(svTot)}\n• Hundi Collection: ₹${fmt(hundiTot)}\n• Auctions: ₹${fmt(aucTot)}\n▶ *Total Income: ₹${fmt(totalIncome)}*\n\n📤 *EXPENDITURE (PAYMENTS)*\n• Actual Incurred: ₹${fmt(exAct)}\n▶ *Total Expenditure: ₹${fmt(exAct)}*\n\n${netBalance >= 0 ? '✅' : '⚠️'} *Net Surplus/(Deficit): ₹${fmt(Math.abs(netBalance))}${netBalance < 0 ? ' (Deficit)' : ' (Surplus)'}*\n\n_Ganapati Bappa Morya!_ 🙏🌺`;
     openWhatsApp(msg);
   };
 
@@ -1090,7 +1091,7 @@ export function App() {
     // 1. Income & Expenditure Statement
     const statementRows = [
       ['INCOME & EXPENDITURE STATEMENT — GANESHOTSAVA 2026'],
-      ['Organization', settings.org || 'Brigade Eldorado'],
+      ['Organization', cleanOrgName(settings.org, 'Eldorado')],
       ['Location', settings.location || 'Amphitheatre'],
       [],
       ['A. INCOME (RECEIPTS)', 'AMOUNT (₹)'],
@@ -1411,7 +1412,7 @@ export function App() {
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-base sm:text-lg font-serif font-black tracking-wide leading-tight">
-                  {settings.org || 'Brigade Eldorado Residents Association'}
+                  {cleanOrgName(settings.org, 'Eldorado Residents Association')}
                 </h1>
                 <span className="hidden sm:inline-block bg-amber-400 text-stone-900 text-[10px] font-bold px-1.5 py-0.5 rounded tracking-wider uppercase">
                   3rd Year

@@ -14,7 +14,7 @@ import {
   ArrowDownToLine
 } from 'lucide-react';
 import { AppSettings, Contribution } from '../types';
-import { fmt, fmtDate, numWords, today } from '../utils/helpers';
+import { fmt, fmtDate, numWords, today, cleanOrgName } from '../utils/helpers';
 import { GaneshaWatermark, DigitalSignatureBlock } from './ReceiptInvoiceModal';
 import {
   generateIndividualReceiptPdfBlobs,
@@ -741,7 +741,7 @@ const ReceiptCard: React.FC<ReceiptCardProps> = ({ item, settings, qrCodeDataUrl
             <h2
               className={`${compact ? 'text-lg sm:text-xl' : 'text-xl sm:text-2xl'} font-serif font-black text-[#991B1B] leading-tight`}
             >
-              {settings.org || 'Brigade Eldorado Residents Association'}
+              {cleanOrgName(settings.org, 'Eldorado Residents Association')}
             </h2>
             <h3 className="text-xs sm:text-sm font-bold text-stone-800">3rd Year Ganeshotsava 2026</h3>
             <p className="text-[11px] text-stone-500">14th September – 18th September 2026</p>

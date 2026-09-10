@@ -46,10 +46,10 @@ export const INITIAL_STATE: AppState = {
   hundi: [],
   auctions: [],
   settings: {
-    org: 'Brigade Eldorado',
+    org: 'Eldorado',
     location: 'Amphitheatre, Brigade Eldorado',
     upi: '',
-    payee: 'Brigade Eldorado Ganeshotsava',
+    payee: 'Eldorado Ganeshotsava',
     logo: '',
     adminHash: '3cc551dd68cb8a0b7720b812b167715dd6f9c0405d26981eeb560f0b7dd8e616',
     sponsorHash: 'a0c7176691b16f74d4449e8163db3bf87eee545d3881e24987e4b0effea0042c',
@@ -62,6 +62,21 @@ export const INITIAL_STATE: AppState = {
     sv: null,
     auc: null
   }
+};
+
+/**
+ * Ensures "Brigade" is not prefixed to Eldorado in receipts, invoices, vouchers, and headers.
+ * Uses Eldorado in all places until it is an address.
+ */
+export const cleanOrgName = (name?: string | null, fallback = 'Eldorado Residents Association'): string => {
+  if (!name || !name.trim()) return fallback;
+  const cleaned = name
+    .replace(/\bBrigade\s+El\s*Dorado\b/gi, 'Eldorado')
+    .replace(/\bBrigade\s+Eldorado\b/gi, 'Eldorado')
+    .replace(/\bBrigade\b/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return cleaned || fallback;
 };
 
 export const fmt = (n: number | string): string => {

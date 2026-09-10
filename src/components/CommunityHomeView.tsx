@@ -276,7 +276,7 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
 
   const handleShareWhatsApp = (title: string, summary: string) => {
     const text = encodeURIComponent(
-      `*${title}*\n${summary}\n\n🚩 ಸಿರಿಗನ್ನಡಂ ಗೆಲ್ಗೆ! ಸಿರಿಗನ್ನಡಂ ಬಾಳ್ಗೆ! 💛\nಎಲ್ ಡೊರಾಡೊ ಕನ್ನಡಿಗರ ಬಳಗ • Brigade El Dorado`
+      `*${title}*\n${summary}\n\n🚩 ಸಿರಿಗನ್ನಡಂ ಗೆಲ್ಗೆ! ಸಿರಿಗನ್ನಡಂ ಬಾಳ್ಗೆ! 💛\nಎಲ್ ಡೊರಾಡೊ ಕನ್ನಡಿಗರ ಬಳಗ • Eldorado`
     );
     window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
   };
@@ -417,7 +417,7 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
                 </span>
               </div>
               <p className={`text-[11px] font-medium ${isDark ? 'text-stone-400' : 'text-stone-500'}`}>
-                Brigade El Dorado • ಸಿರಿಗನ್ನಡಂ ಗೆಲ್ಗೆ, ಸಿರಿಗನ್ನಡಂ ಬಾಳ್ಗೆ!
+                Eldorado • ಸಿರಿಗನ್ನಡಂ ಗೆಲ್ಗೆ, ಸಿರಿಗನ್ನಡಂ ಬಾಳ್ಗೆ!
               </p>
             </div>
           </div>
@@ -624,7 +624,7 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
 
                   {/* Sub-headline */}
                   <p className={`text-sm sm:text-base leading-relaxed ${isDark ? 'text-stone-300' : 'text-stone-600'}`}>
-                    A volunteer-driven community forum of Brigade El Dorado residents dedicated to
+                    A volunteer-driven community forum of Eldorado residents dedicated to
                     preserving and celebrating Kannada language, folk traditions, Vedic poojas, and grand
                     annual festivals in our neighborhood.
                   </p>
@@ -1647,7 +1647,7 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
                 Kannadigara Balaga: Of the Residents, By the Residents, For the Residents
               </h2>
               <p className={`text-sm max-w-2xl leading-relaxed ${isDark ? 'text-stone-400' : 'text-stone-600'}`}>
-                A volunteer working group within Brigade El Dorado dedicated to honoring Kannada heritage,
+                A volunteer working group within Eldorado dedicated to honoring Kannada heritage,
                 organizing community festival sevas, and creating lifelong memories for all apartment
                 families.
               </p>
@@ -1685,7 +1685,7 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
                 </h3>
                 <p className={`text-xs sm:text-sm leading-relaxed ${isDark ? 'text-stone-300' : 'text-stone-600'}`}>
                   Fostering strong neighborly brotherhood, mutual assistance, and festive joy across all
-                  buildings and clusters in Brigade El Dorado through shared celebrations.
+                  buildings and clusters in Eldorado through shared celebrations.
                 </p>
               </div>
 

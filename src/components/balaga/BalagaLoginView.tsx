@@ -108,7 +108,7 @@ export const BalagaLoginView: React.FC<BalagaLoginViewProps> = ({
               Sign in to Kannadigara Balaga
             </h1>
             <p className={`text-xs ${isDark ? 'text-stone-400' : 'text-stone-600'}`}>
-              Eldorado Kannadigara Balaga • Brigade El Dorado
+              Eldorado Kannadigara Balaga • Eldorado
             </p>
           </div>
 

@@ -1,6 +1,6 @@
 {
   "name": "Ganeshotsava 2026",
-  "description": "Brigade Eldorado Ganeshotsava 2026 Event Planner & Financial Ledger with offline snapshot sharing and self-updating storage.",
+  "description": "Eldorado Ganeshotsava 2026 Event Planner & Financial Ledger with offline snapshot sharing and self-updating storage.",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"

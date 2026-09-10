@@ -25,7 +25,7 @@ import {
   Package
 } from 'lucide-react';
 import { SevaBooking, SevaCatalogueItem, AppSettings } from '../types';
-import { fmt, fmtDate, today } from '../utils/helpers';
+import { fmt, fmtDate, today, cleanOrgName } from '../utils/helpers';
 import { ShareSevaPortalModal } from './ShareSevaPortalModal';
 
 interface PublicSevaPortalProps {
@@ -218,7 +218,7 @@ export const PublicSevaPortal: React.FC<PublicSevaPortalProps> = ({
             <div>
               <div className="flex items-center gap-1.5">
                 <h1 className="text-base sm:text-lg font-serif font-black tracking-wide leading-tight text-white">
-                  {settings.org || 'Brigade Eldorado Ganeshotsava 2026'}
+                  {cleanOrgName(settings.org, 'Eldorado Ganeshotsava 2026')}
                 </h1>
                 <span className="text-[10px] bg-amber-400 text-stone-950 font-bold px-1.5 py-0.5 rounded uppercase tracking-wider">
                   Sevas
@@ -1133,7 +1133,7 @@ export const PublicSevaPortal: React.FC<PublicSevaPortalProps> = ({
                   />
                 </div>
                 <h4 className="font-serif font-black text-stone-900 text-base leading-tight">
-                  {settings.org || 'Brigade Eldorado Ganeshotsava 2026'}
+                  {cleanOrgName(settings.org, 'Eldorado Ganeshotsava 2026')}
                 </h4>
                 <p className="text-[11px] text-stone-600">{settings.location || 'Aerospace Park, Bagalur, Bangalore'}</p>
                 <div className="mt-2 inline-block bg-[#991B1B] text-amber-200 font-bold uppercase text-[10px] tracking-widest px-2.5 py-0.5 rounded">

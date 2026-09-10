@@ -91,7 +91,7 @@ export const COMMUNITY_EVENTS: CommunityEvent[] = [
     description:
       'Grand 5-day Sri Ganesha Chaturthi celebration by Eldorado Kannadigara Balaga with Vedic poojas, daily devotee sevas, cultural evenings, community Mahaprasada, and eco-friendly Visarjana.',
     detailsOverview:
-      'Running from the 13th to the 18th of this month at the Clubhouse Grand Arena, bringing together all residents of Brigade El Dorado with 45 active volunteers and 12 registered cultural performances, daily Anna Santharpane, and sacred rituals.'
+      'Running from the 13th to the 18th of this month at the Clubhouse Grand Arena, bringing together all residents of Eldorado with 45 active volunteers and 12 registered cultural performances, daily Anna Santharpane, and sacred rituals.'
   },
   {
     id: 'rajyotsava-2026',

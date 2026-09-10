@@ -71,12 +71,13 @@ export function downloadBlobAsFile(blob: Blob, filename: string): void {
 /**
  * Generates a PDF Blob directly from an HTML element using html2canvas + jsPDF.
  * Never opens print windows or causes unresponsiveness.
+ * Preserves 100% proportional aspect ratio to prevent squishing or distortion when printed.
  */
 export async function generateReceiptPdfBlob(
   element: HTMLElement,
   options?: { quality?: number; scale?: number }
 ): Promise<Blob> {
-  const scale = options?.scale || 2;
+  const scale = options?.scale || 2.2;
   const quality = options?.quality || 0.96;
 
   // Wait for all fonts and images inside the element to load completely
@@ -91,7 +92,7 @@ export async function generateReceiptPdfBlob(
   const images = Array.from(element.querySelectorAll('img'));
   await Promise.all(
     images.map(img => {
-      if (img.complete) return Promise.resolve();
+      if (img.complete && img.naturalWidth !== 0) return Promise.resolve();
       return new Promise<void>(resolve => {
         img.onload = () => resolve();
         img.onerror = () => resolve();
@@ -100,17 +101,43 @@ export async function generateReceiptPdfBlob(
     })
   );
 
-  const setupClonedElement = (clonedDoc: Document) => {
-    const clonedTarget = clonedDoc.getElementById('receipt-print-target');
-    if (clonedTarget) {
-      clonedTarget.style.width = '580px';
-      clonedTarget.style.maxWidth = '580px';
-      clonedTarget.style.minWidth = '580px';
-      clonedTarget.style.boxSizing = 'border-box';
-      clonedTarget.style.overflow = 'hidden';
-      clonedTarget.style.position = 'relative';
-      clonedTarget.style.margin = '0 auto';
-      const watermark = clonedTarget.querySelector('.ganesha-watermark') as HTMLElement | null;
+  const setupClonedElement = (clonedDoc: Document, clonedEl?: HTMLElement) => {
+    const target =
+      clonedEl ||
+      clonedDoc.getElementById('receipt-print-target') ||
+      clonedDoc.getElementById('offscreen-receipt-print-target') ||
+      clonedDoc.getElementById('portal-modal-receipt-target') ||
+      (clonedDoc.querySelector('.receipt-card') as HTMLElement | null);
+
+    if (target) {
+      // Reset any offscreen or parent positioning so element renders in normal flow at (0, 0)
+      let parent = target.parentElement;
+      while (parent && parent !== clonedDoc.body) {
+        parent.style.position = 'static';
+        parent.style.left = '0';
+        parent.style.top = '0';
+        parent.style.transform = 'none';
+        parent.style.visibility = 'visible';
+        parent.style.opacity = '1';
+        parent.style.overflow = 'visible';
+        parent = parent.parentElement;
+      }
+
+      target.style.width = '580px';
+      target.style.maxWidth = '580px';
+      target.style.minWidth = '580px';
+      target.style.boxSizing = 'border-box';
+      target.style.overflow = 'hidden';
+      target.style.position = 'relative';
+      target.style.left = '0';
+      target.style.top = '0';
+      target.style.margin = '0 auto';
+      target.style.visibility = 'visible';
+      target.style.opacity = '1';
+      target.style.display = 'block';
+      target.style.backgroundColor = '#ffffff';
+
+      const watermark = target.querySelector('.ganesha-watermark') as HTMLElement | null;
       if (watermark) {
         watermark.style.position = 'absolute';
         watermark.style.top = '0';
@@ -142,23 +169,23 @@ export async function generateReceiptPdfBlob(
     canvas = await html2canvas(element, {
       scale,
       useCORS: true,
-      allowTaint: true,
+      allowTaint: false,
       backgroundColor: '#ffffff',
       logging: false,
-      imageTimeout: 6000,
+      imageTimeout: 8000,
       windowWidth: 750,
-      onclone: setupClonedElement
+      onclone: (clonedDoc, clonedEl) => setupClonedElement(clonedDoc, clonedEl)
     });
   } catch (err) {
-    console.warn('html2canvas standard pass failed, retrying with lower scale:', err);
+    console.warn('html2canvas standard pass failed, retrying with fallback settings:', err);
     canvas = await html2canvas(element, {
-      scale: 1.5,
-      useCORS: false,
-      allowTaint: true,
+      scale: 1.8,
+      useCORS: true,
+      allowTaint: false,
       backgroundColor: '#ffffff',
       logging: false,
       windowWidth: 750,
-      onclone: setupClonedElement
+      onclone: (clonedDoc, clonedEl) => setupClonedElement(clonedDoc, clonedEl)
     });
   }
 
@@ -173,19 +200,112 @@ export async function generateReceiptPdfBlob(
   const pageWidth = 210; // mm
   const pageHeight = 297; // mm
   const margin = 10; // 10mm margin
-  const printWidth = pageWidth - margin * 2;
-  const printHeight = pageHeight - margin * 2;
+  const maxPrintWidth = pageWidth - margin * 2; // 190mm
+  const maxPrintHeight = pageHeight - margin * 2; // 277mm
 
-  const contentHeight = (canvas.height * printWidth) / canvas.width;
-  const posX = margin;
-  // Center vertically if it fits on a single page, otherwise top-aligned
-  const posY = contentHeight < printHeight ? margin + (printHeight - contentHeight) / 2 : margin;
-  const targetHeight = Math.min(contentHeight, printHeight);
+  // Maintain 100% exact proportional aspect ratio — never vertically squish or distort
+  const aspectRatio = canvas.width / canvas.height;
 
-  const imgData = canvas.toDataURL('image/jpeg', quality);
-  pdf.addImage(imgData, 'JPEG', posX, posY, printWidth, targetHeight, undefined, 'FAST');
+  // Optimal width for single receipt card on A4: ~170mm - 180mm
+  let renderWidth = Math.min(maxPrintWidth, 180);
+  let renderHeight = renderWidth / aspectRatio;
+
+  // If the height exceeds the printable page height, scale down proportionally
+  if (renderHeight > maxPrintHeight) {
+    renderHeight = maxPrintHeight;
+    renderWidth = renderHeight * aspectRatio;
+  }
+
+  // Perfectly centered on the A4 page
+  const posX = (pageWidth - renderWidth) / 2;
+  const posY = (pageHeight - renderHeight) / 2;
+
+  let imgData: string;
+  try {
+    imgData = canvas.toDataURL('image/png');
+    pdf.addImage(imgData, 'PNG', posX, posY, renderWidth, renderHeight, undefined, 'SLOW');
+  } catch {
+    imgData = canvas.toDataURL('image/jpeg', quality);
+    pdf.addImage(imgData, 'JPEG', posX, posY, renderWidth, renderHeight, undefined, 'SLOW');
+  }
 
   return pdf.output('blob');
+}
+
+/**
+ * Triggers isolated direct printing of a single receipt through a hidden iframe.
+ * Ensures only the receipt is printed on an A4 page without background page clutter.
+ */
+export function triggerReceiptDirectPrint(
+  element: HTMLElement,
+  title = 'Ganeshotsava 2026 Official Receipt'
+): void {
+  // Remove any existing print frame
+  const oldFrame = document.getElementById('receipt-print-iframe');
+  if (oldFrame) oldFrame.remove();
+
+  const printFrame = document.createElement('iframe');
+  printFrame.id = 'receipt-print-iframe';
+  printFrame.style.position = 'fixed';
+  printFrame.style.right = '0';
+  printFrame.style.bottom = '0';
+  printFrame.style.width = '0';
+  printFrame.style.height = '0';
+  printFrame.style.border = '0';
+  printFrame.style.opacity = '0';
+  printFrame.style.pointerEvents = 'none';
+  document.body.appendChild(printFrame);
+
+  const frameDoc = printFrame.contentWindow?.document || printFrame.contentDocument;
+  if (!frameDoc) {
+    window.print();
+    return;
+  }
+
+  // Collect existing stylesheets and external fonts
+  const styles = Array.from(document.querySelectorAll('link[rel="stylesheet"], style'))
+    .map(el => el.outerHTML)
+    .join('\n');
+
+  frameDoc.open();
+  frameDoc.write(`
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <title>${title}</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=Great+Vibes&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Playfair+Display:ital,wght@0,600;0,700;0,900;1,400&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+        ${styles}
+        <style>
+          * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; box-sizing: border-box; }
+          body { margin: 0; padding: 12px; background: #fff !important; font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif; }
+          .font-serif { font-family: 'Playfair Display', Georgia, serif; }
+          .font-mono { font-family: 'JetBrains Mono', monospace; }
+          .font-signature { font-family: 'Great Vibes', 'Dancing Script', cursive; }
+          #isolated-receipt-wrapper { max-width: 620px; margin: 0 auto; background: #fff; }
+          @page { size: A4 portrait; margin: 10mm 12mm; }
+        </style>
+      </head>
+      <body>
+        <div id="isolated-receipt-wrapper">
+          ${element.outerHTML}
+        </div>
+      </body>
+    </html>
+  `);
+  frameDoc.close();
+
+  setTimeout(() => {
+    try {
+      printFrame.contentWindow?.focus();
+      printFrame.contentWindow?.print();
+    } catch (e) {
+      console.error('Frame print failed:', e);
+      window.print();
+    }
+  }, 350);
 }
 
 export interface BulkPdfProgress {
@@ -329,10 +449,16 @@ export async function generateBulkReceiptsPdfBlob(
       if (i > 0) {
         pdf.addPage('a4', 'portrait');
       }
-      const contentHeight = (canvas.height * printWidth) / canvas.width;
-      const targetHeight = Math.min(contentHeight, printHeight);
-      const posY = contentHeight < printHeight ? margin + (printHeight - contentHeight) / 2 : margin;
-      pdf.addImage(imgData, 'JPEG', margin, posY, printWidth, targetHeight, undefined, 'FAST');
+      const aspectRatio = canvas.width / canvas.height;
+      let renderWidth = Math.min(printWidth, 180);
+      let renderHeight = renderWidth / aspectRatio;
+      if (renderHeight > printHeight) {
+        renderHeight = printHeight;
+        renderWidth = renderHeight * aspectRatio;
+      }
+      const posX = (pageWidth - renderWidth) / 2;
+      const posY = (pageHeight - renderHeight) / 2;
+      pdf.addImage(imgData, 'JPEG', posX, posY, renderWidth, renderHeight, undefined, 'SLOW');
     } else {
       // 2 receipts per page
       const isFirstOnPage = (i % 2 === 0);
@@ -341,12 +467,18 @@ export async function generateBulkReceiptsPdfBlob(
       }
 
       const halfHeight = (printHeight - 6) / 2;
-      const contentHeight = (canvas.height * printWidth) / canvas.width;
-      const targetHeight = Math.min(contentHeight, halfHeight);
+      const aspectRatio = canvas.width / canvas.height;
+      let renderWidth = printWidth;
+      let renderHeight = renderWidth / aspectRatio;
+      if (renderHeight > halfHeight) {
+        renderHeight = halfHeight;
+        renderWidth = renderHeight * aspectRatio;
+      }
+      const posX = (pageWidth - renderWidth) / 2;
 
       if (isFirstOnPage) {
-        const posY = margin + (halfHeight - targetHeight) / 2;
-        pdf.addImage(imgData, 'JPEG', margin, posY, printWidth, targetHeight, undefined, 'FAST');
+        const posY = margin + (halfHeight - renderHeight) / 2;
+        pdf.addImage(imgData, 'JPEG', posX, posY, renderWidth, renderHeight, undefined, 'SLOW');
       } else {
         // Second on page
         // Draw subtle dashed cutting separator line
@@ -355,8 +487,8 @@ export async function generateBulkReceiptsPdfBlob(
         pdf.line(margin, margin + halfHeight + 3, pageWidth - margin, margin + halfHeight + 3);
         pdf.setLineDashPattern([], 0); // reset
 
-        const posY = margin + halfHeight + 6 + (halfHeight - targetHeight) / 2;
-        pdf.addImage(imgData, 'JPEG', margin, posY, printWidth, targetHeight, undefined, 'FAST');
+        const posY = margin + halfHeight + 6 + (halfHeight - renderHeight) / 2;
+        pdf.addImage(imgData, 'JPEG', posX, posY, renderWidth, renderHeight, undefined, 'SLOW');
       }
     }
   }

@@ -85,7 +85,7 @@ export const GaneshaWatermark: React.FC<GaneshaWatermarkProps> = ({
           padding: 0
         }}
         loading="eager"
-        crossOrigin="anonymous"
+        referrerPolicy="no-referrer"
       />
     </div>
   );

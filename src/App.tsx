@@ -96,7 +96,8 @@ import {
   getReceiptDocumentTitle,
   getReceiptPdfFilename,
   downloadBlobAsFile,
-  generateReceiptPdfBlob
+  generateReceiptPdfBlob,
+  triggerReceiptDirectPrint
 } from './utils/pdfGenerator';
 
 declare global {
@@ -1005,75 +1006,12 @@ export function App() {
   const triggerDirectPrint = () => {
     const element = document.getElementById('receipt-print-target');
     if (element && receiptModalOpen) {
-      // Remove any existing print frame
-      const oldFrame = document.getElementById('receipt-print-iframe');
-      if (oldFrame) oldFrame.remove();
-
-      const printFrame = document.createElement('iframe');
-      printFrame.id = 'receipt-print-iframe';
-      printFrame.style.position = 'fixed';
-      printFrame.style.right = '0';
-      printFrame.style.bottom = '0';
-      printFrame.style.width = '0';
-      printFrame.style.height = '0';
-      printFrame.style.border = '0';
-      printFrame.style.opacity = '0';
-      printFrame.style.pointerEvents = 'none';
-      document.body.appendChild(printFrame);
-
-      const frameDoc = printFrame.contentWindow?.document || printFrame.contentDocument;
-      if (frameDoc) {
-        // Collect existing styles and external stylesheet links
-        const styles = Array.from(document.querySelectorAll('link[rel="stylesheet"], style'))
-          .map(el => el.outerHTML)
-          .join('\n');
-
-        const isRcpt = printData?.type === 'receipt';
-        const num = isRcpt ? (printData?.item?.rcptNo || printData?.item?.tokNo || '') : (printData?.item?.invNo || '');
-        const flat = printData?.item?.flat || '';
-        const docTitle = getReceiptDocumentTitle(isRcpt, num, flat);
-
-        frameDoc.open();
-        frameDoc.write(`
-          <!DOCTYPE html>
-          <html>
-            <head>
-              <meta charset="utf-8">
-              <title>${docTitle}</title>
-              <link rel="preconnect" href="https://fonts.googleapis.com">
-              <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-              <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=Great+Vibes&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Playfair+Display:ital,wght@0,600;0,700;0,900;1,400&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-              ${styles}
-              <style>
-                * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; box-sizing: border-box; }
-                body { margin: 0; padding: 12px; background: #fff !important; font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif; }
-                .font-serif { font-family: 'Playfair Display', Georgia, serif; }
-                .font-mono { font-family: 'JetBrains Mono', monospace; }
-                .font-signature { font-family: 'Great Vibes', 'Dancing Script', cursive; }
-                #isolated-receipt-wrapper { max-width: 650px; margin: 0 auto; background: #fff; }
-                @page { size: A4 portrait; margin: 10mm 12mm; }
-              </style>
-            </head>
-            <body>
-              <div id="isolated-receipt-wrapper">
-                ${element.outerHTML}
-              </div>
-            </body>
-          </html>
-        `);
-        frameDoc.close();
-
-        setTimeout(() => {
-          try {
-            printFrame.contentWindow?.focus();
-            printFrame.contentWindow?.print();
-          } catch (e) {
-            console.error('Frame print failed:', e);
-            window.print();
-          }
-        }, 350);
-        return;
-      }
+      const isRcpt = printData?.type === 'receipt';
+      const num = isRcpt ? (printData?.item?.rcptNo || printData?.item?.tokNo || '') : (printData?.item?.invNo || '');
+      const flat = printData?.item?.flat || '';
+      const docTitle = getReceiptDocumentTitle(isRcpt, num, flat);
+      triggerReceiptDirectPrint(element, docTitle);
+      return;
     }
 
     // Default window.print for Statement view or other views

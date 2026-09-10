@@ -165,14 +165,14 @@ export const ReceiptInvoiceModal: React.FC<ReceiptInvoiceModalProps> = ({
               onClick={onDownloadPdf}
               disabled={isGeneratingPdf}
               className="flex-1 sm:flex-initial justify-center bg-amber-400 hover:bg-amber-300 text-stone-900 text-xs font-bold uppercase tracking-wider px-4 py-2 rounded inline-flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer disabled:opacity-75"
-              title="Save directly as a single PDF receipt file"
+              title="Download official PDF receipt file directly"
             >
               {isGeneratingPdf ? (
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
               ) : (
                 <Download className="w-3.5 h-3.5" />
               )}
-              <span>{isGeneratingPdf ? 'Saving PDF...' : 'Save PDF'}</span>
+              <span>{isGeneratingPdf ? 'Downloading PDF...' : 'Download PDF'}</span>
             </button>
             <button
               onClick={onDirectPrint}

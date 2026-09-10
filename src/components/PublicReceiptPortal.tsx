@@ -31,7 +31,9 @@ import { DigitalSignatureBlock } from './ReceiptInvoiceModal';
 import {
   generateReceiptPdfBlob,
   downloadBlobAsFile,
-  getBulkIndividualReceiptFilename
+  getBulkIndividualReceiptFilename,
+  triggerReceiptDirectPrint,
+  getReceiptDocumentTitle
 } from '../utils/pdfGenerator';
 
 export type ReceiptRecordType = 'contribution' | 'seva';
@@ -100,6 +102,7 @@ export const PublicReceiptPortal: React.FC<PublicReceiptPortalProps> = ({
 
   // Hidden print element ref for background PDF generation
   const offscreenReceiptRef = useRef<HTMLDivElement>(null);
+  const modalReceiptRef = useRef<HTMLDivElement>(null);
   const [offscreenItem, setOffscreenItem] = useState<UnifiedReceiptItem | null>(null);
 
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -253,16 +256,23 @@ export const PublicReceiptPortal: React.FC<PublicReceiptPortalProps> = ({
   const handleDownloadPdf = async (item: UnifiedReceiptItem) => {
     try {
       setDownloadingId(item.id);
-      setOffscreenItem(item);
 
-      // Give React a tick to mount the offscreen receipt
-      await new Promise(resolve => setTimeout(resolve, 80));
+      // If this receipt is already open in the modal, capture the active modal element directly
+      let targetElement: HTMLElement | null = null;
+      if (activeReceiptForModal && activeReceiptForModal.id === item.id && modalReceiptRef.current) {
+        targetElement = modalReceiptRef.current;
+      } else {
+        setOffscreenItem(item);
+        // Allow DOM to mount the receipt container completely
+        await new Promise(resolve => setTimeout(resolve, 120));
+        targetElement = offscreenReceiptRef.current;
+      }
 
-      if (!offscreenReceiptRef.current) {
+      if (!targetElement) {
         throw new Error('Receipt render container is not ready.');
       }
 
-      const blob = await generateReceiptPdfBlob(offscreenReceiptRef.current, { scale: 2 });
+      const blob = await generateReceiptPdfBlob(targetElement, { scale: 2.2, quality: 0.96 });
       const filename = getBulkIndividualReceiptFilename({
         flat: item.flat,
         name: item.name,
@@ -276,7 +286,7 @@ export const PublicReceiptPortal: React.FC<PublicReceiptPortalProps> = ({
       showToast(`Receipt downloaded as "${filename}"`);
     } catch (err: any) {
       console.error('Failed to download receipt PDF:', err);
-      alert('Failed to generate PDF. You can also click "View / Print" to view and print the receipt.');
+      alert('Failed to generate PDF. Please try again or click "Print" to print or save directly as PDF.');
     } finally {
       setDownloadingId(null);
       setOffscreenItem(null);
@@ -316,8 +326,20 @@ export const PublicReceiptPortal: React.FC<PublicReceiptPortalProps> = ({
     window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
   };
 
-  // Direct print function
+  // Direct print function - isolated receipt A4 output
   const handleDirectPrintModal = () => {
+    const el = modalReceiptRef.current || document.getElementById('portal-modal-receipt-target') || document.getElementById('receipt-print-target');
+    if (el && activeReceiptForModal) {
+      const isRcpt = activeReceiptForModal.recordType !== 'invoice';
+      const docTitle = getReceiptDocumentTitle(
+        isRcpt,
+        activeReceiptForModal.rcptNo,
+        activeReceiptForModal.flat,
+        activeReceiptForModal.recordType === 'seva'
+      );
+      triggerReceiptDirectPrint(el, docTitle);
+      return;
+    }
     window.print();
   };
 
@@ -854,8 +876,9 @@ export const PublicReceiptPortal: React.FC<PublicReceiptPortalProps> = ({
             {/* Modal Printable Receipt Content */}
             <div className="p-4 sm:p-6 overflow-y-auto flex-1 bg-stone-100/70">
               <div
-                id="receipt-print-target"
-                className="relative overflow-hidden bg-white p-5 sm:p-7 border-2 border-[#991B1B] shadow-md rounded-lg font-sans mx-auto max-w-lg"
+                ref={modalReceiptRef}
+                id="portal-modal-receipt-target"
+                className="receipt-card relative overflow-hidden bg-white p-5 sm:p-7 border-2 border-[#991B1B] shadow-md rounded-lg font-sans mx-auto max-w-lg"
                 style={{ isolation: 'isolate', overflow: 'hidden' }}
               >
                 <GaneshaWatermark opacity={0.22} size="full" fit="fill" />
@@ -1016,11 +1039,23 @@ export const PublicReceiptPortal: React.FC<PublicReceiptPortalProps> = ({
 
       {/* 5. OFFSCREEN RENDER CONTAINER FOR BACKGROUND PDF GENERATION */}
       {offscreenItem && (
-        <div style={{ position: 'fixed', left: '-9999px', top: 0, zIndex: -100 }}>
+        <div
+          style={{
+            position: 'fixed',
+            left: 0,
+            top: 0,
+            width: '600px',
+            pointerEvents: 'none',
+            zIndex: -999,
+            background: '#ffffff',
+            opacity: 1
+          }}
+          aria-hidden="true"
+        >
           <div
             ref={offscreenReceiptRef}
-            id="receipt-print-target"
-            className="relative overflow-hidden bg-white p-7 border-2 border-[#991B1B] shadow-none rounded-lg font-sans"
+            id="offscreen-receipt-print-target"
+            className="receipt-card relative overflow-hidden bg-white p-7 border-2 border-[#991B1B] shadow-none rounded-lg font-sans"
             style={{ width: '580px', maxWidth: '580px', minWidth: '580px', boxSizing: 'border-box' }}
           >
             <GaneshaWatermark opacity={0.22} size="full" fit="fill" />

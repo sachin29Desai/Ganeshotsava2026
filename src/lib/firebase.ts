@@ -40,7 +40,7 @@ import {
   AppSettings,
   AppState
 } from '../types';
-import { DEFAULT_SEVAS, INITIAL_STATE } from '../utils/helpers';
+import { DEFAULT_SEVAS, INITIAL_STATE, prepareExpenseForStorage } from '../utils/helpers';
 import firebaseConfigData from '../../firebase-applet-config.json';
 
 const firebaseConfig = {
@@ -572,7 +572,8 @@ export async function seedInitialDataIfEmpty(initialState: AppState) {
 
 export async function cloudSaveExpense(expense: Expense) {
   try {
-    await setDoc(doc(db, 'expenses', expense.id), { ...expense, updatedAt: new Date().toISOString() });
+    const prepared = await prepareExpenseForStorage(expense);
+    await setDoc(doc(db, 'expenses', prepared.id), { ...prepared, updatedAt: new Date().toISOString() });
   } catch (err) {
     console.error('Error saving expense to Firestore:', err);
     throw err;
@@ -764,6 +765,20 @@ export async function cloudSyncAllData(state: AppState) {
     ];
 
     for (const col of collectionsToSync) {
+      // Pre-process and optimize expenses before cloud serialization
+      if (col.name === 'expenses') {
+        col.items = await Promise.all(
+          col.items.map(async (item) => {
+            try {
+              return await prepareExpenseForStorage(item as Expense);
+            } catch (prepErr) {
+              console.warn('Expense preparation warning:', prepErr);
+              return item;
+            }
+          })
+        );
+      }
+
       let snap;
       try {
         snap = await getDocs(collection(db, col.name));
@@ -791,8 +806,28 @@ export async function cloudSyncAllData(state: AppState) {
         }
       }
 
-      for (const item of col.items) {
-        batch.set(doc(db, col.name, item.id), { ...item, updatedAt: new Date().toISOString() });
+      for (const rawItem of col.items) {
+        let itemToSave: any = { ...rawItem, updatedAt: new Date().toISOString() };
+        
+        // Safety guard: Firestore limits documents to 1,048,576 bytes
+        const approxSize = JSON.stringify(itemToSave).length;
+        if (approxSize > 950000) {
+          console.warn(`Document ${col.name}/${itemToSave.id} is ${approxSize} bytes, approaching Firestore's 1MB limit. Pruning heavy attachments to prevent write failure.`);
+          if (col.name === 'expenses') {
+            // Keep all financial numbers, voucher details, and comments; clear bloated base64 images
+            const safeBills = (itemToSave.bills || []).map((b: any) => ({
+              ...b,
+              url: b.url && b.url.length > 100000 ? '' : b.url
+            }));
+            itemToSave = {
+              ...itemToSave,
+              bills: safeBills,
+              receiptUrl: undefined
+            };
+          }
+        }
+
+        batch.set(doc(db, col.name, itemToSave.id), itemToSave);
         opCount++;
         if (opCount >= 400) {
           await batch.commit();
@@ -817,6 +852,10 @@ export async function cloudSyncAllData(state: AppState) {
     if (isQuotaExceededError(err)) {
       console.warn('Cloud write quota reached. Data safely secured in local offline ledger.');
       throw new Error('Firestore free daily quota reached for today. Your changes have been securely saved to the local offline ledger.');
+    }
+    const rawMsg = err?.message || String(err);
+    if (rawMsg.includes('exceeds the maximum allowed size') || rawMsg.includes('1,048,576')) {
+      throw new Error('One of the attached bill receipts is too large for database storage (>1 MB limit). Please remove oversized files in Expenses and re-save.');
     }
     console.error('Error syncing all data to Firestore:', err);
     throw err;

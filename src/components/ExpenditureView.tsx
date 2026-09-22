@@ -18,10 +18,12 @@ import {
   MessageSquare,
   ChevronLeft,
   ChevronRight,
-  FileSpreadsheet
+  FileSpreadsheet,
+  AlertTriangle,
+  ShieldCheck
 } from 'lucide-react';
 import { Expense, ExpenseBill } from '../types';
-import { fmt, fmtDate, today, getExpenseBalance, getExpenseActual, compressImageFile } from '../utils/helpers';
+import { fmt, fmtDate, today, getExpenseBalance, getExpenseActual, compressImageFile, formatBytes } from '../utils/helpers';
 
 interface ExpenditureViewProps {
   expenses: Expense[];
@@ -216,13 +218,21 @@ export const ExpenditureView: React.FC<ExpenditureViewProps> = ({
     setIsProcessingFile(true);
     try {
       const added = await processFiles(files);
+      const currentBills = formData.bills || [];
+      const combined = [...currentBills, ...added];
+      const totalBytes = combined.reduce((acc, b) => acc + (b.url ? b.url.length : 0), 0);
+      if (totalBytes > 850 * 1024) {
+        alert(
+          `Warning: Total attached bills size is ${formatBytes(totalBytes)}, approaching Firestore's 1MB document limit. Please use compressed images or remove unnecessary files.`
+        );
+      }
       setFormData(prev => ({
         ...prev,
-        bills: [...prev.bills, ...added]
+        bills: combined
       }));
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to process receipt file(s):', err);
-      alert('Unable to process the uploaded file(s). Please select valid images or PDFs.');
+      alert(err?.message || 'Unable to process the uploaded file(s). Please select valid images or small PDFs.');
     } finally {
       setIsProcessingFile(false);
     }
@@ -256,13 +266,20 @@ export const ExpenditureView: React.FC<ExpenditureViewProps> = ({
     setIsProcessingFile(true);
     try {
       const added = await processFiles(files);
+      const combined = [...quickAttachModal.bills, ...added];
+      const totalBytes = combined.reduce((acc, b) => acc + (b.url ? b.url.length : 0), 0);
+      if (totalBytes > 850 * 1024) {
+        alert(
+          `Warning: Total attached bills size is ${formatBytes(totalBytes)}, approaching Firestore's 1MB document limit. Please use compressed images or remove unnecessary files.`
+        );
+      }
       setQuickAttachModal(prev => ({
         ...prev,
-        bills: [...prev.bills, ...added]
+        bills: combined
       }));
-    } catch (err) {
+    } catch (err: any) {
       console.error('Quick attach error:', err);
-      alert('Error processing file(s). Please retry.');
+      alert(err?.message || 'Error processing file(s). Please retry.');
     } finally {
       setIsProcessingFile(false);
     }
@@ -275,7 +292,7 @@ export const ExpenditureView: React.FC<ExpenditureViewProps> = ({
     const updated: Expense = {
       ...quickAttachModal.expense,
       bills: bills,
-      receiptUrl: primary?.url,
+      receiptUrl: bills.length > 0 ? undefined : primary?.url,
       receiptName: primary?.name,
       receiptType: primary?.type,
       receiptDate: primary?.date
@@ -299,7 +316,7 @@ export const ExpenditureView: React.FC<ExpenditureViewProps> = ({
     const updated: Expense = {
       ...viewingExpense,
       bills: updatedBills,
-      receiptUrl: primary?.url,
+      receiptUrl: updatedBills.length > 0 ? undefined : primary?.url,
       receiptName: primary?.name,
       receiptType: primary?.type,
       receiptDate: primary?.date
@@ -318,7 +335,7 @@ export const ExpenditureView: React.FC<ExpenditureViewProps> = ({
     const updated: Expense = {
       ...viewingExpense,
       bills: updatedBills,
-      receiptUrl: primary?.url,
+      receiptUrl: updatedBills.length > 0 ? undefined : primary?.url,
       receiptName: primary?.name,
       receiptType: primary?.type,
       receiptDate: primary?.date
@@ -340,11 +357,17 @@ export const ExpenditureView: React.FC<ExpenditureViewProps> = ({
       const added = await processFiles(files);
       const currentBills = getExpenseBills(viewingExpense);
       const updatedBills = [...currentBills, ...added];
+      const totalBytes = updatedBills.reduce((acc, b) => acc + (b.url ? b.url.length : 0), 0);
+      if (totalBytes > 850 * 1024) {
+        alert(
+          `Warning: Total attached bills size is ${formatBytes(totalBytes)}, approaching Firestore's 1MB document limit. Please use compressed images.`
+        );
+      }
       const primary = updatedBills[0];
       const updated: Expense = {
         ...viewingExpense,
         bills: updatedBills,
-        receiptUrl: primary?.url,
+        receiptUrl: updatedBills.length > 0 ? undefined : primary?.url,
         receiptName: primary?.name,
         receiptType: primary?.type,
         receiptDate: primary?.date
@@ -352,9 +375,9 @@ export const ExpenditureView: React.FC<ExpenditureViewProps> = ({
       onSave(updated);
       setViewingExpense(updated);
       setActiveBillIdx(updatedBills.length - 1);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Viewer file add error:', err);
-      alert('Error uploading bill.');
+      alert(err?.message || 'Error uploading bill.');
     } finally {
       setIsProcessingFile(false);
     }
@@ -392,7 +415,7 @@ export const ExpenditureView: React.FC<ExpenditureViewProps> = ({
       act: actNum,
       notes: formData.notes?.trim() || undefined,
       bills: bills,
-      receiptUrl: primaryBill?.url,
+      receiptUrl: bills.length > 0 ? undefined : primaryBill?.url,
       receiptName: primaryBill?.name,
       receiptType: primaryBill?.type,
       receiptDate: primaryBill?.date
@@ -969,6 +992,33 @@ export const ExpenditureView: React.FC<ExpenditureViewProps> = ({
               </button>
             </div>
 
+            {/* Storage Size & Safety Monitor */}
+            {(() => {
+              const totalBytes = quickAttachModal.bills.reduce((acc, b) => acc + (b.url ? b.url.length : 0), 0);
+              const isWarning = totalBytes > 700 * 1024;
+              return (
+                <div className={`flex items-center justify-between text-xs px-3 py-2 rounded-lg border ${
+                  isWarning ? 'bg-amber-50 border-amber-300 text-amber-900' : 'bg-stone-50 border-stone-200 text-stone-700'
+                }`}>
+                  <div className="flex items-center gap-1.5 font-medium">
+                    {isWarning ? (
+                      <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                    ) : (
+                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    )}
+                    <span>Bills Payload:</span>
+                    <strong className="text-stone-900 font-mono">{formatBytes(totalBytes)}</strong>
+                    <span className="text-stone-400 text-[10px]">/ 800 KB safe limit</span>
+                  </div>
+                  <span className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                    isWarning ? 'bg-amber-200 text-amber-900' : 'bg-emerald-100 text-emerald-800'
+                  }`}>
+                    {isWarning ? 'Near Limit' : 'Safe to Save'}
+                  </span>
+                </div>
+              );
+            })()}
+
             {/* List of Attached Bills with Comments */}
             {quickAttachModal.bills.length > 0 && (
               <div className="space-y-2.5 max-h-[320px] overflow-y-auto pr-1">
@@ -1233,6 +1283,32 @@ export const ExpenditureView: React.FC<ExpenditureViewProps> = ({
                 </label>
                 <span className="text-[10px] text-stone-400 font-normal">Supports JPG, PNG, PDF</span>
               </div>
+
+              {formData.bills.length > 0 && (() => {
+                const totalBytes = formData.bills.reduce((acc, b) => acc + (b.url ? b.url.length : 0), 0);
+                const isWarning = totalBytes > 700 * 1024;
+                return (
+                  <div className={`flex items-center justify-between text-xs px-3 py-1.5 rounded-lg border ${
+                    isWarning ? 'bg-amber-50 border-amber-300 text-amber-900' : 'bg-stone-50 border-stone-200 text-stone-700'
+                  }`}>
+                    <div className="flex items-center gap-1.5 font-medium">
+                      {isWarning ? (
+                        <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                      ) : (
+                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      )}
+                      <span>Storage Payload:</span>
+                      <strong className="text-stone-900 font-mono">{formatBytes(totalBytes)}</strong>
+                      <span className="text-stone-400 text-[10px]">/ 800 KB safe limit</span>
+                    </div>
+                    <span className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                      isWarning ? 'bg-amber-200 text-amber-900' : 'bg-emerald-100 text-emerald-800'
+                    }`}>
+                      {isWarning ? 'Near Limit' : 'Safe to Save'}
+                    </span>
+                  </div>
+                );
+              })()}
 
               {/* List of current bills */}
               {formData.bills.length > 0 && (

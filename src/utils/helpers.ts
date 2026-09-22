@@ -1,4 +1,4 @@
-import { AppState, Expense, SevaCatalogueItem } from '../types';
+import { AppState, Expense, ExpenseBill, SevaCatalogueItem } from '../types';
 
 export const DEFAULT_SEVAS: SevaCatalogueItem[] = [
   { id: 'ds1', name: 'Rice (Anna Prasadam)', amt: 0, unit: 'kg', totalRequired: 200, desc: 'Sona Masoori / Basmati rice for grand Mahaprasadam' },
@@ -188,18 +188,120 @@ export const getExpenseActual = (e: Partial<Expense>): number => {
 };
 
 /**
+ * Formats bytes into human-readable KB or MB.
+ */
+export function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+}
+
+/**
+ * Calculates approximate serialized document size in bytes.
+ */
+export function getExpenseDocumentSize(expense: Expense): number {
+  try {
+    return new Blob([JSON.stringify(expense)]).size;
+  } catch {
+    return JSON.stringify(expense).length;
+  }
+}
+
+/**
+ * Downscales and compresses a base64 image data URL using an HTML5 Canvas.
+ * Target size is around 60–100 KB per image.
+ */
+export async function compressImageDataUrl(
+  dataUrl: string,
+  maxDimension = 950,
+  quality = 0.72
+): Promise<string> {
+  // If not a data:image or already very lightweight (< 90 KB), keep as is
+  if (!dataUrl || !dataUrl.startsWith('data:image/') || dataUrl.length < 95000) {
+    return dataUrl;
+  }
+
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      let { width, height } = img;
+      if (width <= 0 || height <= 0) {
+        resolve(dataUrl);
+        return;
+      }
+      if (width > maxDimension || height > maxDimension) {
+        if (width > height) {
+          height = Math.round((height * maxDimension) / width);
+          width = maxDimension;
+        } else {
+          width = Math.round((width * maxDimension) / height);
+          height = maxDimension;
+        }
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        resolve(dataUrl);
+        return;
+      }
+
+      // Fill white background for transparent images converted to JPEG
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, width, height);
+      ctx.drawImage(img, 0, 0, width, height);
+
+      let compressed = canvas.toDataURL('image/jpeg', quality);
+
+      // If still relatively large (> 140 KB), apply a second pass at lower quality
+      if (compressed.length > 150000) {
+        compressed = canvas.toDataURL('image/jpeg', 0.58);
+      }
+
+      // If compressed is actually smaller than original, use it
+      resolve(compressed.length < dataUrl.length ? compressed : dataUrl);
+    };
+
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
+}
+
+/**
  * Compresses an image or handles a PDF file for bill receipts.
- * Compresses image to max 1400px JPEG to keep Firestore documents lightweight.
+ * - For images: Compresses to max 950px JPEG with quality 0.72 (~60-90 KB).
+ * - For PDFs: Rejects if raw file size > 380 KB to prevent breaking Firestore's 1 MB document limit.
  */
 export function compressImageFile(
   file: File,
-  maxDimension = 1400,
-  quality = 0.82
-): Promise<{ dataUrl: string; name: string; type: string }> {
+  maxDimension = 950,
+  quality = 0.72
+): Promise<{ dataUrl: string; name: string; type: string; sizeBytes: number }> {
   return new Promise((resolve, reject) => {
     if (file.type === 'application/pdf') {
+      // 380 KB raw binary becomes ~510 KB in Base64
+      const MAX_PDF_BYTES = 380 * 1024;
+      if (file.size > MAX_PDF_BYTES) {
+        reject(
+          new Error(
+            `PDF "${file.name}" is ${formatBytes(file.size)}, which exceeds the safe ${formatBytes(MAX_PDF_BYTES)} limit for database storage. Please compress the PDF or upload a photo / screenshot of the bill.`
+          )
+        );
+        return;
+      }
+
       const reader = new FileReader();
-      reader.onload = () => resolve({ dataUrl: reader.result as string, name: file.name, type: 'application/pdf' });
+      reader.onload = () => {
+        const dataUrl = reader.result as string;
+        resolve({
+          dataUrl,
+          name: file.name,
+          type: 'application/pdf',
+          sizeBytes: dataUrl.length
+        });
+      };
       reader.onerror = reject;
       reader.readAsDataURL(file);
       return;
@@ -224,21 +326,113 @@ export function compressImageFile(
         canvas.height = height;
         const ctx = canvas.getContext('2d');
         if (!ctx) {
-          resolve({ dataUrl: e.target?.result as string, name: file.name, type: file.type });
+          const rawUrl = e.target?.result as string;
+          resolve({
+            dataUrl: rawUrl,
+            name: file.name,
+            type: file.type,
+            sizeBytes: rawUrl.length
+          });
           return;
         }
+
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, width, height);
         ctx.drawImage(img, 0, 0, width, height);
-        const dataUrl = canvas.toDataURL('image/jpeg', quality);
+
+        let dataUrl = canvas.toDataURL('image/jpeg', quality);
+        if (dataUrl.length > 150000) {
+          dataUrl = canvas.toDataURL('image/jpeg', 0.58);
+        }
+
         resolve({
           dataUrl,
           name: file.name.replace(/\.[^/.]+$/, '') + '.jpg',
-          type: 'image/jpeg'
+          type: 'image/jpeg',
+          sizeBytes: dataUrl.length
         });
       };
-      img.onerror = () => resolve({ dataUrl: e.target?.result as string, name: file.name, type: file.type });
+      img.onerror = () => {
+        const rawUrl = e.target?.result as string;
+        resolve({
+          dataUrl: rawUrl,
+          name: file.name,
+          type: file.type,
+          sizeBytes: rawUrl.length
+        });
+      };
       img.src = e.target?.result as string;
     };
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
+}
+
+/**
+ * Prepares an Expense object for Firestore cloud persistence:
+ * 1. Eliminates duplicate base64 string between receiptUrl and bills[0].url (which doubled document size).
+ * 2. Auto-compresses any heavy image data URLs across attached bills to fit under 750 KB.
+ * 3. Guarantees the expense document stays well below Firestore's 1,048,576 byte hard limit.
+ */
+export async function prepareExpenseForStorage(expense: Expense): Promise<Expense> {
+  const bills = expense.bills || [];
+  const hasBills = Array.isArray(bills) && bills.length > 0;
+
+  // 1. Deduplicate: If expense has bills[], DO NOT store the same base64 dataUrl again in receiptUrl!
+  // Keeping primary receipt metadata (name, type, date) is enough for backward compatibility.
+  let cleanedReceiptUrl: string | undefined = undefined;
+  if (!hasBills && expense.receiptUrl) {
+    cleanedReceiptUrl = expense.receiptUrl;
+  }
+
+  // If no bills and small document, return quickly
+  if (!hasBills && (!cleanedReceiptUrl || cleanedReceiptUrl.length < 150000)) {
+    return {
+      ...expense,
+      receiptUrl: cleanedReceiptUrl
+    };
+  }
+
+  // 2. Compress any large image data URLs in bills
+  let processedBills: ExpenseBill[] = bills;
+  if (hasBills) {
+    processedBills = await Promise.all(
+      bills.map(async (bill) => {
+        if (bill.url && bill.url.startsWith('data:image/')) {
+          const compressed = await compressImageDataUrl(bill.url, 950, 0.72);
+          return { ...bill, url: compressed };
+        }
+        return bill;
+      })
+    );
+  } else if (cleanedReceiptUrl && cleanedReceiptUrl.startsWith('data:image/')) {
+    cleanedReceiptUrl = await compressImageDataUrl(cleanedReceiptUrl, 950, 0.72);
+  }
+
+  let finalExpense: Expense = {
+    ...expense,
+    bills: processedBills,
+    receiptUrl: cleanedReceiptUrl
+  };
+
+  // 3. Size check: Firestore limit is 1,048,576 bytes (~1 MB). Target safe limit is 800 KB.
+  let docSize = getExpenseDocumentSize(finalExpense);
+  if (docSize > 850000 && processedBills.length > 0) {
+    // Second aggressive pass if user attached multiple large files
+    processedBills = await Promise.all(
+      processedBills.map(async (bill) => {
+        if (bill.url && bill.url.startsWith('data:image/')) {
+          const ultraCompressed = await compressImageDataUrl(bill.url, 750, 0.50);
+          return { ...bill, url: ultraCompressed };
+        }
+        return bill;
+      })
+    );
+    finalExpense = {
+      ...finalExpense,
+      bills: processedBills
+    };
+  }
+
+  return finalExpense;
 }

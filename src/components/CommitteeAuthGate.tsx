@@ -18,7 +18,7 @@ import { sha256, cleanOrgName } from '../utils/helpers';
 interface CommitteeAuthGateProps {
   settings: AppSettings;
   onSuccess: (role: UserRole) => void;
-  onGoToReceiptPortal: () => void;
+  onGoToReceiptPortal?: () => void;
   onGoToSevaPortal?: () => void;
   onBackToHome?: () => void;
   onSaveSettings?: (newSettings: AppSettings) => void;
@@ -127,19 +127,6 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
-            {onGoToSevaPortal && (
-              <button
-                type="button"
-                onClick={onGoToSevaPortal}
-                className="bg-white/10 hover:bg-white/20 text-white font-semibold text-xs px-2.5 py-1.5 rounded-lg inline-flex items-center gap-1.5 transition-colors cursor-pointer border border-white/20 shrink-0"
-                title="Book Devotional Sevas for Sri Ganeshotsava 2026"
-              >
-                <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-                <span className="hidden sm:inline">Devotee Sevas</span>
-                <span className="text-[9px] bg-amber-400 text-stone-950 font-bold px-1 rounded">Open</span>
-              </button>
-            )}
-
             {onBackToHome && (
               <button
                 type="button"
@@ -151,17 +138,6 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
                 <span className="hidden sm:inline">Celebrations Home</span>
               </button>
             )}
-
-            <button
-              type="button"
-              onClick={onGoToReceiptPortal}
-              className="bg-amber-400 hover:bg-amber-300 text-[#7F1D1D] font-bold text-xs px-3 py-1.5 rounded-lg inline-flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs shrink-0"
-              title="Open the public receipt portal for devotees"
-            >
-              <FileText className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Devotee Receipts</span>
-              <span>→</span>
-            </button>
           </div>
         </div>
       </header>
@@ -241,43 +217,6 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
                 <ShieldCheck className="w-3.5 h-3.5 text-stone-400 shrink-0" />
                 <span>Secure role-based access verified automatically</span>
               </div>
-            </div>
-          </div>
-
-          {/* Devotee Redirection Card */}
-          <div className="bg-amber-50/90 border border-amber-300 rounded-2xl p-4 sm:p-5 text-center space-y-3 shadow-xs">
-            <div className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-950 bg-amber-200/80 px-2.5 py-1 rounded-full">
-              <Sparkles className="w-3.5 h-3.5 text-amber-700" />
-              <span>Devotee &amp; Resident Self-Service</span>
-            </div>
-            <div>
-              <h3 className="text-sm font-serif font-bold text-stone-900">
-                Devotee Receipts &amp; Devotional Seva Bookings
-              </h3>
-              <p className="text-xs text-stone-600 mt-1 max-w-sm mx-auto leading-relaxed">
-                Residents do <strong>not</strong> need any committee password. Download your contribution receipts or book devotional sevas directly:
-              </p>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
-              <button
-                type="button"
-                onClick={onGoToReceiptPortal}
-                className="w-full bg-amber-400 hover:bg-amber-300 text-[#7F1D1D] font-bold text-xs py-2.5 px-3 rounded-xl inline-flex items-center justify-center gap-1.5 shadow-xs transition-all cursor-pointer"
-              >
-                <FileText className="w-4 h-4 text-[#991B1B]" />
-                <span>Devotee Receipts</span>
-              </button>
-
-              {onGoToSevaPortal && (
-                <button
-                  type="button"
-                  onClick={onGoToSevaPortal}
-                  className="w-full bg-[#991B1B] hover:bg-[#7F1D1D] text-white font-bold text-xs py-2.5 px-3 rounded-xl inline-flex items-center justify-center gap-1.5 shadow-xs transition-all cursor-pointer"
-                >
-                  <Sparkles className="w-4 h-4 text-amber-300" />
-                  <span>Book Sevas</span>
-                </button>
-              )}
             </div>
           </div>
         </div>

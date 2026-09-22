@@ -44,7 +44,8 @@ import {
   sha256,
   getExpenseBalance,
   getExpenseActual,
-  cleanOrgName
+  cleanOrgName,
+  prepareExpenseForStorage
 } from './utils/helpers';
 import { generateStandaloneHTML } from './utils/htmlExporter';
 import {
@@ -92,6 +93,7 @@ import { CommitteeAuthGate } from './components/CommitteeAuthGate';
 import { CommunityHomeView } from './components/CommunityHomeView';
 import { PublicSevaPortal } from './components/PublicSevaPortal';
 import { AdminGateForBalaga } from './components/AdminGateForBalaga';
+import { AdminAccessGate } from './components/AdminAccessGate';
 import {
   getReceiptDocumentTitle,
   getReceiptPdfFilename,
@@ -299,14 +301,17 @@ export function App() {
     return auth && (r === 'admin' || !r);
   });
 
-  // Guard restricted tabs for Volunteers
+  // Guard restricted tabs for Non-Admins and Volunteers
   useEffect(() => {
+    if (!isAdmin && activeIncomeSubTab === 'sevas') {
+      setActiveIncomeSubTab('donations');
+    }
     if (userRole === 'volunteer') {
       if (activeIncomeSubTab === 'sponsorship' || activeIncomeSubTab === 'stalls') {
         setActiveIncomeSubTab('donations');
       }
     }
-  }, [userRole, activeIncomeSubTab]);
+  }, [userRole, isAdmin, activeIncomeSubTab]);
 
   // Guard settings for Non-Admins
   useEffect(() => {
@@ -322,7 +327,7 @@ export function App() {
   const [isSaving, setIsSaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const hasUnsavedChangesRef = useRef(false);
-  const [syncToast, setSyncToast] = useState<string | null>(null);
+  const [syncToast, setSyncToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   // --- Modals & Printing ---
   const [receiptModalOpen, setReceiptModalOpen] = useState(false);
@@ -543,6 +548,15 @@ export function App() {
     });
     hasUnsavedChangesRef.current = true;
     setHasUnsavedChanges(true);
+
+    // Asynchronously sanitize & deduplicate bill attachments in the background
+    prepareExpenseForStorage(row)
+      .then(optimized => {
+        setExpenses(prev => prev.map(e => (e.id === optimized.id ? optimized : e)));
+      })
+      .catch(err => {
+        console.warn('Expense preparation warning:', err);
+      });
   };
 
   const handleDeleteExpense = (id: string) => {
@@ -778,15 +792,32 @@ export function App() {
     if (!isAdmin) return;
     setIsSaving(true);
     try {
-      await cloudSyncAllData(getCurrentState());
+      // Auto-sanitize and optimize all expenses in memory before syncing
+      const currentExpenses = expenses;
+      const sanitizedExpenses = await Promise.all(
+        currentExpenses.map(exp => prepareExpenseForStorage(exp))
+      );
+      setExpenses(sanitizedExpenses);
+
+      const stateToSave = {
+        ...getCurrentState(),
+        expenses: sanitizedExpenses
+      };
+
+      await cloudSyncAllData(stateToSave);
       hasUnsavedChangesRef.current = false;
       setHasUnsavedChanges(false);
-      setSyncToast('Data saved successfully');
-      setTimeout(() => setSyncToast(null), 3000);
+      setSyncToast({ message: 'All festival records successfully saved to cloud!', type: 'success' });
+      setTimeout(() => setSyncToast(null), 3500);
     } catch (err: any) {
       console.error('Failed to save data:', err);
-      setSyncToast(err?.message || 'Failed to save data. Please retry.');
-      setTimeout(() => setSyncToast(null), 4000);
+      const rawMsg = err?.message || String(err);
+      const isSizeError = rawMsg.includes('exceeds the maximum allowed size') || rawMsg.includes('1,048,576');
+      const displayMsg = isSizeError
+        ? 'An attached bill file was too large. Large bills have been automatically compressed — please click Save again.'
+        : rawMsg || 'Failed to save data. Please retry.';
+      setSyncToast({ message: displayMsg, type: 'error' });
+      setTimeout(() => setSyncToast(null), 5500);
     } finally {
       setIsSaving(false);
     }
@@ -1234,9 +1265,28 @@ export function App() {
     input.click();
   };
 
-  // 1. PUBLIC DEVOTEE RECEIPTS PORTAL ('/ganeshotsava2026/receipts')
-  // Completely public and accessible by ANY resident/devotee without password!
+  // 1. DEVOTEE RECEIPTS PORTAL ('/ganeshotsava2026/receipts') - Strictly Admin Only
   if (currentRoute === 'receipts') {
+    if (!isAuthenticated || !isAdmin) {
+      return (
+        <AdminAccessGate
+          pageType="receipts"
+          pageTitle="Devotee Receipts Portal"
+          pageRoute="/receipts"
+          settings={settings}
+          currentRole={userRole}
+          onSuccess={() => {
+            setIsAuthenticated(true);
+            setIsAdmin(true);
+            setUserRole('admin');
+            sessionStorage.setItem('eg_committee_auth', 'true');
+            sessionStorage.setItem('eg_user_role', 'admin');
+          }}
+          onBackToHome={navigateToGaneshotsava}
+        />
+      );
+    }
+
     return (
       <PublicReceiptPortal
         contributions={contributions}
@@ -1252,9 +1302,28 @@ export function App() {
     );
   }
 
-  // 2. PUBLIC DEVOTEE SEVAS PORTAL ('/ganeshotsava2026/sevas')
-  // Allows devotees and community residents to view seva catalogue, book sevas, and view bookings
+  // 2. DEVOTEE SEVAS PORTAL ('/ganeshotsavasevas') - Strictly Admin Only
   if (currentRoute === 'sevas') {
+    if (!isAuthenticated || !isAdmin) {
+      return (
+        <AdminAccessGate
+          pageType="sevas"
+          pageTitle="Devotee Seva Portal"
+          pageRoute="/ganeshotsavasevas"
+          settings={settings}
+          currentRole={userRole}
+          onSuccess={() => {
+            setIsAuthenticated(true);
+            setIsAdmin(true);
+            setUserRole('admin');
+            sessionStorage.setItem('eg_committee_auth', 'true');
+            sessionStorage.setItem('eg_user_role', 'admin');
+          }}
+          onBackToHome={navigateToGaneshotsava}
+        />
+      );
+    }
+
     return (
       <PublicSevaPortal
         sevas={sevas}
@@ -1294,7 +1363,6 @@ export function App() {
             sessionStorage.setItem('eg_user_role', 'admin');
           }}
           onBackToGaneshotsava={navigateToGaneshotsava}
-          onGoToReceipts={navigateToReceipts}
         />
       );
     }
@@ -1316,8 +1384,6 @@ export function App() {
       <CommitteeAuthGate
         settings={settings}
         onSuccess={handleLoginSuccess}
-        onGoToReceiptPortal={navigateToReceipts}
-        onGoToSevaPortal={navigateToSevas}
         onSaveSettings={handleSaveSettings}
       />
     );
@@ -1434,25 +1500,31 @@ export function App() {
               </button>
             )}
 
-            {/* Direct Devotee Sevas Booking Portal Quick Switch */}
-            <button
-              onClick={navigateToSevas}
-              className="px-2.5 py-1 rounded-full font-bold uppercase tracking-wider inline-flex items-center gap-1.5 transition-colors cursor-pointer text-[11px] bg-white/10 text-white hover:bg-white/20 border border-white/20 shadow-xs"
-              title="Open Public Devotee Seva Booking Portal (/ganeshotsava2026/sevas)"
-            >
-              <Sparkles className="w-3 h-3 text-amber-300" />
-              <span className="hidden sm:inline">Seva Portal</span>
-            </button>
+            {/* Direct Devotee Sevas Booking Portal Quick Switch (Admin Only) */}
+            {isAdmin && (
+              <button
+                onClick={navigateToSevas}
+                className="px-2.5 py-1 rounded-full font-bold uppercase tracking-wider inline-flex items-center gap-1.5 transition-colors cursor-pointer text-[11px] bg-white/10 text-white hover:bg-white/20 border border-white/20 shadow-xs"
+                title="Open Devotee Seva Booking Portal (/ganeshotsavasevas - Admin Only)"
+              >
+                <Sparkles className="w-3 h-3 text-amber-300" />
+                <span className="hidden sm:inline">Seva Portal</span>
+                <span className="text-[9px] bg-amber-400 text-stone-950 font-bold px-1 rounded">Admin</span>
+              </button>
+            )}
 
-            {/* Direct Devotee Receipt Portal Quick Switch */}
-            <button
-              onClick={navigateToReceipts}
-              className="px-2.5 py-1 rounded-full font-bold uppercase tracking-wider inline-flex items-center gap-1.5 transition-colors cursor-pointer text-[11px] bg-amber-400 text-stone-950 hover:bg-amber-300 shadow-xs"
-              title="Open Public Devotee Receipt Portal"
-            >
-              <FileText className="w-3 h-3 text-[#991B1B]" />
-              <span>Devotee Receipts</span>
-            </button>
+            {/* Direct Devotee Receipt Portal Quick Switch (Admin Only) */}
+            {isAdmin && (
+              <button
+                onClick={navigateToReceipts}
+                className="px-2.5 py-1 rounded-full font-bold uppercase tracking-wider inline-flex items-center gap-1.5 transition-colors cursor-pointer text-[11px] bg-amber-400 text-stone-950 hover:bg-amber-300 shadow-xs"
+                title="Open Devotee Receipt Portal (/receipts - Admin Only)"
+              >
+                <FileText className="w-3 h-3 text-[#991B1B]" />
+                <span>Devotee Receipts</span>
+                <span className="text-[9px] bg-[#991B1B] text-white font-bold px-1 rounded">Admin</span>
+              </button>
+            )}
 
             {/* Lock / Logout Button */}
             <button
@@ -1590,22 +1662,24 @@ export function App() {
                 </button>
               )}
 
-              {/* Sub-tab 4: sevas */}
-              <button
-                onClick={() => setActiveIncomeSubTab('sevas')}
-                className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
-                  activeIncomeSubTab === 'sevas'
-                    ? 'bg-[#991B1B] text-white shadow-xs'
-                    : 'bg-white text-stone-700 hover:bg-stone-200 border border-stone-300'
-                }`}
-              >
-                <span>Sevas</span>
-                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
-                  activeIncomeSubTab === 'sevas' ? 'bg-white/25 text-white' : 'bg-stone-100 text-stone-600'
-                }`}>
-                  {sevas.length}
-                </span>
-              </button>
+              {/* Sub-tab 4: sevas (Admin Only) */}
+              {isAdmin && (
+                <button
+                  onClick={() => setActiveIncomeSubTab('sevas')}
+                  className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                    activeIncomeSubTab === 'sevas'
+                      ? 'bg-[#991B1B] text-white shadow-xs'
+                      : 'bg-white text-stone-700 hover:bg-stone-200 border border-stone-300'
+                  }`}
+                >
+                  <span>Sevas</span>
+                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                    activeIncomeSubTab === 'sevas' ? 'bg-white/25 text-white' : 'bg-stone-100 text-stone-600'
+                  }`}>
+                    {sevas.length}
+                  </span>
+                </button>
+              )}
 
               {/* Sub-tab 5: Hundi */}
               <button
@@ -1728,7 +1802,7 @@ export function App() {
               />
             )}
 
-            {activeIncomeSubTab === 'sevas' && (
+            {activeIncomeSubTab === 'sevas' && isAdmin && (
               <SevasView
                 sevas={sevas}
                 catalogue={sevaCatalogue}
@@ -1828,9 +1902,17 @@ export function App() {
 
       {/* 6. REAL-TIME CLOUD SYNC TOAST NOTIFICATION */}
       {syncToast && (
-        <div className="fixed bottom-4 right-4 z-50 bg-stone-900/95 text-white text-xs px-4 py-3 rounded-xl shadow-2xl border border-amber-500/40 flex items-center gap-2.5 backdrop-blur-md">
-          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-          <span className="font-medium">{syncToast}</span>
+        <div
+          className={`fixed bottom-4 right-4 z-50 bg-stone-900/95 text-white text-xs px-4 py-3 rounded-xl shadow-2xl border flex items-center gap-2.5 backdrop-blur-md max-w-md transition-all animate-in fade-in slide-in-from-bottom-3 duration-200 ${
+            syncToast.type === 'error' ? 'border-rose-500/60 text-rose-100' : 'border-emerald-500/60'
+          }`}
+        >
+          {syncToast.type === 'error' ? (
+            <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+          ) : (
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          )}
+          <span className="font-medium leading-relaxed">{syncToast.message}</span>
         </div>
       )}
     </div>

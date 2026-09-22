@@ -13,8 +13,7 @@ interface AdminGateForBalagaProps {
 export const AdminGateForBalaga: React.FC<AdminGateForBalagaProps> = ({
   settings,
   onSuccess,
-  onBackToGaneshotsava,
-  onGoToReceipts
+  onBackToGaneshotsava
 }) => {
   const [passcode, setPasscode] = useState('');
   const [error, setError] = useState('');
@@ -103,16 +102,6 @@ export const AdminGateForBalaga: React.FC<AdminGateForBalagaProps> = ({
               <ArrowLeft className="w-3.5 h-3.5" />
               <span>Ganeshotsava 2026</span>
             </button>
-            {onGoToReceipts && (
-              <button
-                onClick={onGoToReceipts}
-                className="bg-amber-400 hover:bg-amber-300 text-stone-950 font-bold text-xs px-3 py-1.5 rounded-lg inline-flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
-                title="Open Public Receipts Portal"
-              >
-                <FileText className="w-3.5 h-3.5" />
-                <span>Devotee Receipts</span>
-              </button>
-            )}
           </div>
         </div>
       </header>

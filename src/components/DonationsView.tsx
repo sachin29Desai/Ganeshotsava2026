@@ -445,18 +445,18 @@ export const DonationsView: React.FC<DonationsViewProps> = ({
               <span>{selectedIds.size > 0 ? `Bulk Print (${selectedIds.size})` : 'Bulk Print Receipts'}</span>
             </button>
 
-            {/* Public Devotee Receipt Portal Link Button */}
-            <button
-              onClick={() => setSharePortalModalOpen(true)}
-              className="bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded inline-flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
-              title="Share the isolated Devotee Receipt Download link with residents and society WhatsApp groups"
-            >
-              <Share2 className="w-3.5 h-3.5" />
-              <span>Receipt Download Link</span>
-            </button>
-
             {isAdmin && (
               <>
+                {/* Devotee Receipt Portal Link Button (Admin Only) */}
+                <button
+                  onClick={() => setSharePortalModalOpen(true)}
+                  className="bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded inline-flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                  title="Devotee Receipt Download link (Admin Only)"
+                >
+                  <Share2 className="w-3.5 h-3.5" />
+                  <span>Receipt Download Link</span>
+                </button>
+
                 {/* Bulk Export Button (Admin Only) */}
                 <button
                   onClick={handleBulkExport}

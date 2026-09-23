@@ -106,7 +106,17 @@ export interface AuctionItem {
   notes?: string;
 }
 
-export type UserRole = 'admin' | 'sponsor' | 'volunteer';
+export type UserRole = 'admin' | 'sponsor' | 'volunteer' | 'resident';
+
+export interface UserProfile {
+  email: string;
+  name: string;
+  flat: string;
+  mobile: string;
+  role: UserRole;
+  createdAt?: string;
+  updatedAt?: string;
+}
 
 export interface AppSettings {
   festival?: string;
@@ -121,6 +131,7 @@ export interface AppSettings {
   volunteerHash?: string;
   customReceiptPortalUrl?: string;
   customSevaPortalUrl?: string;
+  adminEmails?: string[];
 }
 
 export interface AppState {

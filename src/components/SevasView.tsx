@@ -156,58 +156,78 @@ export const SevasView: React.FC<SevasViewProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Top Banner: Shareable Seva Portal for Devotees (/ganeshotsavasevas) */}
-      <div className="bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-amber-500/15 border border-amber-300/80 rounded-xl p-4 sm:p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xs">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="bg-[#991B1B] text-amber-200 text-[10px] font-black uppercase px-2 py-0.5 rounded tracking-wider">
-              Devotee Self-Service Portal
-            </span>
-            <span className="text-xs font-bold text-stone-800">
-              Devotional Seva Bookings &amp; Catalogue
-            </span>
-            <span className="font-mono text-[11px] bg-amber-200 text-amber-950 px-2 py-0.5 rounded font-bold">
-              /ganeshotsavasevas
-            </span>
+      {/* Top Banner: Shareable Seva Portal for Devotees (/ganeshotsavasevas) - Admin Only */}
+      {isAdmin && (
+        <div className="bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-amber-500/15 border border-amber-300/80 rounded-xl p-4 sm:p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xs">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="bg-[#991B1B] text-amber-200 text-[10px] font-black uppercase px-2 py-0.5 rounded tracking-wider">
+                Devotee Self-Service Portal
+              </span>
+              <span className="text-xs font-bold text-stone-800">
+                Devotional Seva Bookings &amp; Catalogue
+              </span>
+              <span className="font-mono text-[11px] bg-amber-200 text-amber-950 px-2 py-0.5 rounded font-bold">
+                /ganeshotsavasevas
+              </span>
+            </div>
+            <p className="text-xs text-stone-600 max-w-2xl">
+              Residents can browse sevas and book offerings online without committee login directly at <strong>/ganeshotsavasevas</strong>. Devotee bookings are tagged as <strong>"Booked (To be confirmed by Admin)"</strong> until confirmed.
+            </p>
           </div>
-          <p className="text-xs text-stone-600 max-w-2xl">
-            Residents can browse sevas and book offerings online without committee login directly at <strong>/ganeshotsavasevas</strong>. Devotee bookings are tagged as <strong>"Booked (To be confirmed by Admin)"</strong> until confirmed.
-          </p>
-        </div>
 
-        <div className="flex items-center gap-2.5 flex-wrap shrink-0">
-          <button
-            onClick={() => setShareModalOpen(true)}
-            className="px-3.5 py-2 rounded-lg text-xs font-bold bg-[#991B1B] text-white hover:bg-[#7F1D1D] transition-colors inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
-            title="Share Seva booking portal with residents via WhatsApp or QR Code"
-          >
-            <Share2 className="w-3.5 h-3.5" />
-            <span>Share Seva Portal</span>
-          </button>
-
-          {onOpenPublicSevaPortal && (
+          <div className="flex items-center gap-2.5 flex-wrap shrink-0">
             <button
-              onClick={onOpenPublicSevaPortal}
-              className="px-3.5 py-2 rounded-lg text-xs font-bold bg-white text-[#991B1B] hover:bg-stone-100 border border-stone-300 transition-colors inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
-              title="Open public devotee seva portal view (/ganeshotsavasevas)"
+              onClick={() => setShareModalOpen(true)}
+              className="px-3.5 py-2 rounded-lg text-xs font-bold bg-[#991B1B] text-white hover:bg-[#7F1D1D] transition-colors inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
+              title="Share Seva booking portal with residents via WhatsApp or QR Code"
             >
-              <ExternalLink className="w-3.5 h-3.5" />
-              <span>Open Devotee Portal</span>
+              <Share2 className="w-3.5 h-3.5" />
+              <span>Share Seva Portal</span>
             </button>
-          )}
 
-          <a
-            href="/ganeshotsavasevas"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="px-3 py-2 rounded-lg text-xs font-bold bg-amber-100 hover:bg-amber-200 text-amber-950 border border-amber-300 transition-colors inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
-            title="Open /ganeshotsavasevas in a new browser tab"
-          >
-            <ExternalLink className="w-3.5 h-3.5 text-amber-800" />
-            <span>Open in New Tab</span>
-          </a>
+            {onOpenPublicSevaPortal && (
+              <button
+                onClick={onOpenPublicSevaPortal}
+                className="px-3.5 py-2 rounded-lg text-xs font-bold bg-white text-[#991B1B] hover:bg-stone-100 border border-stone-300 transition-colors inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
+                title="Open public devotee seva portal view (/ganeshotsavasevas)"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                <span>Open Devotee Portal</span>
+              </button>
+            )}
+
+            <a
+              href="/ganeshotsavasevas"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-3 py-2 rounded-lg text-xs font-bold bg-amber-100 hover:bg-amber-200 text-amber-950 border border-amber-300 transition-colors inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
+              title="Open /ganeshotsavasevas in a new browser tab"
+            >
+              <ExternalLink className="w-3.5 h-3.5 text-amber-800" />
+              <span>Open in New Tab</span>
+            </a>
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* Non-Admin Notice */}
+      {!isAdmin && (
+        <div className="bg-amber-50/90 border border-amber-300 rounded-xl p-4 flex items-center justify-between gap-3 text-xs text-amber-950 shadow-xs">
+          <div className="flex items-center gap-2.5">
+            <Sparkles className="w-4 h-4 text-amber-600 shrink-0" />
+            <div>
+              <span className="font-bold">Seva Offerings &amp; Items Requirement List</span>
+              <p className="text-[11px] text-stone-600 mt-0.5">
+                Browse devotional offerings and items needed for Ganeshotsava 2026. This view is read-only.
+              </p>
+            </div>
+          </div>
+          <span className="text-[10px] uppercase font-bold tracking-wider bg-amber-200/80 px-2 py-0.5 rounded text-amber-900">
+            Read-Only
+          </span>
+        </div>
+      )}
 
       {/* Seva Catalogue */}
       <div className="bg-white border border-stone-200 rounded-lg shadow-sm overflow-hidden">
@@ -218,15 +238,17 @@ export const SevasView: React.FC<SevasViewProps> = ({
               Devotional sevas and item contributions (Rice, Ghee, Flowers, Poojas) with Total Required, Booked by Sponsors, and Remaining balance. Amount is non-mandatory.
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setCatModal({ open: true, item: null })}
-              className="bg-[#991B1B] text-white hover:bg-[#7F1D1D] text-xs font-bold uppercase tracking-wider px-3.5 py-2 rounded inline-flex items-center gap-1.5 transition-colors cursor-pointer"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Add Seva Offering</span>
-            </button>
-          </div>
+          {isAdmin && (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCatModal({ open: true, item: null })}
+                className="bg-[#991B1B] text-white hover:bg-[#7F1D1D] text-xs font-bold uppercase tracking-wider px-3.5 py-2 rounded inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add Seva Offering</span>
+              </button>
+            </div>
+          )}
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-sm">
@@ -239,7 +261,7 @@ export const SevasView: React.FC<SevasViewProps> = ({
                 <th className="py-3 px-3 text-right">Booked by Sponsor</th>
                 <th className="py-3 px-4 text-center">Remaining (Needed)</th>
                 <th className="py-3 px-4 text-right">Suggested Amount (₹)</th>
-                <th className="py-3 px-4 text-right min-w-[140px]">Actions</th>
+                <th className="py-3 px-4 text-right min-w-[140px]">{isAdmin ? 'Actions' : 'Status'}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-stone-100">
@@ -321,37 +343,37 @@ export const SevasView: React.FC<SevasViewProps> = ({
                         )}
                       </td>
 
-                      {/* ACTIONS */}
+                      {/* ACTIONS / STATUS */}
                       <td className="py-3 px-4 text-right">
-                        <div className="inline-flex gap-1.5 justify-end items-center">
-                          {/* QUICK BOOK / SPONSOR BUTTON */}
-                          <button
-                            onClick={() => {
-                              setSelectedSevaName(sc.name);
-                              const suggestedQty = stats.remainingQty && stats.remainingQty > 0 ? Math.min(10, stats.remainingQty) : 1;
-                              setBookingModal({
-                                open: true,
-                                item: null,
-                                initialSeva: sc.name,
-                                initialQty: suggestedQty,
-                                initialAmt: sc.amt || 0
-                              });
-                            }}
-                            className="bg-[#991B1B] hover:bg-[#7F1D1D] text-white text-xs font-bold px-2.5 py-1 rounded inline-flex items-center gap-1 transition-colors cursor-pointer shadow-2xs"
-                            title={`Book or sponsor this seva (${sc.name})`}
-                          >
-                            <Plus className="w-3 h-3" />
-                            <span>Sponsor</span>
-                          </button>
+                        {isAdmin ? (
+                          <div className="inline-flex gap-1.5 justify-end items-center">
+                            {/* QUICK BOOK / SPONSOR BUTTON */}
+                            <button
+                              onClick={() => {
+                                setSelectedSevaName(sc.name);
+                                const suggestedQty = stats.remainingQty && stats.remainingQty > 0 ? Math.min(10, stats.remainingQty) : 1;
+                                setBookingModal({
+                                  open: true,
+                                  item: null,
+                                  initialSeva: sc.name,
+                                  initialQty: suggestedQty,
+                                  initialAmt: sc.amt || 0
+                                });
+                              }}
+                              className="bg-[#991B1B] hover:bg-[#7F1D1D] text-white text-xs font-bold px-2.5 py-1 rounded inline-flex items-center gap-1 transition-colors cursor-pointer shadow-2xs"
+                              title={`Book or sponsor this seva (${sc.name})`}
+                            >
+                              <Plus className="w-3 h-3" />
+                              <span>Sponsor</span>
+                            </button>
 
-                          <button
-                            onClick={() => setCatModal({ open: true, item: sc })}
-                            className="p-1.5 text-stone-600 hover:text-stone-900 hover:bg-stone-100 rounded cursor-pointer"
-                            title="Modify Seva Offering"
-                          >
-                            <Edit2 className="w-3.5 h-3.5" />
-                          </button>
-                          {isAdmin && (
+                            <button
+                              onClick={() => setCatModal({ open: true, item: sc })}
+                              className="p-1.5 text-stone-600 hover:text-stone-900 hover:bg-stone-100 rounded cursor-pointer"
+                              title="Modify Seva Offering"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
                             <button
                               onClick={() => {
                                 if (confirm(`Delete seva catalogue item "${sc.name}"?`)) {
@@ -363,8 +385,21 @@ export const SevasView: React.FC<SevasViewProps> = ({
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
-                          )}
-                        </div>
+                          </div>
+                        ) : (
+                          <div className="text-right">
+                            {stats.isFulfilled ? (
+                              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
+                                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                <span>Fulfilled</span>
+                              </span>
+                            ) : (
+                              <span className="text-[11px] font-semibold text-amber-900 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-200">
+                                Needed ({stats.remainingQty != null ? `${stats.remainingQty} ${sc.unit || 'units'}` : 'Open'})
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </td>
                     </tr>
                   );
@@ -375,8 +410,9 @@ export const SevasView: React.FC<SevasViewProps> = ({
         </div>
       </div>
 
-      {/* Seva Bookings */}
-      <div className="bg-white border border-stone-200 rounded-lg shadow-sm overflow-hidden">
+      {/* Seva Bookings (Devotee receipts & bookings - Admin Only) */}
+      {isAdmin && (
+        <div className="bg-white border border-stone-200 rounded-lg shadow-sm overflow-hidden">
         <div className="px-6 py-4 border-b border-stone-200 flex flex-wrap items-center justify-between gap-4">
           <div>
             <h2 className="text-lg font-serif font-bold text-[#1A1A1A]">Seva Bookings &amp; Registrations</h2>
@@ -648,6 +684,7 @@ export const SevasView: React.FC<SevasViewProps> = ({
           </table>
         </div>
       </div>
+      )}
 
       {/* Seva Catalogue Modal */}
       {catModal.open && (

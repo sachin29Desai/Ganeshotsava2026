@@ -32,7 +32,8 @@ import {
   AuctionItem,
   AppSettings,
   AppState,
-  UserRole
+  UserRole,
+  UserProfile
 } from './types';
 import {
   INITIAL_STATE,
@@ -49,6 +50,8 @@ import {
 } from './utils/helpers';
 import { generateStandaloneHTML } from './utils/htmlExporter';
 import {
+  auth,
+  firebaseSignOut,
   initFirestoreSync,
   cloudSyncAllData,
   cloudSaveExpense,
@@ -300,14 +303,26 @@ export function App() {
     const r = sessionStorage.getItem('eg_user_role');
     return auth && (r === 'admin' || !r);
   });
-
-  // Guard restricted tabs for Non-Admins and Volunteers
-  useEffect(() => {
-    if (!isAdmin && activeIncomeSubTab === 'sevas') {
-      setActiveIncomeSubTab('donations');
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(() => {
+    if (typeof window === 'undefined') return null;
+    const p = sessionStorage.getItem('eg_user_profile');
+    if (p) {
+      try {
+        return JSON.parse(p);
+      } catch {}
     }
-    if (userRole === 'volunteer') {
-      if (activeIncomeSubTab === 'sponsorship' || activeIncomeSubTab === 'stalls') {
+    return null;
+  });
+
+  // Guard restricted tabs for Non-Admins (Non-admins can only access statement, expenditure, donations, and read-only sevas)
+  useEffect(() => {
+    if (!isAdmin) {
+      if (
+        activeIncomeSubTab === 'sponsorship' ||
+        activeIncomeSubTab === 'stalls' ||
+        activeIncomeSubTab === 'hundi' ||
+        activeIncomeSubTab === 'auctions'
+      ) {
         setActiveIncomeSubTab('donations');
       }
     }
@@ -315,10 +330,10 @@ export function App() {
 
   // Guard settings for Non-Admins
   useEffect(() => {
-    if (userRole && userRole !== 'admin' && activeTab === 'settings') {
+    if (!isAdmin && activeTab === 'settings') {
       setActiveTab('statement');
     }
-  }, [userRole, activeTab]);
+  }, [isAdmin, activeTab]);
   const [viewOnly, setViewOnly] = useState(false);
   const [activeFileHandle, setActiveFileHandle] = useState<FileSystemFileHandle | null>(null);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'unsaved' | null>(null);
@@ -824,28 +839,46 @@ export function App() {
   };
 
   // Committee Login Success handler
-  const handleLoginSuccess = (role: UserRole = 'admin') => {
+  const handleLoginSuccess = (role: UserRole = 'admin', profile?: UserProfile) => {
     sessionStorage.setItem('eg_committee_auth', 'true');
     sessionStorage.setItem('eg_user_role', role);
+    if (profile) {
+      sessionStorage.setItem('eg_user_profile', JSON.stringify(profile));
+      sessionStorage.setItem('eg_user_email', profile.email);
+      setUserProfile(profile);
+    }
     setUserRole(role);
     setIsAuthenticated(true);
     setIsAdmin(role === 'admin');
   };
 
-  // Committee Logout & Lock handler
-  const handleLogout = () => {
+  // Committee Logout & Signout handler
+  const handleLogout = async () => {
+    try {
+      if (auth) {
+        await firebaseSignOut(auth);
+      }
+    } catch (e) {
+      console.warn('Firebase signout warning:', e);
+    }
     sessionStorage.removeItem('eg_committee_auth');
     sessionStorage.removeItem('eg_user_role');
+    sessionStorage.removeItem('eg_user_email');
+    sessionStorage.removeItem('eg_user_profile');
+    localStorage.removeItem('eg_committee_auth');
+    localStorage.removeItem('eg_user_role');
+    localStorage.removeItem('eg_user_profile');
+    setUserProfile(null);
     setUserRole(null);
     setIsAuthenticated(false);
     setIsAdmin(false);
+    setActiveTab('statement');
+    setActiveIncomeSubTab('donations');
   };
 
-  // Lock / Sign out handler
-  const handleToggleAdmin = async () => {
-    if (window.confirm('Lock the management portal and sign out?')) {
-      handleLogout();
-    }
+  // Signout handler
+  const handleToggleAdmin = () => {
+    handleLogout();
   };
 
   // Connect File (File System Access API)
@@ -1526,14 +1559,32 @@ export function App() {
               </button>
             )}
 
-            {/* Lock / Logout Button */}
+            {/* User Profile Badge (Name, Flat & Role) */}
+            {userProfile && (
+              <div
+                className="px-2.5 py-1 rounded-full text-[11px] bg-white/15 text-white border border-white/20 inline-flex items-center gap-1.5 shadow-xs"
+                title={`Logged in as ${userProfile.name} (Flat: ${userProfile.flat}, Mobile: ${userProfile.mobile}, Email: ${userProfile.email})`}
+              >
+                <div className="w-4 h-4 rounded-full bg-amber-400 text-stone-900 flex items-center justify-center font-bold text-[9px]">
+                  {userProfile.name.charAt(0).toUpperCase()}
+                </div>
+                <span className="font-bold max-w-[120px] truncate hidden sm:inline">
+                  {userProfile.name}
+                </span>
+                <span className="text-[10px] text-amber-200 font-mono hidden md:inline">
+                  [{userProfile.flat}]
+                </span>
+              </div>
+            )}
+
+            {/* Signout Button */}
             <button
-              onClick={handleToggleAdmin}
-              className="px-2.5 py-1 rounded-full font-bold uppercase tracking-wider inline-flex items-center gap-1.5 transition-colors cursor-pointer text-[11px] bg-white/10 text-white hover:bg-white/20 border border-white/20"
-              title="Lock management portal and sign out"
+              onClick={handleLogout}
+              className="px-2.5 py-1 rounded-full font-bold uppercase tracking-wider inline-flex items-center gap-1.5 transition-colors cursor-pointer text-[11px] bg-white/10 text-white hover:bg-white/20 border border-white/20 shadow-xs active:scale-95"
+              title="Sign out of management portal"
             >
               <LogOut className="w-3 h-3" />
-              <span>Lock &amp; Sign Out</span>
+              <span>Signout</span>
             </button>
           </div>
         </div>
@@ -1541,70 +1592,143 @@ export function App() {
         {/* 2. PRIMARY FIRST-LEVEL NAVIGATION TABS */}
         <div className="bg-[#7F1D1D] border-t border-red-800/60 overflow-x-auto no-scrollbar">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center gap-1 sm:gap-2 text-xs font-bold uppercase tracking-wider py-1">
-            {/* Tab 1: Income & Expenditure statement */}
-            <button
-              onClick={() => setActiveTab('statement')}
-              className={`px-3.5 py-2 rounded-t font-semibold transition-all inline-flex items-center gap-2 cursor-pointer border-b-2 whitespace-nowrap ${
-                activeTab === 'statement'
-                  ? 'bg-[#FDFBF7] text-[#991B1B] border-amber-400 shadow-xs'
-                  : 'text-white/85 hover:text-white hover:bg-red-900/50 border-transparent'
-              }`}
-            >
-              <FileText className="w-4 h-4" />
-              <span>Income &amp; Expenditure statement</span>
-            </button>
+            {isAdmin ? (
+              <>
+                {/* Admin Tab 1: Income & Expenditure statement */}
+                <button
+                  onClick={() => setActiveTab('statement')}
+                  className={`px-3.5 py-2 rounded-t font-semibold transition-all inline-flex items-center gap-2 cursor-pointer border-b-2 whitespace-nowrap ${
+                    activeTab === 'statement'
+                      ? 'bg-[#FDFBF7] text-[#991B1B] border-amber-400 shadow-xs'
+                      : 'text-white/85 hover:text-white hover:bg-red-900/50 border-transparent'
+                  }`}
+                >
+                  <FileText className="w-4 h-4" />
+                  <span>Income &amp; Expenditure statement</span>
+                </button>
 
-            {/* Tab 2: Income(receipts) */}
-            <button
-              onClick={() => setActiveTab('income')}
-              className={`px-3.5 py-2 rounded-t font-semibold transition-all inline-flex items-center gap-2 cursor-pointer border-b-2 whitespace-nowrap ${
-                activeTab === 'income'
-                  ? 'bg-[#FDFBF7] text-[#991B1B] border-amber-400 shadow-xs'
-                  : 'text-white/85 hover:text-white hover:bg-red-900/50 border-transparent'
-              }`}
-            >
-              <Coins className="w-4 h-4" />
-              <span>Income(receipts)</span>
-              <span className="bg-amber-400 text-[#991B1B] text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold">
-                ₹{fmt(totalIncome)}
-              </span>
-            </button>
+                {/* Admin Tab 2: Income(receipts) */}
+                <button
+                  onClick={() => setActiveTab('income')}
+                  className={`px-3.5 py-2 rounded-t font-semibold transition-all inline-flex items-center gap-2 cursor-pointer border-b-2 whitespace-nowrap ${
+                    activeTab === 'income'
+                      ? 'bg-[#FDFBF7] text-[#991B1B] border-amber-400 shadow-xs'
+                      : 'text-white/85 hover:text-white hover:bg-red-900/50 border-transparent'
+                  }`}
+                >
+                  <Coins className="w-4 h-4" />
+                  <span>Income(receipts)</span>
+                  <span className="bg-amber-400 text-[#991B1B] text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold">
+                    ₹{fmt(totalIncome)}
+                  </span>
+                </button>
 
-            {/* Tab 3: Expenditure(payments) */}
-            <button
-              onClick={() => setActiveTab('expenditure')}
-              className={`px-3.5 py-2 rounded-t font-semibold transition-all inline-flex items-center gap-2 cursor-pointer border-b-2 whitespace-nowrap ${
-                activeTab === 'expenditure'
-                  ? 'bg-[#FDFBF7] text-[#991B1B] border-amber-400 shadow-xs'
-                  : 'text-white/85 hover:text-white hover:bg-red-900/50 border-transparent'
-              }`}
-            >
-              <CreditCard className="w-4 h-4" />
-              <span>Expenditure(payments)</span>
-              <span className="bg-white/20 text-white text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold">
-                ₹{fmt(exAct)}
-              </span>
-            </button>
+                {/* Admin Tab 3: Expenditure(payments) */}
+                <button
+                  onClick={() => setActiveTab('expenditure')}
+                  className={`px-3.5 py-2 rounded-t font-semibold transition-all inline-flex items-center gap-2 cursor-pointer border-b-2 whitespace-nowrap ${
+                    activeTab === 'expenditure'
+                      ? 'bg-[#FDFBF7] text-[#991B1B] border-amber-400 shadow-xs'
+                      : 'text-white/85 hover:text-white hover:bg-red-900/50 border-transparent'
+                  }`}
+                >
+                  <CreditCard className="w-4 h-4" />
+                  <span>Expenditure(payments)</span>
+                  <span className="bg-white/20 text-white text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold">
+                    ₹{fmt(exAct)}
+                  </span>
+                </button>
 
-            {/* Tab 4: Settings (Admin Only) */}
-            {isAdmin && (
-              <button
-                onClick={() => setActiveTab('settings')}
-                className={`px-3.5 py-2 rounded-t font-semibold transition-all inline-flex items-center gap-2 cursor-pointer border-b-2 whitespace-nowrap ${
-                  activeTab === 'settings'
-                    ? 'bg-[#FDFBF7] text-[#991B1B] border-amber-400 shadow-xs'
-                    : 'text-white/85 hover:text-white hover:bg-red-900/50 border-transparent'
-                }`}
-              >
-                <Settings className="w-4 h-4" />
-                <span>Settings</span>
-              </button>
+                {/* Admin Tab 4: Settings */}
+                <button
+                  onClick={() => setActiveTab('settings')}
+                  className={`px-3.5 py-2 rounded-t font-semibold transition-all inline-flex items-center gap-2 cursor-pointer border-b-2 whitespace-nowrap ${
+                    activeTab === 'settings'
+                      ? 'bg-[#FDFBF7] text-[#991B1B] border-amber-400 shadow-xs'
+                      : 'text-white/85 hover:text-white hover:bg-red-900/50 border-transparent'
+                  }`}
+                >
+                  <Settings className="w-4 h-4" />
+                  <span>Settings</span>
+                </button>
+              </>
+            ) : (
+              <>
+                {/* Non-Admin Tab 1: Income & Expenditure statement */}
+                <button
+                  onClick={() => setActiveTab('statement')}
+                  className={`px-3.5 py-2 rounded-t font-semibold transition-all inline-flex items-center gap-2 cursor-pointer border-b-2 whitespace-nowrap ${
+                    activeTab === 'statement'
+                      ? 'bg-[#FDFBF7] text-[#991B1B] border-amber-400 shadow-xs'
+                      : 'text-white/85 hover:text-white hover:bg-red-900/50 border-transparent'
+                  }`}
+                >
+                  <FileText className="w-4 h-4" />
+                  <span>Income &amp; Expenditure statement</span>
+                </button>
+
+                {/* Non-Admin Tab 2: Expenditure(payments) */}
+                <button
+                  onClick={() => setActiveTab('expenditure')}
+                  className={`px-3.5 py-2 rounded-t font-semibold transition-all inline-flex items-center gap-2 cursor-pointer border-b-2 whitespace-nowrap ${
+                    activeTab === 'expenditure'
+                      ? 'bg-[#FDFBF7] text-[#991B1B] border-amber-400 shadow-xs'
+                      : 'text-white/85 hover:text-white hover:bg-red-900/50 border-transparent'
+                  }`}
+                >
+                  <CreditCard className="w-4 h-4" />
+                  <span>Expenditure(payments)</span>
+                  <span className="bg-white/20 text-white text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold">
+                    ₹{fmt(exAct)}
+                  </span>
+                </button>
+
+                {/* Non-Admin Tab 3: Voluntary Contributions Resident (Their Flat receipts) */}
+                <button
+                  onClick={() => {
+                    setActiveTab('income');
+                    setActiveIncomeSubTab('donations');
+                  }}
+                  className={`px-3.5 py-2 rounded-t font-semibold transition-all inline-flex items-center gap-2 cursor-pointer border-b-2 whitespace-nowrap ${
+                    activeTab === 'income' && activeIncomeSubTab === 'donations'
+                      ? 'bg-[#FDFBF7] text-[#991B1B] border-amber-400 shadow-xs'
+                      : 'text-white/85 hover:text-white hover:bg-red-900/50 border-transparent'
+                  }`}
+                >
+                  <Coins className="w-4 h-4" />
+                  <span>Voluntary Contributions Resident</span>
+                  {userProfile?.flat && (
+                    <span className="bg-amber-400 text-[#991B1B] text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold">
+                      Flat {userProfile.flat}
+                    </span>
+                  )}
+                </button>
+
+                {/* Non-Admin Tab 4: Seva List (Read-Only) */}
+                <button
+                  onClick={() => {
+                    setActiveTab('income');
+                    setActiveIncomeSubTab('sevas');
+                  }}
+                  className={`px-3.5 py-2 rounded-t font-semibold transition-all inline-flex items-center gap-2 cursor-pointer border-b-2 whitespace-nowrap ${
+                    activeTab === 'income' && activeIncomeSubTab === 'sevas'
+                      ? 'bg-[#FDFBF7] text-[#991B1B] border-amber-400 shadow-xs'
+                      : 'text-white/85 hover:text-white hover:bg-red-900/50 border-transparent'
+                  }`}
+                >
+                  <Sparkles className="w-4 h-4" />
+                  <span>Seva Offerings List</span>
+                  <span className="bg-amber-200/90 text-amber-950 text-[10px] px-1.5 py-0.2 rounded-full font-semibold">
+                    Read-Only
+                  </span>
+                </button>
+              </>
             )}
           </div>
         </div>
 
-        {/* 3. FLOATING SUB-LEVEL NAVIGATION TABS (Inside sticky header: continuously floats while scrolling through data) */}
-        {activeTab === 'income' && (
+        {/* 3. FLOATING SUB-LEVEL NAVIGATION TABS (Admin Only) */}
+        {isAdmin && activeTab === 'income' && (
           <div className="bg-[#F8EFE5] border-t border-red-800/40 border-b border-stone-300 shadow-md overflow-x-auto no-scrollbar">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2 flex items-center gap-1.5 sm:gap-2">
               {/* Sub-tab 1: Voluntary Contributions Resident */}
@@ -1764,6 +1888,7 @@ export function App() {
                 contributions={contributions}
                 isAdmin={isAdmin}
                 settings={settings}
+                userProfile={userProfile}
                 onSave={handleSaveContribution}
                 onDelete={handleDeleteContribution}
                 onBulkImport={handleBulkImportContributions}
@@ -1776,7 +1901,7 @@ export function App() {
               />
             )}
 
-            {activeIncomeSubTab === 'sponsorship' && userRole !== 'volunteer' && (
+            {activeIncomeSubTab === 'sponsorship' && isAdmin && (
               <SponsorshipView
                 sponsors={sponsors}
                 isAdmin={isAdmin}
@@ -1789,7 +1914,7 @@ export function App() {
               />
             )}
 
-            {activeIncomeSubTab === 'stalls' && userRole !== 'volunteer' && (
+            {activeIncomeSubTab === 'stalls' && isAdmin && (
               <CommercialStallsView
                 stalls={commercialStalls}
                 isAdmin={isAdmin}
@@ -1802,7 +1927,7 @@ export function App() {
               />
             )}
 
-            {activeIncomeSubTab === 'sevas' && isAdmin && (
+            {activeIncomeSubTab === 'sevas' && (
               <SevasView
                 sevas={sevas}
                 catalogue={sevaCatalogue}
@@ -1821,7 +1946,7 @@ export function App() {
               />
             )}
 
-            {activeIncomeSubTab === 'hundi' && (
+            {activeIncomeSubTab === 'hundi' && isAdmin && (
               <HundiView
                 hundi={hundi}
                 isAdmin={isAdmin}
@@ -1830,7 +1955,7 @@ export function App() {
               />
             )}
 
-            {activeIncomeSubTab === 'auctions' && (
+            {activeIncomeSubTab === 'auctions' && isAdmin && (
               <AuctionsView
                 auctions={auctions}
                 isAdmin={isAdmin}

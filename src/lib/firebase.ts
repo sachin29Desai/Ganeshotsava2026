@@ -5,6 +5,9 @@ import {
   signInWithPopup,
   signOut as firebaseSignOut,
   onAuthStateChanged,
+  sendSignInLinkToEmail,
+  isSignInWithEmailLink,
+  signInWithEmailLink,
   type User
 } from 'firebase/auth';
 import {
@@ -38,7 +41,9 @@ import {
   HundiCollection,
   AuctionItem,
   AppSettings,
-  AppState
+  AppState,
+  UserProfile,
+  UserRole
 } from '../types';
 import { DEFAULT_SEVAS, INITIAL_STATE, prepareExpenseForStorage } from '../utils/helpers';
 import firebaseConfigData from '../../firebase-applet-config.json';
@@ -113,7 +118,14 @@ try {
 export const auth = authInstance;
 export const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: 'select_account' });
-export { signInWithPopup, firebaseSignOut, onAuthStateChanged };
+export {
+  signInWithPopup,
+  firebaseSignOut,
+  onAuthStateChanged,
+  sendSignInLinkToEmail,
+  isSignInWithEmailLink,
+  signInWithEmailLink
+};
 export type { User };
 
 export type SyncStatus = 'connecting' | 'connected' | 'offline' | 'synced' | 'saving' | 'error' | 'quota-limited';
@@ -877,3 +889,112 @@ export async function cloudClearAllData() {
     throw err;
   }
 }
+
+// --- User Profile & Email OTP Services ---
+
+export async function cloudSaveUserProfile(profile: UserProfile): Promise<void> {
+  try {
+    const emailKey = profile.email.toLowerCase().trim();
+    await setDoc(doc(db, 'user_profiles', emailKey), {
+      ...profile,
+      email: emailKey,
+      updatedAt: new Date().toISOString()
+    });
+  } catch (err) {
+    console.error('Error saving user profile to Firestore:', err);
+    throw err;
+  }
+}
+
+export async function cloudGetUserProfile(email: string): Promise<UserProfile | null> {
+  try {
+    const emailKey = email.toLowerCase().trim();
+    const snap = await getDoc(doc(db, 'user_profiles', emailKey));
+    if (snap.exists()) {
+      return snap.data() as UserProfile;
+    }
+    return null;
+  } catch (err) {
+    console.error('Error fetching user profile from Firestore:', err);
+    return null;
+  }
+}
+
+export async function cloudGetAllUserProfiles(): Promise<UserProfile[]> {
+  try {
+    const snap = await getDocs(collection(db, 'user_profiles'));
+    const profiles: UserProfile[] = [];
+    snap.forEach(docSnap => {
+      profiles.push(docSnap.data() as UserProfile);
+    });
+    return profiles;
+  } catch (err) {
+    console.error('Error fetching all user profiles from Firestore:', err);
+    return [];
+  }
+}
+
+export async function cloudUpdateUserRole(email: string, role: UserRole): Promise<void> {
+  try {
+    const emailKey = email.toLowerCase().trim();
+    const docRef = doc(db, 'user_profiles', emailKey);
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      await setDoc(docRef, { ...snap.data(), role, updatedAt: new Date().toISOString() }, { merge: true });
+    }
+  } catch (err) {
+    console.error('Error updating user role in Firestore:', err);
+    throw err;
+  }
+}
+
+export async function cloudSaveOtp(email: string, otpHash: string, expiresAt: number): Promise<void> {
+  try {
+    const emailKey = email.toLowerCase().trim();
+    await setDoc(doc(db, 'email_otps', emailKey), {
+      email: emailKey,
+      otpHash,
+      expiresAt,
+      attempts: 0,
+      createdAt: new Date().toISOString()
+    });
+  } catch (err) {
+    console.error('Error saving OTP to Firestore:', err);
+    throw err;
+  }
+}
+
+export async function cloudGetOtp(email: string): Promise<{ otpHash: string; expiresAt: number; attempts: number } | null> {
+  try {
+    const emailKey = email.toLowerCase().trim();
+    const snap = await getDoc(doc(db, 'email_otps', emailKey));
+    if (snap.exists()) {
+      return snap.data() as { otpHash: string; expiresAt: number; attempts: number };
+    }
+    return null;
+  } catch (err) {
+    console.error('Error getting OTP from Firestore:', err);
+    return null;
+  }
+}
+
+export async function cloudDeleteOtp(email: string): Promise<void> {
+  try {
+    const emailKey = email.toLowerCase().trim();
+    await deleteDoc(doc(db, 'email_otps', emailKey));
+  } catch (err) {
+    console.error('Error deleting OTP from Firestore:', err);
+  }
+}
+
+export async function cloudIncrementOtpAttempts(email: string, currentAttempts: number): Promise<void> {
+  try {
+    const emailKey = email.toLowerCase().trim();
+    await setDoc(doc(db, 'email_otps', emailKey), {
+      attempts: currentAttempts + 1
+    }, { merge: true });
+  } catch (err) {
+    console.error('Error updating OTP attempts in Firestore:', err);
+  }
+}
+

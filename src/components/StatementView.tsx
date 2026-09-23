@@ -71,16 +71,18 @@ export const StatementView: React.FC<StatementViewProps> = ({
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            onClick={onPrint}
-            className="bg-stone-100 hover:bg-stone-200 text-stone-800 text-xs font-bold uppercase tracking-wider px-3.5 py-2 rounded inline-flex items-center gap-1.5 transition-colors cursor-pointer border border-stone-200"
-            title="Print Income & Expenditure Statement"
-          >
-            <Printer className="w-3.5 h-3.5 text-[#991B1B]" />
-            <span>Print</span>
-          </button>
-        </div>
+        {userRole === 'admin' && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onPrint}
+              className="bg-stone-100 hover:bg-stone-200 text-stone-800 text-xs font-bold uppercase tracking-wider px-3.5 py-2 rounded inline-flex items-center gap-1.5 transition-colors cursor-pointer border border-stone-200"
+              title="Print Income & Expenditure Statement"
+            >
+              <Printer className="w-3.5 h-3.5 text-[#991B1B]" />
+              <span>Print</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* 2. EXECUTIVE FINANCIAL KPI CARDS */}

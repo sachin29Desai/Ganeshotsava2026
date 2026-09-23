@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Plus,
   Edit2,
@@ -12,7 +12,7 @@ import {
   Link2
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { Contribution, AppSettings } from '../types';
+import { Contribution, AppSettings, UserProfile } from '../types';
 import { fmt, fmtDate, today } from '../utils/helpers';
 import { BulkReceiptsModal } from './BulkReceiptsModal';
 import { ShareReceiptPortalModal } from './ShareReceiptPortalModal';
@@ -21,6 +21,7 @@ interface DonationsViewProps {
   contributions: Contribution[];
   isAdmin: boolean;
   settings: AppSettings;
+  userProfile?: UserProfile | null;
   onSave: (contribution: Contribution) => void;
   onDelete: (id: string) => void;
   onBulkImport: (newContributions: Contribution[]) => void;
@@ -34,6 +35,7 @@ export const DonationsView: React.FC<DonationsViewProps> = ({
   contributions,
   isAdmin,
   settings,
+  userProfile,
   onSave,
   onDelete,
   onBulkImport,
@@ -49,6 +51,13 @@ export const DonationsView: React.FC<DonationsViewProps> = ({
 
   const [modal, setModal] = useState<{ open: boolean; item?: Contribution | null }>({ open: false });
   const [search, setSearch] = useState('');
+  const [nonAdminFlatInput, setNonAdminFlatInput] = useState<string>(userProfile?.flat || '');
+
+  useEffect(() => {
+    if (userProfile?.flat) {
+      setNonAdminFlatInput(userProfile.flat);
+    }
+  }, [userProfile?.flat]);
   const [bulkPrintOpen, setBulkPrintOpen] = useState<boolean>(false);
   const [sharePortalModalOpen, setSharePortalModalOpen] = useState<boolean>(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -56,7 +65,21 @@ export const DonationsView: React.FC<DonationsViewProps> = ({
 
   const totalCollected = contributions.reduce((s, r) => s + Number(r.amt || 0), 0);
 
+  const effectiveFlat = (userProfile?.flat || nonAdminFlatInput).trim();
+  const effectiveFlatClean = effectiveFlat.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+  // For non-admin, filter strictly to their flat number
+  const baseContributions = isAdmin
+    ? contributions
+    : effectiveFlatClean
+    ? contributions.filter(c => {
+        const cFlatClean = (c.flat || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        return cFlatClean.includes(effectiveFlatClean) || effectiveFlatClean.includes(cFlatClean);
+      })
+    : [];
+
   const toggleSelect = (id: string) => {
+    if (!isAdmin) return;
     setSelectedIds(prev => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
@@ -66,6 +89,7 @@ export const DonationsView: React.FC<DonationsViewProps> = ({
   };
 
   const toggleSelectAll = () => {
+    if (!isAdmin) return;
     if (selectedIds.size === filtered.length && filtered.length > 0) {
       setSelectedIds(new Set());
     } else {
@@ -86,7 +110,7 @@ export const DonationsView: React.FC<DonationsViewProps> = ({
   };
 
   // Filtered rows for display
-  const filtered = contributions.filter(c =>
+  const filtered = baseContributions.filter(c =>
     (c.name || '').toLowerCase().includes(search.toLowerCase()) ||
     (c.flat || '').toLowerCase().includes(search.toLowerCase()) ||
     (c.rcptNo || '').toLowerCase().includes(search.toLowerCase()) ||
@@ -426,27 +450,41 @@ export const DonationsView: React.FC<DonationsViewProps> = ({
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
+            {/* If non-admin doesn't have a profile flat, let them enter their flat number */}
+            {!isAdmin && !userProfile?.flat && (
+              <div className="flex items-center gap-1.5 bg-amber-50 border border-amber-300 rounded px-2.5 py-1 text-xs">
+                <span className="font-bold text-amber-900 whitespace-nowrap">Your Flat:</span>
+                <input
+                  type="text"
+                  placeholder="e.g. A-402"
+                  value={nonAdminFlatInput}
+                  onChange={e => setNonAdminFlatInput(e.target.value)}
+                  className="bg-white border border-amber-200 rounded px-2 py-0.5 text-xs w-24 outline-none font-bold"
+                />
+              </div>
+            )}
+
             {/* Search Box */}
             <input
               type="text"
-              placeholder="🔍 Search contributor, flat, ref, receipt..."
+              placeholder={isAdmin ? "🔍 Search contributor, flat, ref, receipt..." : "🔍 Search your receipts..."}
               value={search}
               onChange={e => setSearch(e.target.value)}
               className="border border-stone-300 rounded px-3 py-1.5 text-xs bg-stone-50 focus:bg-white outline-none focus:border-[#991B1B] w-52 sm:w-60"
             />
 
-            {/* Bulk Print Receipts Button */}
-            <button
-              onClick={() => setBulkPrintOpen(true)}
-              className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded inline-flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
-              title="Print receipts in bulk and save all receipts in a consolidated PDF document onto your device"
-            >
-              <Printer className="w-3.5 h-3.5" />
-              <span>{selectedIds.size > 0 ? `Bulk Print (${selectedIds.size})` : 'Bulk Print Receipts'}</span>
-            </button>
-
             {isAdmin && (
               <>
+                {/* Bulk Print Receipts Button */}
+                <button
+                  onClick={() => setBulkPrintOpen(true)}
+                  className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded inline-flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                  title="Print receipts in bulk and save all receipts in a consolidated PDF document onto your device"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>{selectedIds.size > 0 ? `Bulk Print (${selectedIds.size})` : 'Bulk Print Receipts'}</span>
+                </button>
+
                 {/* Devotee Receipt Portal Link Button (Admin Only) */}
                 <button
                   onClick={() => setSharePortalModalOpen(true)}
@@ -490,8 +528,27 @@ export const DonationsView: React.FC<DonationsViewProps> = ({
           </div>
         </div>
 
-        {/* Selection Banner */}
-        {selectedIds.size > 0 && (
+        {/* Non-Admin Resident Flat Notice */}
+        {!isAdmin && (
+          <div className="bg-amber-50/80 border-b border-amber-200 px-6 py-2.5 text-xs text-amber-900 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-amber-600"></span>
+              <span>
+                {effectiveFlat ? (
+                  <>
+                    Restricted Resident View: Showing voluntary contributions recorded for Flat <strong>{effectiveFlat}</strong> ({filtered.length} receipt{filtered.length === 1 ? '' : 's'}).
+                  </>
+                ) : (
+                  <>Please specify your Flat Number above to find and view your voluntary contribution receipts.</>
+                )}
+              </span>
+            </div>
+            <span className="text-[11px] text-stone-500 italic">Read-only view • Confidential resident records</span>
+          </div>
+        )}
+
+        {/* Selection Banner (Admin Only) */}
+        {isAdmin && selectedIds.size > 0 && (
           <div className="bg-amber-50 border-b border-amber-200 px-6 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs text-amber-900 animate-in fade-in duration-150">
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-amber-600"></span>
@@ -524,29 +581,39 @@ export const DonationsView: React.FC<DonationsViewProps> = ({
           <table className="w-full text-left border-collapse text-sm">
             <thead>
               <tr className="bg-[#FDF8F3] border-b border-stone-200 text-[10px] font-bold text-stone-500 uppercase tracking-[0.15em]">
-                <th className="py-3 px-3 w-10 text-center">
-                  <input
-                    type="checkbox"
-                    checked={filtered.length > 0 && selectedIds.size === filtered.length}
-                    onChange={toggleSelectAll}
-                    className="rounded border-stone-300 text-[#991B1B] focus:ring-[#991B1B] cursor-pointer"
-                    title="Select all / Deselect all"
-                  />
-                </th>
+                {isAdmin && (
+                  <th className="py-3 px-3 w-10 text-center">
+                    <input
+                      type="checkbox"
+                      checked={filtered.length > 0 && selectedIds.size === filtered.length}
+                      onChange={toggleSelectAll}
+                      className="rounded border-stone-300 text-[#991B1B] focus:ring-[#991B1B] cursor-pointer"
+                      title="Select all / Deselect all"
+                    />
+                  </th>
+                )}
                 <th className="py-3 px-4">Receipt No</th>
                 <th className="py-3 px-4">Resident / Contributor</th>
                 <th className="py-3 px-4">Flat / Unit</th>
                 <th className="py-3 px-4">Date</th>
                 <th className="py-3 px-4">Mode / Ref</th>
                 <th className="py-3 px-4 text-right">Amount (₹)</th>
-                <th className="py-3 px-4 text-right">Actions</th>
+                <th className="py-3 px-4 text-right">{isAdmin ? 'Actions' : 'Status'}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-stone-100">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-8 text-center text-stone-400">
-                    No resident voluntary contributions found. Click "Bulk Import" to upload your Excel sheet or "Add Voluntary Contribution" to create a record.
+                  <td colSpan={isAdmin ? 8 : 7} className="py-8 text-center text-stone-400">
+                    {!isAdmin ? (
+                      effectiveFlat ? (
+                        `No voluntary contribution records found for Flat "${effectiveFlat}". If you contributed, please contact the Ganeshotsava committee.`
+                      ) : (
+                        'Enter your Flat Number above to search and view your contribution receipts.'
+                      )
+                    ) : (
+                      'No resident voluntary contributions found. Click "Bulk Import" to upload your Excel sheet or "Add Voluntary Contribution" to create a record.'
+                    )}
                   </td>
                 </tr>
               ) : (
@@ -557,14 +624,16 @@ export const DonationsView: React.FC<DonationsViewProps> = ({
                       selectedIds.has(c.id) ? 'bg-amber-50/50' : 'hover:bg-stone-50/60'
                     }`}
                   >
-                    <td className="py-3 px-3 text-center">
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.has(c.id)}
-                        onChange={() => toggleSelect(c.id)}
-                        className="rounded border-stone-300 text-[#991B1B] focus:ring-[#991B1B] cursor-pointer"
-                      />
-                    </td>
+                    {isAdmin && (
+                      <td className="py-3 px-3 text-center">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(c.id)}
+                          onChange={() => toggleSelect(c.id)}
+                          className="rounded border-stone-300 text-[#991B1B] focus:ring-[#991B1B] cursor-pointer"
+                        />
+                      </td>
+                    )}
                     <td className="py-3 px-4 font-mono font-bold text-stone-900">{c.rcptNo}</td>
                     <td className="py-3 px-4 font-semibold text-stone-900">
                       {c.name}
@@ -586,54 +655,57 @@ export const DonationsView: React.FC<DonationsViewProps> = ({
                     </td>
                     <td className="py-3 px-4 font-mono text-right font-bold text-emerald-700">₹ {fmt(c.amt)}</td>
                     <td className="py-3 px-4 text-right">
-                      <div className="inline-flex gap-1.5 justify-end">
-                        <button
-                          onClick={() => onPrintReceipt(c)}
-                          className="bg-stone-100 hover:bg-stone-200 text-stone-800 text-xs font-medium px-2.5 py-1 rounded inline-flex items-center gap-1 transition-colors cursor-pointer"
-                          title="Print Official E-Receipt"
-                        >
-                          <Printer className="w-3 h-3 text-[#991B1B]" />
-                          <span>Receipt</span>
-                        </button>
-                        <button
-                          onClick={() => {
-                            const query = encodeURIComponent(c.flat || c.name || '');
-                            const baseUrl = settings.customReceiptPortalUrl
-                              ? settings.customReceiptPortalUrl
-                              : `${window.location.origin}/receipts`;
-                            const separator = baseUrl.includes('?') ? '&' : '?';
-                            const url = `${baseUrl}${separator}q=${query}`;
-                            navigator.clipboard.writeText(url);
-                            setStatusMessage({
-                              type: 'success',
-                              text: `Copied direct receipt link for ${c.flat || c.name}! Devotee can open this short link to download their receipt.`
-                            });
-                            setTimeout(() => setStatusMessage(null), 4000);
-                          }}
-                          className="p-1.5 text-stone-600 hover:text-[#991B1B] hover:bg-stone-100 rounded transition-colors cursor-pointer border border-stone-200"
-                          title="Copy direct receipt download link for this devotee"
-                        >
-                          <Link2 className="w-3 h-3" />
-                        </button>
-                        {isAdmin && (
-                          <>
-                            <button
-                              onClick={() => setModal({ open: true, item: c })}
-                              className="p-1.5 text-stone-600 hover:text-stone-900 hover:bg-stone-100 rounded cursor-pointer"
-                              title="Edit Record"
-                            >
-                              <Edit2 className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteRow(c.id)}
-                              className="p-1.5 text-red-600 hover:text-red-800 hover:bg-red-50 rounded cursor-pointer"
-                              title="Delete Record"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </>
-                        )}
-                      </div>
+                      {isAdmin ? (
+                        <div className="inline-flex gap-1.5 justify-end">
+                          <button
+                            onClick={() => onPrintReceipt(c)}
+                            className="bg-stone-100 hover:bg-stone-200 text-stone-800 text-xs font-medium px-2.5 py-1 rounded inline-flex items-center gap-1 transition-colors cursor-pointer"
+                            title="Print Official E-Receipt"
+                          >
+                            <Printer className="w-3 h-3 text-[#991B1B]" />
+                            <span>Receipt</span>
+                          </button>
+                          <button
+                            onClick={() => {
+                              const query = encodeURIComponent(c.flat || c.name || '');
+                              const baseUrl = settings.customReceiptPortalUrl
+                                ? settings.customReceiptPortalUrl
+                                : `${window.location.origin}/receipts`;
+                              const separator = baseUrl.includes('?') ? '&' : '?';
+                              const url = `${baseUrl}${separator}q=${query}`;
+                              navigator.clipboard.writeText(url);
+                              setStatusMessage({
+                                type: 'success',
+                                text: `Copied direct receipt link for ${c.flat || c.name}! Devotee can open this short link to download their receipt.`
+                              });
+                              setTimeout(() => setStatusMessage(null), 4000);
+                            }}
+                            className="p-1.5 text-stone-600 hover:text-[#991B1B] hover:bg-stone-100 rounded transition-colors cursor-pointer border border-stone-200"
+                            title="Copy direct receipt download link for this devotee"
+                          >
+                            <Link2 className="w-3 h-3" />
+                          </button>
+                          <button
+                            onClick={() => setModal({ open: true, item: c })}
+                            className="p-1.5 text-stone-600 hover:text-stone-900 hover:bg-stone-100 rounded cursor-pointer"
+                            title="Edit Record"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteRow(c.id)}
+                            className="p-1.5 text-red-600 hover:text-red-800 hover:bg-red-50 rounded cursor-pointer"
+                            title="Delete Record"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>Official Record</span>
+                        </span>
+                      )}
                     </td>
                   </tr>
                 ))
@@ -642,10 +714,14 @@ export const DonationsView: React.FC<DonationsViewProps> = ({
             {filtered.length > 0 && (
               <tfoot>
                 <tr className="bg-red-50/40 border-t-2 border-[#991B1B] font-bold text-xs text-[#7F1D1D]">
-                  <td colSpan={5} className="py-3 px-4 uppercase tracking-wider">
-                    Total Voluntary Contributions ({filtered.length} records)
+                  <td colSpan={isAdmin ? 6 : 5} className="py-3 px-4 uppercase tracking-wider">
+                    {isAdmin
+                      ? `Total Voluntary Contributions (${filtered.length} records)`
+                      : `Total Voluntary Contributions for Flat ${effectiveFlat} (${filtered.length} records)`}
                   </td>
-                  <td className="py-3 px-4 font-mono text-right text-sm">₹ {fmt(totalCollected)}</td>
+                  <td className="py-3 px-4 font-mono text-right text-sm">
+                    ₹ {fmt(isAdmin ? totalCollected : filtered.reduce((s, r) => s + Number(r.amt || 0), 0))}
+                  </td>
                   <td></td>
                 </tr>
               </tfoot>

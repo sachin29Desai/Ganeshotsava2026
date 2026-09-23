@@ -167,9 +167,45 @@
         "sv": { "type": "string" },
         "auc": { "type": "string" }
       }
+    },
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Devotee and resident profile with flat number and contact",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "name": { "type": "string" },
+        "flat": { "type": "string" },
+        "mobile": { "type": "string" },
+        "role": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["email", "name", "flat", "mobile"]
+    },
+    "EmailOtp": {
+      "title": "EmailOtp",
+      "description": "Temporary email OTP verification record",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "otpHash": { "type": "string" },
+        "expiresAt": { "type": "number" },
+        "attempts": { "type": "number" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["email", "otpHash", "expiresAt"]
     }
   },
   "firestore": {
+    "/user_profiles/{email}": {
+      "schema": "UserProfile",
+      "description": "Registered resident and devotee profiles"
+    },
+    "/email_otps/{email}": {
+      "schema": "EmailOtp",
+      "description": "Transient OTP records for passwordless email verification"
+    },
     "/expenses/{expenseId}": {
       "schema": "Expense",
       "description": "Collection of all expenditure items"

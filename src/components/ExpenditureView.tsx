@@ -902,7 +902,7 @@ export const ExpenditureView: React.FC<ExpenditureViewProps> = ({
                 {currentActiveBill.name && `📎 ${currentActiveBill.name}`}
               </div>
               <div className="flex items-center gap-2 flex-wrap">
-                {currentActiveBill.url && (
+                {currentActiveBill.url && isAdmin && (
                   <>
                     <a
                       href={currentActiveBill.url}

@@ -114,6 +114,8 @@ export interface UserProfile {
   flat: string;
   mobile: string;
   role: UserRole;
+  username?: string;
+  preferences?: string;
   createdAt?: string;
   updatedAt?: string;
 }

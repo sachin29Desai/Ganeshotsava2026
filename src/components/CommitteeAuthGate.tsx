@@ -63,7 +63,6 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
   const [emailInput, setEmailInput] = useState('');
   const [otpStage, setOtpStage] = useState<'request' | 'verify'>('request');
   const [otpDigits, setOtpDigits] = useState(['', '', '', '', '', '']);
-  const [activeOtpCode, setActiveOtpCode] = useState<string | null>(null);
   const [resendTimer, setResendTimer] = useState(0);
 
   // First-time onboarding modal state
@@ -107,7 +106,7 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
     return Array.from(list);
   };
 
-  // --- 1. EMAIL OTP: Send OTP Handler ---
+  // --- 1. PASSWORDLESS MAGIC LINK & OTP: Send Login Link Handler ---
   const handleSendOtp = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setError(null);
@@ -126,43 +125,51 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
 
     setIsSubmitting(true);
     try {
-      // 1. Generate 6-digit numeric code
-      const generatedCode = Math.floor(100000 + Math.random() * 900000).toString();
-      const otpHash = await sha256(generatedCode);
-      const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
+      // 1. Configure actionCodeSettings to redirect back to app and save email to localStorage
+      const actionCodeSettings = {
+        url: window.location.origin + window.location.pathname,
+        handleCodeInApp: true
+      };
+      window.localStorage.setItem('emailForSignIn', cleanEmail);
 
-      // 2. Save OTP record to Firestore
-      await cloudSaveOtp(cleanEmail, otpHash, expiresAt);
-
-      // 3. Attempt Firebase Email link if supported
+      // 2. Call sendSignInLinkToEmail from Firebase Auth
       if (auth) {
         try {
-          const actionCodeSettings = {
-            url: window.location.href,
-            handleCodeInApp: true
-          };
           await sendSignInLinkToEmail(auth, cleanEmail, actionCodeSettings);
-          window.localStorage.setItem('emailForSignIn', cleanEmail);
-        } catch (linkErr) {
-          // Native email link is optional; fallback to standard OTP verification
-          console.debug('Firebase direct link optional notice:', linkErr);
+        } catch (firebaseErr: any) {
+          console.warn('Firebase sendSignInLinkToEmail warning:', firebaseErr);
         }
       }
 
-      // 4. Store active code for instant session verification and preview helper
-      setActiveOtpCode(generatedCode);
+      // 3. Generate auxiliary 6-digit OTP & save to Firestore (verified storage)
+      const generatedCode = Math.floor(100000 + Math.random() * 900000).toString();
+      const otpHash = await sha256(generatedCode);
+      const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
+      await cloudSaveOtp(cleanEmail, otpHash, expiresAt);
+
+      // 4. Dispatch real email to cleanEmail via email proxy
+      try {
+        await fetch('/api/send-otp-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: cleanEmail,
+            otp: generatedCode,
+            orgName: settings.org
+          })
+        });
+      } catch (mailErr) {
+        console.warn('Backend email dispatch warning:', mailErr);
+      }
+
+      // 5. Update stage to verification
       setOtpDigits(['', '', '', '', '', '']);
       setOtpStage('verify');
       setResendTimer(60);
-      setInfoMessage(`Verification OTP generated for ${cleanEmail}.`);
-
-      // Focus first OTP input on next tick
-      setTimeout(() => {
-        otpInputRefs.current[0]?.focus();
-      }, 100);
+      setInfoMessage(`We've dispatched a passwordless sign-in link and verification code to ${cleanEmail}. Please check your email inbox to proceed.`);
     } catch (err: any) {
-      console.error('Error generating OTP:', err);
-      setError('Failed to generate verification OTP. Please check your connection and retry.');
+      console.error('Error sending sign-in link:', err);
+      setError('Failed to send sign-in link. Please check your connection and retry.');
     } finally {
       setIsSubmitting(false);
     }
@@ -183,53 +190,40 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
 
     setIsSubmitting(true);
     try {
-      let isMatch = false;
-
-      // 1. Check local session active OTP
-      if (activeOtpCode && enteredOtp === activeOtpCode) {
-        isMatch = true;
-      } else {
-        // 2. Check Firestore record
-        const record = await cloudGetOtp(cleanEmail);
-        if (!record) {
-          setError('OTP has expired or was not requested. Please request a new code.');
-          setIsSubmitting(false);
-          return;
-        }
-
-        if (Date.now() > record.expiresAt) {
-          await cloudDeleteOtp(cleanEmail);
-          setError('OTP has expired. Please request a new verification code.');
-          setIsSubmitting(false);
-          return;
-        }
-
-        if (record.attempts >= 5) {
-          await cloudDeleteOtp(cleanEmail);
-          setError('Too many incorrect attempts. Please request a new OTP.');
-          setIsSubmitting(false);
-          return;
-        }
-
-        const testHash = await sha256(enteredOtp);
-        if (testHash === record.otpHash) {
-          isMatch = true;
-        } else {
-          await cloudIncrementOtpAttempts(cleanEmail, record.attempts);
-        }
+      // 1. Check Firestore OTP record
+      const record = await cloudGetOtp(cleanEmail);
+      if (!record) {
+        setError('OTP has expired or was not requested. Please request a new code.');
+        setIsSubmitting(false);
+        return;
       }
 
-      if (!isMatch) {
-        setError('Incorrect OTP. Please check the 6-digit code and try again.');
+      if (Date.now() > record.expiresAt) {
+        await cloudDeleteOtp(cleanEmail);
+        setError('OTP has expired. Please request a new verification code.');
+        setIsSubmitting(false);
+        return;
+      }
+
+      if (record.attempts >= 5) {
+        await cloudDeleteOtp(cleanEmail);
+        setError('Too many incorrect attempts. Please request a new OTP.');
+        setIsSubmitting(false);
+        return;
+      }
+
+      const testHash = await sha256(enteredOtp);
+      if (testHash !== record.otpHash) {
+        await cloudIncrementOtpAttempts(cleanEmail, record.attempts);
+        setError('Incorrect OTP. Please enter the valid 6-digit code received on your email.');
         setIsSubmitting(false);
         return;
       }
 
       // OTP Verified successfully! Clean up OTP record
       await cloudDeleteOtp(cleanEmail);
-      setActiveOtpCode(null);
 
-      // 3. Check if user profile exists in Firestore (First-Time User Detection)
+      // 2. Check if user profile exists in Firestore (First-Time User Detection)
       const existingProfile = await cloudGetUserProfile(cleanEmail);
 
       if (!existingProfile) {
@@ -473,12 +467,12 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
               </h2>
               <p className="text-xs sm:text-sm text-amber-200/90 font-medium mt-1">
                 {authMode === 'email'
-                  ? (otpStage === 'request' ? 'Login with Email & Enter OTP' : 'Enter 6-digit verification code')
+                  ? (otpStage === 'request' ? 'Passwordless Email Magic Link' : 'Check your email for link or enter code')
                   : 'Enter committee access password'}
               </p>
             </div>
 
-            {/* Navigation Tabs: Email OTP vs Passcode */}
+            {/* Navigation Tabs: Magic Link vs Passcode */}
             <div className="flex border-b border-stone-200 bg-stone-50/70 p-1.5 gap-1.5">
               <button
                 type="button"
@@ -492,8 +486,8 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
                     : 'text-stone-600 hover:text-stone-900 hover:bg-stone-100'
                 }`}
               >
-                <Mail className="w-3.5 h-3.5" />
-                <span>Email &amp; OTP</span>
+                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                <span>Magic Link &amp; OTP</span>
               </button>
 
               <button
@@ -522,28 +516,23 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
                 </div>
               )}
 
-              {/* Info Notice (OTP preview code for immediate testing) */}
+              {/* Info Notice (Link & OTP Sent to Email notification) */}
               {infoMessage && (
-                <div className="bg-amber-50 border border-amber-300 text-amber-900 rounded-xl p-3 text-xs space-y-1 animate-in fade-in duration-150">
-                  <div className="flex items-center gap-2 font-bold text-amber-950">
-                    <Sparkles className="w-4 h-4 text-amber-600 shrink-0" />
-                    <span>OTP Notification</span>
+                <div className="bg-emerald-50 border border-emerald-300 text-emerald-900 rounded-xl p-3.5 text-xs space-y-1.5 animate-in fade-in duration-150">
+                  <div className="flex items-center gap-2 font-bold text-emerald-950">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>Sign-In Link &amp; Code Dispatched</span>
                   </div>
-                  <p className="text-[11px] leading-relaxed text-amber-800">
+                  <p className="text-[12px] leading-relaxed text-emerald-800">
                     {infoMessage}
                   </p>
-                  {activeOtpCode && (
-                    <div className="mt-1 bg-white/90 p-2 rounded-lg border border-amber-300/80 flex items-center justify-between">
-                      <span className="text-[10px] uppercase font-bold text-stone-500">Preview OTP:</span>
-                      <span className="font-mono text-sm font-black tracking-widest text-[#991B1B]">
-                        {activeOtpCode}
-                      </span>
-                    </div>
-                  )}
+                  <p className="text-[11px] text-emerald-700/90 font-medium">
+                    📧 Don't see it? Please check your Spam or Junk mail folder.
+                  </p>
                 </div>
               )}
 
-              {/* MODE 1: EMAIL & OTP LOGIN */}
+              {/* MODE 1: EMAIL MAGIC LINK & OTP LOGIN */}
               {authMode === 'email' && (
                 <div className="space-y-4">
                   {otpStage === 'request' ? (
@@ -569,7 +558,7 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
                           />
                         </div>
                         <p className="text-[11px] text-stone-500">
-                          A 6-digit one-time password (OTP) will be generated for your email.
+                          We will send a passwordless sign-in link to your email. Click it to log in instantly.
                         </p>
                       </div>
 
@@ -578,17 +567,28 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
                         disabled={isSubmitting || !emailInput.trim()}
                         className="w-full bg-[#991B1B] hover:bg-[#7F1D1D] active:scale-[0.99] text-white font-bold text-xs sm:text-sm uppercase tracking-wider py-3.5 px-4 rounded-xl shadow-md inline-flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
                       >
-                        <Mail className="w-4 h-4 text-amber-300" />
-                        <span>{isSubmitting ? 'Sending OTP...' : 'Send OTP to Email'}</span>
+                        <Sparkles className="w-4 h-4 text-amber-300" />
+                        <span>{isSubmitting ? 'Sending Sign-In Link...' : 'Send Magic Sign-In Link'}</span>
                       </button>
                     </form>
                   ) : (
-                    /* Stage 2: Enter 6-digit OTP */
+                    /* Stage 2: Enter 6-digit OTP or click link */
                     <form onSubmit={handleVerifyOtp} className="space-y-4">
+                      {/* Magic Link & OTP Explanation */}
+                      <div className="bg-amber-50/80 border border-amber-200/80 rounded-xl p-3 text-xs text-amber-950 space-y-1.5 text-left">
+                        <div className="font-bold flex items-center gap-1.5 text-amber-900">
+                          <Sparkles className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                          <span>Check Your Email</span>
+                        </div>
+                        <p className="text-[11px] text-amber-800 leading-relaxed">
+                          A secure passwordless sign-in link and verification code have been dispatched to your email. Click the link in your email to authenticate automatically, or type the received 6-digit code below.
+                        </p>
+                      </div>
+
                       <div className="space-y-2 text-left">
                         <div className="flex items-center justify-between">
                           <label className="block text-xs font-bold uppercase tracking-wider text-stone-700">
-                            Enter 6-Digit OTP
+                            Enter 6-Digit Code
                           </label>
                           <button
                             type="button"
@@ -606,7 +606,7 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
                           <span className="font-medium truncate max-w-[220px]">{emailInput}</span>
                           <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
                             <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                            <span>Requested</span>
+                            <span>Link Dispatched</span>
                           </span>
                         </div>
 
@@ -634,13 +634,13 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
                         className="w-full bg-[#991B1B] hover:bg-[#7F1D1D] active:scale-[0.99] text-white font-bold text-xs sm:text-sm uppercase tracking-wider py-3.5 px-4 rounded-xl shadow-md inline-flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
                       >
                         <ShieldCheck className="w-4 h-4 text-amber-300" />
-                        <span>{isSubmitting ? 'Verifying OTP...' : 'Verify OTP & Continue'}</span>
+                        <span>{isSubmitting ? 'Verifying Code...' : 'Verify Code & Sign In'}</span>
                       </button>
 
-                      {/* Resend OTP button */}
+                      {/* Resend button */}
                       <div className="flex items-center justify-center pt-1 text-xs text-stone-500">
                         {resendTimer > 0 ? (
-                          <span>Resend OTP in <strong className="text-stone-800">{resendTimer}s</strong></span>
+                          <span>Resend link &amp; code in <strong className="text-stone-800">{resendTimer}s</strong></span>
                         ) : (
                           <button
                             type="button"
@@ -649,7 +649,7 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
                             className="text-[#991B1B] hover:underline font-bold inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                           >
                             <RefreshCw className="w-3.5 h-3.5" />
-                            <span>Resend OTP Code</span>
+                            <span>Resend Magic Link &amp; Code</span>
                           </button>
                         )}
                       </div>

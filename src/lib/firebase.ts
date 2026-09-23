@@ -8,6 +8,7 @@ import {
   sendSignInLinkToEmail,
   isSignInWithEmailLink,
   signInWithEmailLink,
+  getAdditionalUserInfo,
   type User
 } from 'firebase/auth';
 import {
@@ -124,7 +125,8 @@ export {
   onAuthStateChanged,
   sendSignInLinkToEmail,
   isSignInWithEmailLink,
-  signInWithEmailLink
+  signInWithEmailLink,
+  getAdditionalUserInfo
 };
 export type { User };
 

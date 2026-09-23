@@ -19,7 +19,9 @@ import {
   Crown,
   Briefcase,
   Users2,
-  Home
+  Home,
+  Loader2,
+  Mail
 } from 'lucide-react';
 import {
   Expense,
@@ -78,7 +80,12 @@ import {
   SyncStatus,
   loadLocalSnapshotBackup,
   saveLocalSnapshotBackup,
-  isQuotaExceededError
+  isQuotaExceededError,
+  isSignInWithEmailLink,
+  signInWithEmailLink,
+  getAdditionalUserInfo,
+  cloudGetUserProfile,
+  cloudSaveUserProfile
 } from './lib/firebase';
 
 import { StatementView } from './components/StatementView';
@@ -93,6 +100,7 @@ import { SettingsView } from './components/SettingsView';
 import { ReceiptInvoiceModal, PrintData } from './components/ReceiptInvoiceModal';
 import { PublicReceiptPortal } from './components/PublicReceiptPortal';
 import { CommitteeAuthGate } from './components/CommitteeAuthGate';
+import { UserProfileOnboardingModal } from './components/UserProfileOnboardingModal';
 import { CommunityHomeView } from './components/CommunityHomeView';
 import { PublicSevaPortal } from './components/PublicSevaPortal';
 import { AdminGateForBalaga } from './components/AdminGateForBalaga';
@@ -313,6 +321,16 @@ export function App() {
     }
     return null;
   });
+
+  // --- Passwordless Email Magic Link State ---
+  const [isVerifyingMagicLink, setIsVerifyingMagicLink] = useState(false);
+  const [magicLinkError, setMagicLinkError] = useState<string | null>(null);
+  const [promptEmailForMagicLink, setPromptEmailForMagicLink] = useState(false);
+  const [manualMagicEmail, setManualMagicEmail] = useState('');
+  const [firstTimeOnboardingUser, setFirstTimeOnboardingUser] = useState<{
+    email: string;
+    name?: string;
+  } | null>(null);
 
   // Guard restricted tabs for Non-Admins (Non-admins can only access statement, expenditure, donations, and read-only sevas)
   useEffect(() => {
@@ -851,6 +869,92 @@ export function App() {
     setIsAuthenticated(true);
     setIsAdmin(role === 'admin');
   };
+
+  const getAdminEmailList = (): string[] => {
+    const list = new Set<string>([
+      'desaisachin95@gmail.com',
+      'kannadigara.balaga.eldorado@gmail.com'
+    ]);
+    if (settings.adminEmails && Array.isArray(settings.adminEmails)) {
+      settings.adminEmails.forEach(e => list.add(e.toLowerCase().trim()));
+    }
+    try {
+      const saved = localStorage.getItem('ekb_allowed_emails');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          parsed.forEach(e => list.add(e.toLowerCase().trim()));
+        }
+      }
+    } catch {}
+    return Array.from(list);
+  };
+
+  // --- Process Passwordless Email Magic Link Sign-In ---
+  const processEmailMagicLink = async (emailToUse: string) => {
+    if (!auth) return;
+    setIsVerifyingMagicLink(true);
+    setMagicLinkError(null);
+    try {
+      const cleanEmail = emailToUse.toLowerCase().trim();
+      const result = await signInWithEmailLink(auth, cleanEmail, window.location.href);
+
+      // Clean up localStorage and remove query parameters from URL without reloading
+      window.localStorage.removeItem('emailForSignIn');
+      window.history.replaceState({}, document.title, window.location.pathname);
+
+      // Inspect whether this is a new user
+      const additionalInfo = getAdditionalUserInfo(result);
+      const isNewUserFromAuth = !!additionalInfo?.isNewUser;
+      const verifiedEmail = (result.user.email || cleanEmail).toLowerCase().trim();
+
+      // Check whether user profile already exists in Firestore database
+      const existingProfile = await cloudGetUserProfile(verifiedEmail);
+
+      if (isNewUserFromAuth || !existingProfile) {
+        // FIRST-TIME USER: Route to onboarding form to collect resident details
+        setPromptEmailForMagicLink(false);
+        setFirstTimeOnboardingUser({
+          email: verifiedEmail,
+          name: result.user.displayName || ''
+        });
+      } else {
+        // RETURNING USER: Bypass onboarding form and instantly log into dashboard
+        setPromptEmailForMagicLink(false);
+        const adminEmails = getAdminEmailList();
+        const role: UserRole = existingProfile.role || (adminEmails.includes(verifiedEmail) ? 'admin' : 'resident');
+        handleLoginSuccess(role, existingProfile);
+        setSyncToast({
+          message: `Welcome back, ${existingProfile.name}! Logged in successfully.`,
+          type: 'success'
+        });
+        setTimeout(() => setSyncToast(null), 3500);
+      }
+    } catch (err: any) {
+      console.error('Error during signInWithEmailLink:', err);
+      setMagicLinkError(err?.message || 'Failed to complete magic link sign-in. The link may have expired or was already used.');
+    } finally {
+      setIsVerifyingMagicLink(false);
+    }
+  };
+
+  // Check on app initialization if the user opened the app via Email Magic Link
+  useEffect(() => {
+    if (!auth) return;
+    try {
+      if (isSignInWithEmailLink(auth, window.location.href)) {
+        const savedEmail = window.localStorage.getItem('emailForSignIn');
+        if (!savedEmail) {
+          // If link was opened on a different browser or device, prompt user for confirmation
+          setPromptEmailForMagicLink(true);
+        } else {
+          processEmailMagicLink(savedEmail);
+        }
+      }
+    } catch (err) {
+      console.warn('isSignInWithEmailLink check error:', err);
+    }
+  }, []);
 
   // Committee Logout & Signout handler
   const handleLogout = async () => {
@@ -1411,7 +1515,120 @@ export function App() {
   }
 
   // 4. GANESHOTSAVA 2026 FESTIVAL PORTAL (Default Landing Page '/')
-  // If not authenticated, require Committee Authentication before showing financial data, statements, or expenses!
+  // A. If currently verifying magic link, show dedicated loading state
+  if (isVerifyingMagicLink) {
+    return (
+      <div className="min-h-screen bg-[#FDFBF7] flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl max-w-md w-full p-8 shadow-xl border-2 border-amber-300 text-center space-y-4 animate-in fade-in">
+          <div className="w-16 h-16 rounded-full bg-amber-100 text-[#991B1B] flex items-center justify-center mx-auto">
+            <Loader2 className="w-8 h-8 animate-spin text-[#991B1B]" />
+          </div>
+          <h2 className="text-xl font-serif font-black text-stone-900">
+            Verifying Magic Sign-In Link...
+          </h2>
+          <p className="text-sm text-stone-600">
+            Authenticating your passwordless email link with Firebase. Please wait a moment.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // B. If user opened magic link in a different browser/device, ask them to confirm email
+  if (promptEmailForMagicLink) {
+    return (
+      <div className="min-h-screen bg-[#FDFBF7] flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl max-w-md w-full p-8 shadow-xl border-2 border-amber-400 text-center space-y-5 animate-in fade-in">
+          <div className="w-16 h-16 rounded-full bg-amber-400/20 text-[#991B1B] flex items-center justify-center mx-auto border border-amber-400">
+            <Mail className="w-8 h-8 text-[#991B1B]" />
+          </div>
+          <div>
+            <h2 className="text-xl font-serif font-black text-stone-900">
+              Confirm Your Email Address
+            </h2>
+            <p className="text-xs text-stone-600 mt-1">
+              You opened this sign-in link on a new device or browser. Please confirm the email address you requested the link for.
+            </p>
+          </div>
+          {magicLinkError && (
+            <div className="p-3 bg-red-50 border border-red-200 text-red-800 rounded-xl text-xs text-left">
+              {magicLinkError}
+            </div>
+          )}
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (manualMagicEmail.trim()) {
+                processEmailMagicLink(manualMagicEmail.trim());
+              }
+            }}
+            className="space-y-4 text-left"
+          >
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold uppercase tracking-wider text-stone-700">
+                Email Address
+              </label>
+              <input
+                type="email"
+                required
+                autoFocus
+                value={manualMagicEmail}
+                onChange={(e) => setManualMagicEmail(e.target.value)}
+                placeholder="e.g. resident@gmail.com"
+                className="w-full bg-stone-50 border border-stone-300 rounded-xl px-4 py-3 text-sm text-stone-900 outline-none focus:bg-white focus:border-[#991B1B] focus:ring-2 focus:ring-[#991B1B]/20 font-medium"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={!manualMagicEmail.trim() || isVerifyingMagicLink}
+              className="w-full bg-[#991B1B] hover:bg-[#7F1D1D] text-white font-bold text-sm uppercase tracking-wider py-3.5 rounded-xl shadow-md cursor-pointer disabled:opacity-50 inline-flex items-center justify-center gap-2"
+            >
+              <span>{isVerifyingMagicLink ? 'Verifying...' : 'Confirm & Sign In'}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setPromptEmailForMagicLink(false);
+                setMagicLinkError(null);
+                window.history.replaceState({}, document.title, window.location.pathname);
+              }}
+              className="w-full text-center text-xs text-stone-500 hover:text-stone-800 underline cursor-pointer pt-1"
+            >
+              Cancel and Return to Login
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  // C. If first-time user after magic link sign-in, show onboarding form
+  if (firstTimeOnboardingUser) {
+    return (
+      <UserProfileOnboardingModal
+        email={firstTimeOnboardingUser.email}
+        initialName={firstTimeOnboardingUser.name}
+        settings={settings}
+        onComplete={(newProfile) => {
+          const adminEmails = getAdminEmailList();
+          const role: UserRole = newProfile.role || (adminEmails.includes(newProfile.email.toLowerCase()) ? 'admin' : 'resident');
+          handleLoginSuccess(role, newProfile);
+          setFirstTimeOnboardingUser(null);
+          setSyncToast({
+            message: `Welcome to Ganeshotsava 2026, ${newProfile.name}! Your profile has been registered.`,
+            type: 'success'
+          });
+          setTimeout(() => setSyncToast(null), 4000);
+        }}
+        onCancel={() => {
+          setFirstTimeOnboardingUser(null);
+          handleLogout();
+        }}
+      />
+    );
+  }
+
+  // D. If not authenticated, require Committee Authentication before showing financial data, statements, or expenses!
   if (!isAuthenticated) {
     return (
       <CommitteeAuthGate

@@ -16,6 +16,7 @@ import { cleanOrgName } from '../utils/helpers';
 
 interface UserProfileOnboardingModalProps {
   email: string;
+  initialName?: string;
   settings: AppSettings;
   onComplete: (profile: UserProfile) => void;
   onCancel: () => void;
@@ -23,13 +24,16 @@ interface UserProfileOnboardingModalProps {
 
 export const UserProfileOnboardingModal: React.FC<UserProfileOnboardingModalProps> = ({
   email,
+  initialName = '',
   settings,
   onComplete,
   onCancel
 }) => {
-  const [name, setName] = useState('');
+  const [name, setName] = useState(initialName);
   const [flat, setFlat] = useState('');
   const [mobile, setMobile] = useState('');
+  const [username, setUsername] = useState('');
+  const [preferences, setPreferences] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -48,6 +52,8 @@ export const UserProfileOnboardingModal: React.FC<UserProfileOnboardingModalProp
     const trimmedName = name.trim();
     const trimmedFlat = flat.trim().toUpperCase();
     const cleanedMobile = mobile.replace(/\D/g, '');
+    const trimmedUsername = username.trim().toLowerCase().replace(/[^a-z0-9_.-]/g, '');
+    const trimmedPreferences = preferences.trim();
 
     if (!trimmedName) {
       setError('Please enter your full name.');
@@ -74,6 +80,8 @@ export const UserProfileOnboardingModal: React.FC<UserProfileOnboardingModalProp
         flat: trimmedFlat,
         mobile: cleanedMobile,
         role,
+        ...(trimmedUsername ? { username: trimmedUsername } : {}),
+        ...(trimmedPreferences ? { preferences: trimmedPreferences } : {}),
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
@@ -173,9 +181,9 @@ export const UserProfileOnboardingModal: React.FC<UserProfileOnboardingModalProp
                 <label className="block text-xs font-bold uppercase tracking-wider text-stone-700">
                   Email Address
                 </label>
-                <span className="inline-flex items-center gap-1 text-[11px] text-emerald-700 font-semibold">
+                <span className="inline-flex items-center gap-1 text-[11px] text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
                   <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                  <span>OTP Verified</span>
+                  <span>Email Verified</span>
                 </span>
               </div>
               <div className="relative">
@@ -213,6 +221,37 @@ export const UserProfileOnboardingModal: React.FC<UserProfileOnboardingModalProp
                   className="w-full bg-stone-50 border border-stone-300 rounded-xl pl-18 pr-4 py-2.5 text-sm text-stone-900 outline-none focus:bg-white focus:border-[#991B1B] focus:ring-2 focus:ring-[#991B1B]/20 transition-all font-medium"
                 />
               </div>
+            </div>
+
+            {/* Username / Resident Handle (Optional) */}
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold uppercase tracking-wider text-stone-700">
+                Username / Display Alias <span className="text-stone-400 text-[10px] font-normal lowercase">(optional)</span>
+              </label>
+              <div className="relative">
+                <span className="w-4 h-4 absolute left-3.5 top-3 text-stone-400 font-mono text-sm leading-none">@</span>
+                <input
+                  type="text"
+                  value={username}
+                  onChange={e => setUsername(e.target.value)}
+                  placeholder="e.g. sachin_eldorado"
+                  className="w-full bg-stone-50 border border-stone-300 rounded-xl pl-10 pr-4 py-2.5 text-sm text-stone-900 outline-none focus:bg-white focus:border-[#991B1B] focus:ring-2 focus:ring-[#991B1B]/20 transition-all font-medium lowercase"
+                />
+              </div>
+            </div>
+
+            {/* Devotional Preferences / Volunteering Interests (Optional) */}
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold uppercase tracking-wider text-stone-700">
+                Preferences &amp; Interests <span className="text-stone-400 text-[10px] font-normal lowercase">(optional)</span>
+              </label>
+              <input
+                type="text"
+                value={preferences}
+                onChange={e => setPreferences(e.target.value)}
+                placeholder="e.g. Maha Pooja, Cultural Programs, Prasada Seva, Volunteering"
+                className="w-full bg-stone-50 border border-stone-300 rounded-xl px-4 py-2.5 text-sm text-stone-900 outline-none focus:bg-white focus:border-[#991B1B] focus:ring-2 focus:ring-[#991B1B]/20 transition-all font-medium"
+              />
             </div>
 
             <div className="pt-2">

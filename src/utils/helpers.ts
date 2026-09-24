@@ -1,4 +1,62 @@
-import { AppState, Expense, ExpenseBill, SevaCatalogueItem } from '../types';
+import { AppState, CommercialStall, Expense, ExpenseBill, SevaCatalogueItem } from '../types';
+
+export const DEFAULT_COMMERCIAL_STALLS: CommercialStall[] = [
+  {
+    id: 'cs_Y65247537',
+    invNo: 'Y65247537',
+    particular: 'CANOPY - EDUCATION FEST',
+    vendor: 'KESAR INTERNATIONAL SCHOOL',
+    det: 'CANOPY - EDUCATION FEST — KESAR INTERNATIONAL SCHOOL',
+    est: 20000,
+    act: 20000,
+    date: '2026-09-01',
+    notes: 'UPI'
+  },
+  {
+    id: 'cs_65247538',
+    invNo: 'GNS-CS-65247538',
+    particular: 'CANOPY - EDUCATION FEST',
+    vendor: 'KIDZEE',
+    det: 'CANOPY - EDUCATION FEST — KIDZEE',
+    est: 12500,
+    act: 12500,
+    date: '2026-09-07',
+    notes: 'CASH 6000+ UPI 6500'
+  },
+  {
+    id: 'cs_65247539',
+    invNo: 'GNS-CS-65247539',
+    particular: 'CANOPY - EDUCATION FEST',
+    vendor: 'BM ENGLISH SCHOOL',
+    det: 'CANOPY - EDUCATION FEST — BM ENGLISH SCHOOL',
+    est: 15000,
+    act: 15000,
+    date: '2026-09-07',
+    notes: 'NEFT'
+  },
+  {
+    id: 'cs_65247541',
+    invNo: 'GNS-CS-65247541',
+    particular: 'CANOPY - EDUCATION FEST',
+    vendor: 'DEEKSHA\nMILLION DREAMS EVENT',
+    det: 'CANOPY - EDUCATION FEST — DEEKSHA\nMILLION DREAMS EVENT',
+    est: 20000,
+    act: 20000,
+    date: '2026-09-07',
+    notes: 'NEFT'
+  },
+  {
+    id: 'cs_65247542',
+    invNo: 'GNS-CS-65247542',
+    particular: 'CANOPY - EDUCATION FEST',
+    vendor: 'UNITED INTERNATIONAL SCHOOL',
+    det: 'CANOPY - EDUCATION FEST — UNITED INTERNATIONAL SCHOOL',
+    est: 30000,
+    act: 30000,
+    date: '2026-09-07',
+    notes: 'UPI'
+  }
+];
 
 export const DEFAULT_SEVAS: SevaCatalogueItem[] = [
   { id: 'ds1', name: 'Rice (Anna Prasadam)', amt: 0, unit: 'kg', totalRequired: 200, desc: 'Sona Masoori / Basmati rice for grand Mahaprasadam' },
@@ -40,7 +98,7 @@ export const INITIAL_STATE: AppState = {
     }
   ],
   sponsors: [],
-  commercialStalls: [],
+  commercialStalls: DEFAULT_COMMERCIAL_STALLS,
   sevas: [],
   sevaCatalogue: DEFAULT_SEVAS,
   hundi: [],
@@ -58,7 +116,7 @@ export const INITIAL_STATE: AppState = {
   counters: {
     rc: '1',
     sp: null,
-    cs: null,
+    cs: '65247543',
     sv: null,
     auc: null
   }

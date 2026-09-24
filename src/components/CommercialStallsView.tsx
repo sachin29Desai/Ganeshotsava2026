@@ -124,7 +124,7 @@ export const CommercialStallsView: React.FC<CommercialStallsViewProps> = ({
               {filtered.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="py-8 text-center text-stone-400">
-                    No commercial stalls recorded yet.
+                    No Education Fest stalls recorded yet. {isAdmin && 'Click "Add Education Fest Stall" above to record entries.'}
                   </td>
                 </tr>
               ) : (

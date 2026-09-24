@@ -656,16 +656,23 @@ export function App() {
       if (n > cur) {
         countersRef.current = { ...countersRef.current, rc: String(n) };
         setCounters(prev => ({ ...prev, rc: String(n) }));
+        cloudSaveCounters({ rc: String(n) }).catch(() => {});
       }
     }
     hasUnsavedChangesRef.current = true;
     setHasUnsavedChanges(true);
+    cloudSaveContribution(row).catch(err => {
+      console.warn('Live contribution cloud sync error:', err);
+    });
   };
 
   const handleDeleteContribution = (id: string) => {
     setContributions(prev => prev.filter(x => x.id !== id));
     hasUnsavedChangesRef.current = true;
     setHasUnsavedChanges(true);
+    cloudDeleteContribution(id).catch(err => {
+      console.warn('Live contribution cloud delete error:', err);
+    });
   };
 
   const handleBulkImportContributions = (newItems: Contribution[]) => {
@@ -680,9 +687,13 @@ export function App() {
     const newRc = String(maxNum);
     countersRef.current = { ...countersRef.current, rc: newRc };
     setCounters(prev => ({ ...prev, rc: newRc }));
+    cloudSaveCounters({ rc: newRc }).catch(() => {});
     setContributions(prev => [...prev, ...newItems]);
     hasUnsavedChangesRef.current = true;
     setHasUnsavedChanges(true);
+    cloudBulkImportContributions(newItems).catch(err => {
+      console.warn('Live bulk contributions cloud sync error:', err);
+    });
   };
 
   const handleSaveSponsor = (row: Sponsor) => {
@@ -702,16 +713,23 @@ export function App() {
       if (n > cur) {
         countersRef.current = { ...countersRef.current, sp: String(n) };
         setCounters(prev => ({ ...prev, sp: String(n) }));
+        cloudSaveCounters({ sp: String(n) }).catch(() => {});
       }
     }
     hasUnsavedChangesRef.current = true;
     setHasUnsavedChanges(true);
+    cloudSaveSponsor(row).catch(err => {
+      console.warn('Live sponsor cloud sync error:', err);
+    });
   };
 
   const handleDeleteSponsor = (id: string) => {
     setSponsors(prev => prev.filter(x => x.id !== id));
     hasUnsavedChangesRef.current = true;
     setHasUnsavedChanges(true);
+    cloudDeleteSponsor(id).catch(err => {
+      console.warn('Live sponsor cloud delete error:', err);
+    });
   };
 
   const handleSaveCommercialStall = (row: CommercialStall) => {
@@ -731,16 +749,24 @@ export function App() {
       if (n > cur) {
         countersRef.current = { ...countersRef.current, cs: String(n) };
         setCounters(prev => ({ ...prev, cs: String(n) }));
+        cloudSaveCounters({ cs: String(n) }).catch(() => {});
       }
     }
     hasUnsavedChangesRef.current = true;
     setHasUnsavedChanges(true);
+    // Realtime persistence to Firestore
+    cloudSaveCommercialStall(row).catch(err => {
+      console.warn('Live commercial stall cloud sync error:', err);
+    });
   };
 
   const handleDeleteCommercialStall = (id: string) => {
     setCommercialStalls(prev => prev.filter(x => x.id !== id));
     hasUnsavedChangesRef.current = true;
     setHasUnsavedChanges(true);
+    cloudDeleteCommercialStall(id).catch(err => {
+      console.warn('Live commercial stall cloud delete error:', err);
+    });
   };
 
   const handleSaveSeva = (row: SevaBooking) => {
@@ -2224,8 +2250,8 @@ export function App() {
                 </span>
               </button>
 
-              {/* Sub-tab 2: Sponsorship (Hidden for Volunteers) */}
-              {userRole !== 'volunteer' && (
+              {/* Sub-tab 2: Sponsorship (Admin and Members) */}
+              {(isAdmin || isMember || isReadOnly) && (
                 <button
                   onClick={() => setActiveIncomeSubTab('sponsorship')}
                   className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
@@ -2243,8 +2269,8 @@ export function App() {
                 </button>
               )}
 
-              {/* Sub-tab 3: Education Fest (Hidden for Volunteers) */}
-              {userRole !== 'volunteer' && (
+              {/* Sub-tab 3: Education Fest (Admin and Members) */}
+              {(isAdmin || isMember || isReadOnly) && (
                 <button
                   onClick={() => setActiveIncomeSubTab('stalls')}
                   className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
@@ -2375,6 +2401,20 @@ export function App() {
             auctions={auctions}
             settings={settings}
             userRole={userRole || undefined}
+            isAdmin={isAdmin}
+            isMember={isMember || isReadOnly}
+            onNavigateToTab={(subTab) => {
+              setActiveTab('income');
+              setActiveIncomeSubTab(subTab);
+            }}
+            onPrintInvoice={s => {
+              setPrintData({ type: 'invoice', subType: 'stall', item: s });
+              setReceiptModalOpen(true);
+            }}
+            onAddStall={() => {
+              setActiveTab('income');
+              setActiveIncomeSubTab('stalls');
+            }}
             onShareWhatsApp={shareWhatsAppSummary}
             onExportExcel={handleExportExcel}
             onPrint={triggerDirectPrint}
@@ -2402,7 +2442,7 @@ export function App() {
               />
             )}
 
-            {activeIncomeSubTab === 'sponsorship' && (isAdmin || isReadOnly) && (
+            {activeIncomeSubTab === 'sponsorship' && (isAdmin || isMember || isReadOnly) && (
               <SponsorshipView
                 sponsors={sponsors}
                 isAdmin={isAdmin}
@@ -2415,7 +2455,7 @@ export function App() {
               />
             )}
 
-            {activeIncomeSubTab === 'stalls' && (isAdmin || isReadOnly) && (
+            {activeIncomeSubTab === 'stalls' && (isAdmin || isMember || isReadOnly) && (
               <CommercialStallsView
                 stalls={commercialStalls}
                 isAdmin={isAdmin}

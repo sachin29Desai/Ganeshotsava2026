@@ -1,12 +1,12 @@
 {
   "projectId": "ganeshotsava2026-d0f9e",
-  "appId": "1:1060603103220:web:3681a6458aad90aa895ba1",
+  "appId": "1:1060603103220:web:c791a26fbaa2c71f895ba1",
   "apiKey": "AIzaSyARQQ2BwqkLnGrS9RrxhF8nBNrc_sGijsQ",
   "authDomain": "ganeshotsava2026-d0f9e.firebaseapp.com",
-  "firestoreDatabaseId": "(default)",
+  "firestoreDatabaseId": "ai-studio-ganeshotsava2026-de634832-964e-4c3f-a8c4-26cb12f0a480",
   "storageBucket": "ganeshotsava2026-d0f9e.firebasestorage.app",
   "messagingSenderId": "1060603103220",
-  "measurementId": "G-RFEMDTE637",
-  "oAuthClientId": "",
+  "measurementId": "",
+  "oAuthClientId": "1060603103220-j4kafen092bdhadd5498i3754gh7pasp.apps.googleusercontent.com",
   "recaptchaSiteKey": ""
 }

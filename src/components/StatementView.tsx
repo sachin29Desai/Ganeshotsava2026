@@ -4,10 +4,14 @@ import {
   TrendingUp,
   TrendingDown,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  GraduationCap,
+  ExternalLink,
+  Plus
 } from 'lucide-react';
 import { Expense, Contribution, Sponsor, CommercialStall, SevaBooking, HundiCollection, AuctionItem, AppSettings, UserRole } from '../types';
-import { fmt, getExpenseActual, cleanOrgName } from '../utils/helpers';
+import { fmt, getExpenseActual, cleanOrgName, fmtDate } from '../utils/helpers';
+import { getStallFields } from './CommercialStallsView';
 
 interface StatementViewProps {
   expenses: Expense[];
@@ -19,6 +23,11 @@ interface StatementViewProps {
   auctions: AuctionItem[];
   settings: AppSettings;
   userRole?: UserRole;
+  isAdmin?: boolean;
+  isMember?: boolean;
+  onNavigateToTab?: (tab: 'donations' | 'sponsorship' | 'stalls' | 'sevas' | 'hundi' | 'auctions') => void;
+  onPrintInvoice?: (stall: CommercialStall) => void;
+  onAddStall?: () => void;
   onShareWhatsApp: () => void;
   onExportExcel: () => void;
   onPrint: () => void;
@@ -34,12 +43,21 @@ export const StatementView: React.FC<StatementViewProps> = ({
   auctions,
   settings,
   userRole,
+  isAdmin = false,
+  isMember = false,
+  onNavigateToTab,
+  onPrintInvoice,
+  onAddStall,
   onPrint
 }) => {
+  // Determine if user has admin or member privileges to view detailed data breakdowns
+  const canViewDetails = isAdmin || isMember || userRole === 'admin' || userRole === 'member' || userRole === 'read_only';
   const isVolunteer = userRole === 'volunteer';
+
   // Income stream totals
   const ctTot = contributions.reduce((s, r) => s + Number(r.amt || 0), 0);
   const spAct = sponsors.reduce((s, r) => s + Number(r.act || 0), 0);
+  const csEst = commercialStalls.reduce((s, r) => s + Number(r.est || 0), 0);
   const csAct = commercialStalls.reduce((s, r) => s + Number(r.act || 0), 0);
   const svTot = sevas.reduce((s, r) => s + Number(r.amt || 0), 0);
   const hundiTot = hundi.reduce((s, r) => s + Number(r.act || 0), 0);
@@ -71,7 +89,7 @@ export const StatementView: React.FC<StatementViewProps> = ({
           </p>
         </div>
 
-        {userRole === 'admin' && (
+        {canViewDetails && (
           <div className="flex items-center gap-2">
             <button
               onClick={onPrint}
@@ -164,7 +182,13 @@ export const StatementView: React.FC<StatementViewProps> = ({
 
       {/* 3. REVENUE STREAMS MINI-TILES */}
       <div className={`grid grid-cols-2 sm:grid-cols-3 ${isVolunteer ? 'lg:grid-cols-4' : 'lg:grid-cols-6'} gap-2.5`}>
-        <div className="bg-white border border-stone-200 rounded p-3 text-center shadow-2xs hover:border-emerald-300 transition-colors">
+        {/* Voluntary Contributions */}
+        <div
+          onClick={() => onNavigateToTab?.('donations')}
+          className={`bg-white border border-stone-200 rounded p-3 text-center shadow-2xs hover:border-emerald-300 transition-colors ${
+            onNavigateToTab ? 'cursor-pointer hover:bg-emerald-50/20' : ''
+          }`}
+        >
           <div className="text-[9px] font-bold text-stone-500 uppercase tracking-wider mb-0.5">
             Voluntary Contributions
           </div>
@@ -176,7 +200,13 @@ export const StatementView: React.FC<StatementViewProps> = ({
 
         {!isVolunteer && (
           <>
-            <div className="bg-white border border-stone-200 rounded p-3 text-center shadow-2xs hover:border-emerald-300 transition-colors">
+            {/* Sponsorship */}
+            <div
+              onClick={() => onNavigateToTab?.('sponsorship')}
+              className={`bg-white border border-stone-200 rounded p-3 text-center shadow-2xs hover:border-emerald-300 transition-colors ${
+                onNavigateToTab ? 'cursor-pointer hover:bg-emerald-50/20' : ''
+              }`}
+            >
               <div className="text-[9px] font-bold text-stone-500 uppercase tracking-wider mb-0.5">
                 Sponsorship
               </div>
@@ -186,19 +216,32 @@ export const StatementView: React.FC<StatementViewProps> = ({
               </div>
             </div>
 
-            <div className="bg-white border border-stone-200 rounded p-3 text-center shadow-2xs hover:border-emerald-300 transition-colors">
-              <div className="text-[9px] font-bold text-stone-500 uppercase tracking-wider mb-0.5">
-                Education Fest
+            {/* Education Fest */}
+            <div
+              onClick={() => onNavigateToTab?.('stalls')}
+              className={`bg-white border-2 border-amber-300/80 rounded p-3 text-center shadow-xs hover:border-[#991B1B] hover:shadow-md transition-all ${
+                onNavigateToTab ? 'cursor-pointer bg-amber-50/30 hover:bg-amber-50/60' : ''
+              }`}
+            >
+              <div className="text-[9px] font-bold text-[#991B1B] uppercase tracking-wider mb-0.5 flex items-center justify-center gap-1">
+                <GraduationCap className="w-3 h-3 text-[#991B1B]" />
+                <span>Education Fest</span>
               </div>
               <div className="text-base font-mono font-bold text-emerald-700">₹ {fmt(csAct)}</div>
-              <div className="text-[10px] text-stone-400 mt-0.5">
+              <div className="text-[10px] text-stone-500 mt-0.5 font-medium">
                 {commercialStalls.length} vendor(s) • {getPercent(csAct)}%
               </div>
             </div>
           </>
         )}
 
-        <div className="bg-white border border-stone-200 rounded p-3 text-center shadow-2xs hover:border-emerald-300 transition-colors">
+        {/* Seva Bookings */}
+        <div
+          onClick={() => onNavigateToTab?.('sevas')}
+          className={`bg-white border border-stone-200 rounded p-3 text-center shadow-2xs hover:border-emerald-300 transition-colors ${
+            onNavigateToTab ? 'cursor-pointer hover:bg-emerald-50/20' : ''
+          }`}
+        >
           <div className="text-[9px] font-bold text-stone-500 uppercase tracking-wider mb-0.5">
             Seva Bookings
           </div>
@@ -208,7 +251,13 @@ export const StatementView: React.FC<StatementViewProps> = ({
           </div>
         </div>
 
-        <div className="bg-white border border-stone-200 rounded p-3 text-center shadow-2xs hover:border-emerald-300 transition-colors">
+        {/* Hundi Collections */}
+        <div
+          onClick={() => onNavigateToTab?.('hundi')}
+          className={`bg-white border border-stone-200 rounded p-3 text-center shadow-2xs hover:border-emerald-300 transition-colors ${
+            onNavigateToTab ? 'cursor-pointer hover:bg-emerald-50/20' : ''
+          }`}
+        >
           <div className="text-[9px] font-bold text-stone-500 uppercase tracking-wider mb-0.5">
             Hundi Collections
           </div>
@@ -218,7 +267,13 @@ export const StatementView: React.FC<StatementViewProps> = ({
           </div>
         </div>
 
-        <div className="bg-white border border-stone-200 rounded p-3 text-center shadow-2xs hover:border-emerald-300 transition-colors">
+        {/* Auctions */}
+        <div
+          onClick={() => onNavigateToTab?.('auctions')}
+          className={`bg-white border border-stone-200 rounded p-3 text-center shadow-2xs hover:border-emerald-300 transition-colors ${
+            onNavigateToTab ? 'cursor-pointer hover:bg-emerald-50/20' : ''
+          }`}
+        >
           <div className="text-[9px] font-bold text-stone-500 uppercase tracking-wider mb-0.5">
             Auctions (Maha Laddu)
           </div>
@@ -228,6 +283,134 @@ export const StatementView: React.FC<StatementViewProps> = ({
           </div>
         </div>
       </div>
+
+      {/* 4. DETAILED EDUCATION FEST DATA BREAKDOWN (Visible to Admin & Members) */}
+      {canViewDetails && (
+        <div className="bg-white border border-amber-200/90 rounded-lg shadow-sm overflow-hidden mt-6">
+          <div className="px-5 py-3.5 bg-gradient-to-r from-amber-50/70 via-white to-amber-50/40 border-b border-amber-200 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-full bg-amber-400 text-[#991B1B] flex items-center justify-center shadow-xs">
+                <GraduationCap className="w-4 h-4 text-[#991B1B]" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-serif font-bold text-[#1A1A1A]">
+                    Education Fest — Stalls &amp; Exhibitions Breakdown
+                  </h3>
+                  <span className="bg-[#991B1B] text-white text-[10px] font-mono px-2 py-0.5 rounded-full font-bold">
+                    {commercialStalls.length} Stalls
+                  </span>
+                </div>
+                <p className="text-xs text-stone-500">
+                  Detailed ledger of educational booths, science workshops, literature counters &amp; campus partners. Total Actual: <strong className="text-emerald-700 font-mono">₹ {fmt(csAct)}</strong> (Est: ₹ {fmt(csEst)})
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {isAdmin && onAddStall && (
+                <button
+                  onClick={onAddStall}
+                  className="bg-[#991B1B] hover:bg-[#7F1D1D] text-white text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded inline-flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Add Stall</span>
+                </button>
+              )}
+              {onNavigateToTab && (
+                <button
+                  onClick={() => onNavigateToTab('stalls')}
+                  className="bg-white hover:bg-stone-50 text-stone-700 hover:text-stone-900 border border-stone-300 text-xs font-medium px-3 py-1.5 rounded inline-flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                >
+                  <span>Open Full Portal</span>
+                  <ExternalLink className="w-3 h-3 text-[#991B1B]" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-sm">
+              <thead>
+                <tr className="bg-[#FDF8F3] border-b border-stone-200 text-[10px] font-bold text-stone-500 uppercase tracking-[0.14em]">
+                  <th className="py-2.5 px-4 font-semibold">Invoice No</th>
+                  <th className="py-2.5 px-4 font-semibold">Stall Particular / Activity</th>
+                  <th className="py-2.5 px-4 font-semibold">Vendor / Organization</th>
+                  <th className="py-2.5 px-4 text-right font-semibold">Estimated (₹)</th>
+                  <th className="py-2.5 px-4 text-right font-semibold">Actual (₹)</th>
+                  <th className="py-2.5 px-4 text-right font-semibold">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-stone-100">
+                {commercialStalls.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="py-8 text-center text-stone-400">
+                      No Education Fest stalls recorded yet. {isAdmin && 'Click "Add Stall" above to record education fest counters.'}
+                    </td>
+                  </tr>
+                ) : (
+                  commercialStalls.map(s => {
+                    const { particular, vendor } = getStallFields(s);
+                    return (
+                      <tr key={s.id} className="hover:bg-amber-50/30 transition-colors">
+                        <td className="py-3 px-4 font-mono font-bold text-stone-900 whitespace-nowrap">
+                          {s.invNo}
+                        </td>
+                        <td className="py-3 px-4 text-stone-900">
+                          <div className="font-semibold">{particular || s.det}</div>
+                          {s.notes && (
+                            <div className="text-[11px] text-stone-500 italic mt-0.5">{s.notes}</div>
+                          )}
+                        </td>
+                        <td className="py-3 px-4 text-stone-800 font-medium">
+                          {vendor || <span className="text-stone-400 italic">—</span>}
+                          {s.date && (
+                            <div className="text-[10px] text-stone-400 font-mono mt-0.5">Date: {fmtDate(s.date)}</div>
+                          )}
+                        </td>
+                        <td className="py-3 px-4 font-mono text-right text-stone-600">
+                          ₹ {fmt(s.est)}
+                        </td>
+                        <td className="py-3 px-4 font-mono text-right font-bold text-emerald-700">
+                          ₹ {fmt(s.act)}
+                        </td>
+                        <td className="py-3 px-4 text-right whitespace-nowrap">
+                          {onPrintInvoice && (
+                            <button
+                              onClick={() => onPrintInvoice(s)}
+                              className="bg-stone-100 hover:bg-stone-200 text-stone-800 text-xs font-medium px-2.5 py-1 rounded inline-flex items-center gap-1 transition-colors cursor-pointer"
+                              title="Print Invoice"
+                            >
+                              <Printer className="w-3 h-3 text-[#991B1B]" />
+                              <span>Invoice</span>
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+              {commercialStalls.length > 0 && (
+                <tfoot>
+                  <tr className="bg-amber-50/50 border-t-2 border-amber-300 font-bold text-xs text-stone-900">
+                    <td colSpan={3} className="py-3 px-4 uppercase tracking-wider text-[#991B1B]">
+                      Total Education Fest
+                    </td>
+                    <td className="py-3 px-4 font-mono text-right text-stone-700">
+                      ₹ {fmt(csEst)}
+                    </td>
+                    <td className="py-3 px-4 font-mono text-right text-sm font-bold text-emerald-700">
+                      ₹ {fmt(csAct)}
+                    </td>
+                    <td></td>
+                  </tr>
+                </tfoot>
+              )}
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

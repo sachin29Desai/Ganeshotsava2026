@@ -58,11 +58,13 @@
     },
     "CommercialStall": {
       "title": "CommercialStall",
-      "description": "Commercial stall and kiosk vendor bookings",
+      "description": "Commercial stall, education fest, and kiosk vendor bookings",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
         "invNo": { "type": "string" },
+        "particular": { "type": "string" },
+        "vendor": { "type": "string" },
         "det": { "type": "string" },
         "est": { "type": "number" },
         "act": { "type": "number" },
@@ -70,7 +72,7 @@
         "notes": { "type": "string" },
         "updatedAt": { "type": "string" }
       },
-      "required": ["id", "invNo", "det", "act"]
+      "required": ["id", "invNo", "act"]
     },
     "SevaBooking": {
       "title": "SevaBooking",

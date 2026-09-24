@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   AlertTriangle,
   Download,
@@ -10,10 +10,14 @@ import {
   CheckCircle2,
   KeyRound,
   ShieldCheck,
-  Share2
+  Share2,
+  Users,
+  Sparkles,
+  Sliders
 } from 'lucide-react';
 import { AppSettings } from '../types';
 import { sha256 } from '../utils/helpers';
+import { RegisteredUsersManagement } from './RegisteredUsersManagement';
 
 interface SettingsViewProps {
   settings: AppSettings;
@@ -22,6 +26,9 @@ interface SettingsViewProps {
   onExportExcel: () => void;
   onSaveHTML: () => void;
   onClearAllData: () => void;
+  onOpenAdminManagement?: () => void;
+  defaultSubTab?: 'general' | 'users';
+  currentAdminEmail?: string;
 }
 
 export const SettingsView: React.FC<SettingsViewProps> = ({
@@ -30,8 +37,19 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   onSaveSettings,
   onExportExcel,
   onSaveHTML,
-  onClearAllData
+  onClearAllData,
+  onOpenAdminManagement,
+  defaultSubTab = 'general',
+  currentAdminEmail
 }) => {
+  const [activeSettingsTab, setActiveSettingsTab] = useState<'general' | 'users'>(defaultSubTab);
+
+  useEffect(() => {
+    if (defaultSubTab) {
+      setActiveSettingsTab(defaultSubTab);
+    }
+  }, [defaultSubTab]);
+
   const [copiedRoleInfo, setCopiedRoleInfo] = useState(false);
   const [activePasswordTab, setActivePasswordTab] = useState<'admin' | 'sponsor' | 'volunteer'>('admin');
 
@@ -117,13 +135,75 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
   return (
     <div className="space-y-6 pb-8">
-      {/* Feedback Toast */}
-      {feedbackMessage && (
-        <div className="bg-emerald-50 border border-emerald-300 text-emerald-900 rounded-xl p-3.5 text-xs font-semibold flex items-center gap-2 animate-in fade-in duration-200 shadow-sm">
-          <CheckCircle2 className="w-4 h-4 text-emerald-700 shrink-0" />
-          <span>{feedbackMessage}</span>
-        </div>
-      )}
+      {/* Sub-Navigation Tabs inside Settings: General Settings vs Registered Users */}
+      <div className="flex items-center gap-2 border-b border-stone-200 pb-3">
+        <button
+          type="button"
+          onClick={() => setActiveSettingsTab('general')}
+          className={`px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all inline-flex items-center gap-2 cursor-pointer shadow-xs ${
+            activeSettingsTab === 'general'
+              ? 'bg-[#991B1B] text-white shadow-xs'
+              : 'bg-white border border-stone-200 hover:bg-stone-50 text-stone-700'
+          }`}
+        >
+          <Sliders className="w-4 h-4" />
+          <span>General &amp; Event Settings</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveSettingsTab('users')}
+          className={`px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all inline-flex items-center gap-2 cursor-pointer shadow-xs ${
+            activeSettingsTab === 'users'
+              ? 'bg-[#991B1B] text-white shadow-xs'
+              : 'bg-white border border-stone-200 hover:bg-stone-50 text-stone-700'
+          }`}
+        >
+          <Users className="w-4 h-4 text-amber-500" />
+          <span>Registered Users &amp; Roles</span>
+        </button>
+      </div>
+
+      {activeSettingsTab === 'users' ? (
+        <RegisteredUsersManagement
+          settings={settings}
+          onSaveSettings={onSaveSettings}
+          currentAdminEmail={currentAdminEmail}
+        />
+      ) : (
+        <>
+          {/* Feedback Toast */}
+          {feedbackMessage && (
+            <div className="bg-emerald-50 border border-emerald-300 text-emerald-900 rounded-xl p-3.5 text-xs font-semibold flex items-center gap-2 animate-in fade-in duration-200 shadow-sm">
+              <CheckCircle2 className="w-4 h-4 text-emerald-700 shrink-0" />
+              <span>{feedbackMessage}</span>
+            </div>
+          )}
+
+          {/* Devotees & Roles Management Card */}
+          <div className="bg-white border-2 border-amber-400 rounded-xl p-5 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="p-1.5 rounded-lg bg-red-100 text-[#991B1B]">
+                  <ShieldCheck className="w-5 h-5" />
+                </span>
+                <h2 className="text-base font-serif font-bold text-[#1A1A1A]">
+                  Registered Devotee Roles &amp; Permissions
+                </h2>
+              </div>
+              <p className="text-xs text-stone-600 mt-1">
+                Global Admin: <span className="font-mono font-bold text-stone-900">desaisachin95@gmail.com</span>. Manage registered devotee accounts, photos, and grant <strong>Admin</strong> (all rights), <strong>Member</strong> (read-only complete data), or <strong>Viewer</strong> (limited statement &amp; payments).
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActiveSettingsTab('users')}
+              className="bg-[#991B1B] hover:bg-[#7F1D1D] text-white font-bold text-xs uppercase tracking-wider px-4 py-2.5 rounded-xl shadow-xs transition-colors inline-flex items-center gap-2 cursor-pointer shrink-0"
+            >
+              <Users className="w-4 h-4 text-amber-300" />
+              <span>Open Registered Users Tab</span>
+            </button>
+          </div>
 
       {/* Organization Settings */}
       <div className="bg-white border border-stone-200 rounded-xl p-6 shadow-sm">
@@ -518,6 +598,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           </button>
         </div>
       </div>
+        </>
+      )}
     </div>
   );
 };

@@ -19,9 +19,14 @@ import {
   Crown,
   Briefcase,
   Users2,
+  Users,
+  Eye,
+  ShieldCheck,
   Home,
   Loader2,
-  Mail
+  Mail,
+  Video,
+  X
 } from 'lucide-react';
 import {
   Expense,
@@ -85,7 +90,8 @@ import {
   signInWithEmailLink,
   getAdditionalUserInfo,
   cloudGetUserProfile,
-  cloudSaveUserProfile
+  cloudSaveUserProfile,
+  cloudGetAllUserProfiles
 } from './lib/firebase';
 
 import { StatementView } from './components/StatementView';
@@ -105,6 +111,9 @@ import { CommunityHomeView } from './components/CommunityHomeView';
 import { PublicSevaPortal } from './components/PublicSevaPortal';
 import { AdminGateForBalaga } from './components/AdminGateForBalaga';
 import { AdminAccessGate } from './components/AdminAccessGate';
+import { AdminManagementModal } from './components/AdminManagementModal';
+import { RequestDetailsModal } from './components/RequestDetailsModal';
+import { GaneshaFestivalVideoShowcase } from './components/GaneshaFestivalVideoShowcase';
 import {
   getReceiptDocumentTitle,
   getReceiptPdfFilename,
@@ -291,25 +300,20 @@ export function App() {
   }, []);
 
   // --- Committee Authentication & Multi-Role Access Control (3-Tiers) ---
-  // Tier 1: Admin - Super User, all access to view & modify data, settings, export, sync
-  // Tier 2: Sponsor - Read-only access to view all data (cannot modify)
-  // Tier 3: Volunteer - Read-only access, restricted from Sponsorship & Commercial Stalls tabs
+  // Tier 1: Admin ('admin') - Super User, all access to view & modify data, settings, export, sync
+  // desaisachin95@gmail.com is permanently guaranteed Super Admin status
+  // Tier 2: Read-Only Complete Data ('read_only') - Can view complete data across all tabs (cannot modify)
+  // Tier 3: Unassigned / Basic ('unassigned') - Can ONLY see Income & Expenditure Statement and Expenditure(payments) with high-level details only
   const [userRole, setUserRole] = useState<UserRole | null>(() => {
     if (typeof window === 'undefined') return null;
     const auth = sessionStorage.getItem('eg_committee_auth') === 'true';
     if (!auth) return null;
     const r = sessionStorage.getItem('eg_user_role') as UserRole;
-    return r || 'admin';
+    return r || 'unassigned';
   });
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
     return sessionStorage.getItem('eg_committee_auth') === 'true';
-  });
-  const [isAdmin, setIsAdmin] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return false;
-    const auth = sessionStorage.getItem('eg_committee_auth') === 'true';
-    const r = sessionStorage.getItem('eg_user_role');
-    return auth && (r === 'admin' || !r);
   });
   const [userProfile, setUserProfile] = useState<UserProfile | null>(() => {
     if (typeof window === 'undefined') return null;
@@ -322,6 +326,48 @@ export function App() {
     return null;
   });
 
+  const getAdminEmailList = (): string[] => {
+    const list = new Set<string>([
+      'desaisachin95@gmail.com',
+      'kannadigara.balaga.eldorado@gmail.com'
+    ]);
+    if (settings.adminEmails && Array.isArray(settings.adminEmails)) {
+      settings.adminEmails.forEach(e => list.add(e.toLowerCase().trim()));
+    }
+    try {
+      const saved = localStorage.getItem('ekb_allowed_emails');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          parsed.forEach(e => list.add(e.toLowerCase().trim()));
+        }
+      }
+    } catch {}
+    return Array.from(list);
+  };
+
+  const currentEmail = (userProfile?.email || sessionStorage.getItem('eg_user_email') || '').toLowerCase().trim();
+  const isGlobalAdminEmail = currentEmail === 'desaisachin95@gmail.com' || currentEmail === 'kannadigara.balaga.eldorado@gmail.com';
+  const adminEmailList = getAdminEmailList().map(e => e.toLowerCase());
+
+  // 1. Admin (Full access: create, modify, delete, export, settings, manage roles)
+  const isAdmin = isAuthenticated && (isGlobalAdminEmail || adminEmailList.includes(currentEmail) || userRole === 'admin');
+  // 2. Member (Read-Only Complete Data: can view all records across all modules, cannot create/edit/delete)
+  const isMember = isAuthenticated && !isAdmin && (userRole === 'member' || userRole === 'read_only' || userRole === 'sponsor');
+  // 3. Viewer (Only Income & Expenditure Statement and Expenditure payments with high-level details only)
+  const isViewer = isAuthenticated && !isAdmin && !isMember;
+
+  // Backward compatibility aliases
+  const isReadOnly = isMember;
+  const isUnassigned = isViewer;
+
+  const [settingsSubTab, setSettingsSubTab] = useState<'general' | 'users'>('general');
+
+  // Modals state
+  const [adminManagementModalOpen, setAdminManagementModalOpen] = useState(false);
+  const [requestDetailsModalOpen, setRequestDetailsModalOpen] = useState(false);
+  const [darshanVideoModalOpen, setDarshanVideoModalOpen] = useState(false);
+
   // --- Passwordless Email Magic Link State ---
   const [isVerifyingMagicLink, setIsVerifyingMagicLink] = useState(false);
   const [magicLinkError, setMagicLinkError] = useState<string | null>(null);
@@ -332,26 +378,21 @@ export function App() {
     name?: string;
   } | null>(null);
 
-  // Guard restricted tabs for Non-Admins (Non-admins can only access statement, expenditure, donations, and read-only sevas)
+  // Guard restricted tabs based on 3-tier roles:
+  // Viewer: only 'statement' and 'expenditure'
+  // Member: 'statement', 'income', and 'expenditure'
+  // Admin: all tabs
   useEffect(() => {
-    if (!isAdmin) {
-      if (
-        activeIncomeSubTab === 'sponsorship' ||
-        activeIncomeSubTab === 'stalls' ||
-        activeIncomeSubTab === 'hundi' ||
-        activeIncomeSubTab === 'auctions'
-      ) {
-        setActiveIncomeSubTab('donations');
+    if (isViewer) {
+      if (activeTab !== 'statement' && activeTab !== 'expenditure') {
+        setActiveTab('statement');
+      }
+    } else if (isMember) {
+      if (activeTab === 'settings') {
+        setActiveTab('statement');
       }
     }
-  }, [userRole, isAdmin, activeIncomeSubTab]);
-
-  // Guard settings for Non-Admins
-  useEffect(() => {
-    if (!isAdmin && activeTab === 'settings') {
-      setActiveTab('statement');
-    }
-  }, [isAdmin, activeTab]);
+  }, [isViewer, isMember, activeTab]);
   const [viewOnly, setViewOnly] = useState(false);
   const [activeFileHandle, setActiveFileHandle] = useState<FileSystemFileHandle | null>(null);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'unsaved' | null>(null);
@@ -857,37 +898,34 @@ export function App() {
   };
 
   // Committee Login Success handler
-  const handleLoginSuccess = (role: UserRole = 'admin', profile?: UserProfile) => {
-    sessionStorage.setItem('eg_committee_auth', 'true');
-    sessionStorage.setItem('eg_user_role', role);
-    if (profile) {
-      sessionStorage.setItem('eg_user_profile', JSON.stringify(profile));
-      sessionStorage.setItem('eg_user_email', profile.email);
-      setUserProfile(profile);
+  const handleLoginSuccess = (role: UserRole = 'viewer', profile?: UserProfile) => {
+    const adminEmails = getAdminEmailList().map(e => e.toLowerCase());
+    const email = (profile?.email || sessionStorage.getItem('eg_user_email') || '').toLowerCase().trim();
+    let effectiveRole: UserRole = 'viewer';
+    if (email === 'desaisachin95@gmail.com' || adminEmails.includes(email) || role === 'admin' || profile?.role === 'admin') {
+      effectiveRole = 'admin';
+    } else if (
+      profile?.role === 'member' ||
+      profile?.role === 'read_only' ||
+      role === 'member' ||
+      role === 'read_only' ||
+      role === 'sponsor' ||
+      profile?.role === 'sponsor'
+    ) {
+      effectiveRole = 'member';
+    } else {
+      effectiveRole = 'viewer';
     }
-    setUserRole(role);
-    setIsAuthenticated(true);
-    setIsAdmin(role === 'admin');
-  };
 
-  const getAdminEmailList = (): string[] => {
-    const list = new Set<string>([
-      'desaisachin95@gmail.com',
-      'kannadigara.balaga.eldorado@gmail.com'
-    ]);
-    if (settings.adminEmails && Array.isArray(settings.adminEmails)) {
-      settings.adminEmails.forEach(e => list.add(e.toLowerCase().trim()));
+    sessionStorage.setItem('eg_committee_auth', 'true');
+    sessionStorage.setItem('eg_user_role', effectiveRole);
+    if (profile) {
+      sessionStorage.setItem('eg_user_profile', JSON.stringify({ ...profile, role: effectiveRole }));
+      sessionStorage.setItem('eg_user_email', profile.email);
+      setUserProfile({ ...profile, role: effectiveRole });
     }
-    try {
-      const saved = localStorage.getItem('ekb_allowed_emails');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          parsed.forEach(e => list.add(e.toLowerCase().trim()));
-        }
-      }
-    } catch {}
-    return Array.from(list);
+    setUserRole(effectiveRole);
+    setIsAuthenticated(true);
   };
 
   // --- Process Passwordless Email Magic Link Sign-In ---
@@ -897,41 +935,89 @@ export function App() {
     setMagicLinkError(null);
     try {
       const cleanEmail = emailToUse.toLowerCase().trim();
-      const result = await signInWithEmailLink(auth, cleanEmail, window.location.href);
+      let verifiedEmail = cleanEmail;
 
-      // Clean up localStorage and remove query parameters from URL without reloading
+      if (isSignInWithEmailLink(auth, window.location.href)) {
+        try {
+          const result = await signInWithEmailLink(auth, cleanEmail, window.location.href);
+          verifiedEmail = (result.user.email || cleanEmail).toLowerCase().trim();
+        } catch (authErr: any) {
+          console.warn('signInWithEmailLink notice:', authErr);
+        }
+      }
+
+      // Clean up localStorage and remove query parameters from URL cleanly
       window.localStorage.removeItem('emailForSignIn');
       window.history.replaceState({}, document.title, window.location.pathname);
-
-      // Inspect whether this is a new user
-      const additionalInfo = getAdditionalUserInfo(result);
-      const isNewUserFromAuth = !!additionalInfo?.isNewUser;
-      const verifiedEmail = (result.user.email || cleanEmail).toLowerCase().trim();
 
       // Check whether user profile already exists in Firestore database
       const existingProfile = await cloudGetUserProfile(verifiedEmail);
 
-      if (isNewUserFromAuth || !existingProfile) {
-        // FIRST-TIME USER: Route to onboarding form to collect resident details
+      const adminEmails = getAdminEmailList().map(e => e.toLowerCase());
+      const isSuperAdmin = verifiedEmail === 'desaisachin95@gmail.com' || adminEmails.includes(verifiedEmail);
+
+      if (existingProfile) {
+        // RETURNING REGISTERED USER:
+        // AUTOMATIC LOGIN WITHOUT ASKING OR CONFIRMING EMAIL
         setPromptEmailForMagicLink(false);
-        setFirstTimeOnboardingUser({
-          email: verifiedEmail,
-          name: result.user.displayName || ''
-        });
-      } else {
-        // RETURNING USER: Bypass onboarding form and instantly log into dashboard
-        setPromptEmailForMagicLink(false);
-        const adminEmails = getAdminEmailList();
-        const role: UserRole = existingProfile.role || (adminEmails.includes(verifiedEmail) ? 'admin' : 'resident');
+        let role: UserRole = 'viewer';
+        if (isSuperAdmin || existingProfile.role === 'admin') {
+          role = 'admin';
+        } else if (
+          existingProfile.role === 'member' ||
+          existingProfile.role === 'read_only' ||
+          existingProfile.role === 'sponsor'
+        ) {
+          role = 'member';
+        } else {
+          role = 'viewer';
+        }
+
         handleLoginSuccess(role, existingProfile);
         setSyncToast({
-          message: `Welcome back, ${existingProfile.name}! Logged in successfully.`,
+          message: `Welcome back, ${existingProfile.name}! Logged in automatically.`,
           type: 'success'
         });
         setTimeout(() => setSyncToast(null), 3500);
+      } else if (isSuperAdmin) {
+        // Global admin logging in
+        setPromptEmailForMagicLink(false);
+        const adminProfile: UserProfile = {
+          email: verifiedEmail,
+          name: 'Sachin Desai (Admin)',
+          flat: 'Admin Desk',
+          mobile: '',
+          role: 'admin',
+          createdAt: new Date().toISOString()
+        };
+        await cloudSaveUserProfile(adminProfile);
+        handleLoginSuccess('admin', adminProfile);
+      } else {
+        // UNREGISTERED FIRST-TIME USER: Route to onboarding modal to record name, flat, mobile & picture
+        setPromptEmailForMagicLink(false);
+        setFirstTimeOnboardingUser({
+          email: verifiedEmail,
+          name: ''
+        });
       }
     } catch (err: any) {
       console.error('Error during signInWithEmailLink:', err);
+      // Fallback: If user is already registered in database, log them in!
+      const cleanEmail = emailToUse.toLowerCase().trim();
+      const existingProfile = await cloudGetUserProfile(cleanEmail);
+      if (existingProfile) {
+        const adminEmails = getAdminEmailList().map(e => e.toLowerCase());
+        const isSuperAdmin = cleanEmail === 'desaisachin95@gmail.com' || adminEmails.includes(cleanEmail);
+        const role: UserRole = isSuperAdmin ? 'admin' : (existingProfile.role || 'viewer');
+        handleLoginSuccess(role, existingProfile);
+        setPromptEmailForMagicLink(false);
+        setSyncToast({
+          message: `Welcome back, ${existingProfile.name}! Logged in automatically.`,
+          type: 'success'
+        });
+        setTimeout(() => setSyncToast(null), 3500);
+        return;
+      }
       setMagicLinkError(err?.message || 'Failed to complete magic link sign-in. The link may have expired or was already used.');
     } finally {
       setIsVerifyingMagicLink(false);
@@ -942,13 +1028,31 @@ export function App() {
   useEffect(() => {
     if (!auth) return;
     try {
-      if (isSignInWithEmailLink(auth, window.location.href)) {
-        const savedEmail = window.localStorage.getItem('emailForSignIn');
-        if (!savedEmail) {
-          // If link was opened on a different browser or device, prompt user for confirmation
-          setPromptEmailForMagicLink(true);
-        } else {
+      const url = new URL(window.location.href);
+      const isEmailLink = isSignInWithEmailLink(auth, window.location.href);
+      const emailFromUrl = url.searchParams.get('email');
+      const otpFromUrl = url.searchParams.get('otp');
+
+      if (isEmailLink || (emailFromUrl && otpFromUrl)) {
+        const savedEmail = (
+          emailFromUrl ||
+          window.localStorage.getItem('emailForSignIn') ||
+          sessionStorage.getItem('eg_user_email') ||
+          ''
+        ).toLowerCase().trim();
+
+        if (savedEmail) {
           processEmailMagicLink(savedEmail);
+        } else {
+          cloudGetAllUserProfiles().then(profiles => {
+            if (profiles.length === 1) {
+              processEmailMagicLink(profiles[0].email);
+            } else {
+              setPromptEmailForMagicLink(true);
+            }
+          }).catch(() => {
+            setPromptEmailForMagicLink(true);
+          });
         }
       }
     } catch (err) {
@@ -975,7 +1079,6 @@ export function App() {
     setUserProfile(null);
     setUserRole(null);
     setIsAuthenticated(false);
-    setIsAdmin(false);
     setActiveTab('statement');
     setActiveIncomeSubTab('donations');
   };
@@ -1414,7 +1517,6 @@ export function App() {
           currentRole={userRole}
           onSuccess={() => {
             setIsAuthenticated(true);
-            setIsAdmin(true);
             setUserRole('admin');
             sessionStorage.setItem('eg_committee_auth', 'true');
             sessionStorage.setItem('eg_user_role', 'admin');
@@ -1451,7 +1553,6 @@ export function App() {
           currentRole={userRole}
           onSuccess={() => {
             setIsAuthenticated(true);
-            setIsAdmin(true);
             setUserRole('admin');
             sessionStorage.setItem('eg_committee_auth', 'true');
             sessionStorage.setItem('eg_user_role', 'admin');
@@ -1475,7 +1576,6 @@ export function App() {
         onNavigateToReceipts={navigateToReceipts}
         onAdminLoginSuccess={() => {
           setIsAuthenticated(true);
-          setIsAdmin(true);
           setUserRole('admin');
           sessionStorage.setItem('eg_committee_auth', 'true');
           sessionStorage.setItem('eg_user_role', 'admin');
@@ -1494,7 +1594,6 @@ export function App() {
           settings={settings}
           onSuccess={() => {
             setIsAuthenticated(true);
-            setIsAdmin(true);
             setUserRole('admin');
             sessionStorage.setItem('eg_committee_auth', 'true');
             sessionStorage.setItem('eg_user_role', 'admin');
@@ -1524,10 +1623,10 @@ export function App() {
             <Loader2 className="w-8 h-8 animate-spin text-[#991B1B]" />
           </div>
           <h2 className="text-xl font-serif font-black text-stone-900">
-            Verifying Magic Sign-In Link...
+            Verifying Email Sign-In Link...
           </h2>
           <p className="text-sm text-stone-600">
-            Authenticating your passwordless email link with Firebase. Please wait a moment.
+            Authenticating your passwordless email verification link. Please wait a moment.
           </p>
         </div>
       </div>
@@ -1611,7 +1710,7 @@ export function App() {
         settings={settings}
         onComplete={(newProfile) => {
           const adminEmails = getAdminEmailList();
-          const role: UserRole = newProfile.role || (adminEmails.includes(newProfile.email.toLowerCase()) ? 'admin' : 'resident');
+          const role: UserRole = newProfile.role || (adminEmails.includes(newProfile.email.toLowerCase()) ? 'admin' : 'unassigned');
           handleLoginSuccess(role, newProfile);
           setFirstTimeOnboardingUser(null);
           setSyncToast({
@@ -1671,22 +1770,21 @@ export function App() {
                 <span className="hidden sm:inline-block bg-amber-400 text-stone-900 text-[10px] font-bold px-1.5 py-0.5 rounded tracking-wider uppercase">
                   3rd Year
                 </span>
-                {userRole === 'admin' && (
+                {isAdmin && (
                   <span className="bg-amber-300 text-[#7F1D1D] text-[10px] font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-1 uppercase tracking-wider shadow-2xs">
                     <Crown className="w-3 h-3 text-[#991B1B]" />
                     <span>Super Admin</span>
                   </span>
                 )}
-                {userRole === 'sponsor' && (
-                  <span className="bg-amber-200 text-amber-950 text-[10px] font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-1 uppercase tracking-wider shadow-2xs">
-                    <Briefcase className="w-3 h-3 text-amber-800" />
-                    <span>Sponsors (View Only)</span>
+                {isReadOnly && (
+                  <span className="bg-blue-100 text-blue-900 text-[10px] font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-1 uppercase tracking-wider shadow-2xs">
+                    <Eye className="w-3 h-3 text-blue-700" />
+                    <span>Read-Only (Complete Data)</span>
                   </span>
                 )}
-                {userRole === 'volunteer' && (
-                  <span className="bg-stone-200 text-stone-900 text-[10px] font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-1 uppercase tracking-wider shadow-2xs">
-                    <Users2 className="w-3 h-3 text-stone-700" />
-                    <span>Volunteers (Restricted)</span>
+                {isUnassigned && (
+                  <span className="bg-stone-200 text-stone-900 text-[10px] font-medium px-2 py-0.5 rounded-full inline-flex items-center gap-1 tracking-wider shadow-2xs">
+                    <span>Summary View</span>
                   </span>
                 )}
               </div>
@@ -1698,111 +1796,261 @@ export function App() {
 
           {/* Action Bar */}
           <div className="flex items-center gap-2 flex-wrap text-xs">
-            {/* Manual Live Cloud Refresh Button */}
-            <button
-              onClick={() => triggerLiveServerSync(true)}
-              disabled={isRefreshing || isSaving}
-              className="px-2.5 py-1 rounded-full font-bold uppercase tracking-wider inline-flex items-center gap-1.5 transition-colors cursor-pointer text-[11px] bg-white/10 text-amber-200 hover:text-white hover:bg-white/20 border border-white/20 shadow-xs disabled:opacity-50"
-              title="Refresh Data"
-            >
-              <RefreshCw className={`w-3 h-3 ${isRefreshing ? 'animate-spin text-amber-300' : ''}`} />
-              <span>{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
-            </button>
+            {/* 1. UNASSIGNED / BASIC USERS: STRICTLY ONLY CONTACT US + LOGOUT */}
+            {isUnassigned ? (
+              <>
+                {/* Watch Festival Video & Darshan Button */}
+                <button
+                  onClick={() => setDarshanVideoModalOpen(true)}
+                  className="px-2.5 py-1 rounded-full font-bold uppercase tracking-wider inline-flex items-center gap-1.5 transition-all cursor-pointer text-[11px] bg-gradient-to-r from-amber-400 to-amber-500 text-stone-950 hover:brightness-110 shadow-xs"
+                  title="Watch Sri Ganeshotsava 2026 Festival Darshan Video"
+                >
+                  <Video className="w-3.5 h-3.5 text-[#991B1B]" />
+                  <span>Festival Video</span>
+                </button>
 
-            {/* Offline Cache Mode Indicator */}
-            {syncStatus === 'quota-limited' && (
-              <span
-                className="px-2.5 py-1 rounded-full font-bold uppercase tracking-wider inline-flex items-center gap-1.5 text-[11px] bg-amber-400/20 text-amber-200 border border-amber-300/40 shadow-xs"
-                title="Daily Firestore read limit reached. Seamlessly running in resilient offline cache mode."
-              >
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-                <span>Offline Cache Mode</span>
-              </span>
+                {/* Button to request details on detailed data */}
+                <button
+                  onClick={() => setRequestDetailsModalOpen(true)}
+                  className="px-3 py-1.5 rounded-full font-bold uppercase tracking-wider inline-flex items-center gap-1.5 transition-all cursor-pointer text-[11px] bg-amber-400 text-stone-950 hover:bg-amber-300 shadow-sm"
+                  title="Request access to detailed data or contact the committee"
+                >
+                  <PhoneCall className="w-3.5 h-3.5 text-[#991B1B]" />
+                  <span>Contact Us for Details</span>
+                </button>
+
+                {/* Devotee Profile Badge with Photo */}
+                {userProfile && (
+                  <div
+                    className="px-2.5 py-1 rounded-full text-[11px] bg-white/15 text-white border border-white/20 inline-flex items-center gap-1.5 shadow-xs"
+                    title={`Signed in as ${userProfile.name} (Flat: ${userProfile.flat}, Mobile: ${userProfile.mobile}, Email: ${userProfile.email})`}
+                  >
+                    {userProfile.photoUrl ? (
+                      <img
+                        src={userProfile.photoUrl}
+                        alt={userProfile.name}
+                        className="w-4 h-4 rounded-full object-cover border border-amber-300 shrink-0"
+                      />
+                    ) : (
+                      <div className="w-4 h-4 rounded-full bg-amber-400 text-stone-900 flex items-center justify-center font-bold text-[9px] shrink-0">
+                        {(userProfile.name || 'U').charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                    <span className="font-bold max-w-[120px] truncate hidden sm:inline">
+                      {userProfile.name}
+                    </span>
+                    {userProfile.flat && (
+                      <span className="text-[10px] text-amber-200 font-mono hidden md:inline">
+                        [{userProfile.flat}]
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {/* Only Logout option seen by basic unassigned users */}
+                <button
+                  onClick={handleLogout}
+                  className="px-3 py-1 rounded-full font-bold uppercase tracking-wider inline-flex items-center gap-1.5 transition-colors cursor-pointer text-[11px] bg-white/10 text-white hover:bg-white/20 border border-white/20 shadow-xs active:scale-95"
+                  title="Sign out of portal"
+                >
+                  <LogOut className="w-3 h-3" />
+                  <span>Logout</span>
+                </button>
+              </>
+            ) : isReadOnly ? (
+              /* 2. READ-ONLY COMPLETE USERS */
+              <>
+                <button
+                  onClick={() => triggerLiveServerSync(true)}
+                  disabled={isRefreshing}
+                  className="px-2.5 py-1 rounded-full font-bold uppercase tracking-wider inline-flex items-center gap-1.5 transition-colors cursor-pointer text-[11px] bg-white/10 text-amber-200 hover:text-white hover:bg-white/20 border border-white/20 shadow-xs disabled:opacity-50"
+                  title="Refresh Data"
+                >
+                  <RefreshCw className={`w-3 h-3 ${isRefreshing ? 'animate-spin text-amber-300' : ''}`} />
+                  <span>{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
+                </button>
+
+                {/* Watch Festival Video & Darshan Button */}
+                <button
+                  onClick={() => setDarshanVideoModalOpen(true)}
+                  className="px-2.5 py-1 rounded-full font-bold uppercase tracking-wider inline-flex items-center gap-1.5 transition-all cursor-pointer text-[11px] bg-gradient-to-r from-amber-400 to-amber-500 text-stone-950 hover:brightness-110 shadow-xs"
+                  title="Watch Sri Ganeshotsava 2026 Festival Darshan Video"
+                >
+                  <Video className="w-3.5 h-3.5 text-[#991B1B]" />
+                  <span>Festival Video</span>
+                </button>
+
+                <button
+                  onClick={() => setRequestDetailsModalOpen(true)}
+                  className="px-2.5 py-1 rounded-full font-bold uppercase tracking-wider inline-flex items-center gap-1.5 transition-all cursor-pointer text-[11px] bg-white/10 text-amber-200 hover:bg-white/20 border border-white/20 shadow-xs"
+                  title="Contact festival coordinators"
+                >
+                  <PhoneCall className="w-3 h-3 text-amber-300" />
+                  <span>Contact Us</span>
+                </button>
+
+                {/* User Profile Badge with Photo */}
+                {userProfile && (
+                  <div
+                    className="px-2.5 py-1 rounded-full text-[11px] bg-white/15 text-white border border-white/20 inline-flex items-center gap-1.5 shadow-xs"
+                    title={`Signed in as ${userProfile.name} (Flat: ${userProfile.flat}, Mobile: ${userProfile.mobile}, Email: ${userProfile.email})`}
+                  >
+                    {userProfile.photoUrl ? (
+                      <img
+                        src={userProfile.photoUrl}
+                        alt={userProfile.name}
+                        className="w-4 h-4 rounded-full object-cover border border-amber-300 shrink-0"
+                      />
+                    ) : (
+                      <div className="w-4 h-4 rounded-full bg-amber-400 text-stone-900 flex items-center justify-center font-bold text-[9px] shrink-0">
+                        {(userProfile.name || 'U').charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                    <span className="font-bold max-w-[120px] truncate hidden sm:inline">
+                      {userProfile.name}
+                    </span>
+                    {userProfile.flat && (
+                      <span className="text-[10px] text-amber-200 font-mono hidden md:inline">
+                        [{userProfile.flat}]
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {/* Logout Button */}
+                <button
+                  onClick={handleLogout}
+                  className="px-2.5 py-1 rounded-full font-bold uppercase tracking-wider inline-flex items-center gap-1.5 transition-colors cursor-pointer text-[11px] bg-white/10 text-white hover:bg-white/20 border border-white/20 shadow-xs active:scale-95"
+                  title="Sign out of portal"
+                >
+                  <LogOut className="w-3 h-3" />
+                  <span>Logout</span>
+                </button>
+              </>
+            ) : (
+              /* 3. ADMIN: FULL CONTROLS & MANAGEMENT */
+              <>
+                {/* Manual Live Cloud Refresh Button */}
+                <button
+                  onClick={() => triggerLiveServerSync(true)}
+                  disabled={isRefreshing || isSaving}
+                  className="px-2.5 py-1 rounded-full font-bold uppercase tracking-wider inline-flex items-center gap-1.5 transition-colors cursor-pointer text-[11px] bg-white/10 text-amber-200 hover:text-white hover:bg-white/20 border border-white/20 shadow-xs disabled:opacity-50"
+                  title="Refresh Data"
+                >
+                  <RefreshCw className={`w-3 h-3 ${isRefreshing ? 'animate-spin text-amber-300' : ''}`} />
+                  <span>{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
+                </button>
+
+                {/* Save Button (Admin Only) */}
+                <button
+                  onClick={handleSaveAllToCloud}
+                  disabled={isSaving || isRefreshing}
+                  className={`px-3 py-1 rounded-full font-bold uppercase tracking-wider inline-flex items-center gap-1.5 transition-all cursor-pointer text-[11px] shadow-xs ${
+                    hasUnsavedChanges
+                      ? 'bg-emerald-600 hover:bg-emerald-500 text-white ring-2 ring-emerald-300 ring-offset-1 ring-offset-[#991B1B]'
+                      : 'bg-white/10 text-white/90 hover:bg-white/20 border border-white/20'
+                  } disabled:opacity-50`}
+                  title={hasUnsavedChanges ? 'Unsaved changes! Click to save modified data' : 'Save data'}
+                >
+                  <Save className={`w-3 h-3 ${isSaving ? 'animate-bounce' : ''}`} />
+                  <span>{isSaving ? 'Saving...' : hasUnsavedChanges ? 'Save *' : 'Save'}</span>
+                </button>
+
+                {/* Manage Devotee Roles Button (Admin Only) */}
+                <button
+                  onClick={() => {
+                    setActiveTab('settings');
+                    setSettingsSubTab('users');
+                  }}
+                  className="px-2.5 py-1 rounded-full font-bold uppercase tracking-wider inline-flex items-center gap-1.5 transition-colors cursor-pointer text-[11px] bg-amber-400 text-stone-950 hover:bg-amber-300 shadow-xs"
+                  title="Manage Devotee Roles: Assign Admin, Member, or Viewer permissions"
+                >
+                  <Users className="w-3 h-3 text-[#991B1B]" />
+                  <span>Registered Users</span>
+                </button>
+
+                {/* Watch Festival Video & Darshan Button */}
+                <button
+                  onClick={() => setDarshanVideoModalOpen(true)}
+                  className="px-2.5 py-1 rounded-full font-bold uppercase tracking-wider inline-flex items-center gap-1.5 transition-all cursor-pointer text-[11px] bg-gradient-to-r from-amber-400 to-amber-500 text-stone-950 hover:brightness-110 shadow-xs"
+                  title="Watch Sri Ganeshotsava 2026 Festival Darshan Video"
+                >
+                  <Video className="w-3.5 h-3.5 text-[#991B1B]" />
+                  <span>Festival Video</span>
+                </button>
+
+                {/* Eldorado Kannadigara Balaga Page */}
+                <button
+                  onClick={navigateToBalagaInDev}
+                  className="px-2.5 py-1 rounded-full font-bold uppercase tracking-wider inline-flex items-center gap-1.5 transition-colors cursor-pointer text-[11px] bg-white/10 text-white hover:bg-white/20 border border-white/20 shadow-xs"
+                  title="Open Eldorado Kannadigara Balaga Page (/homepageindevelop - Admin Only)"
+                >
+                  <Sparkles className="w-3 h-3 text-amber-300" />
+                  <span className="hidden sm:inline">Balaga</span>
+                  <span className="text-[9px] bg-amber-400 text-stone-950 font-bold px-1 rounded">Admin</span>
+                </button>
+
+                {/* Devotee Sevas Booking Portal */}
+                <button
+                  onClick={navigateToSevas}
+                  className="px-2.5 py-1 rounded-full font-bold uppercase tracking-wider inline-flex items-center gap-1.5 transition-colors cursor-pointer text-[11px] bg-white/10 text-white hover:bg-white/20 border border-white/20 shadow-xs"
+                  title="Open Devotee Seva Booking Portal (/ganeshotsavasevas - Admin Only)"
+                >
+                  <Sparkles className="w-3 h-3 text-amber-300" />
+                  <span className="hidden sm:inline">Sevas</span>
+                  <span className="text-[9px] bg-amber-400 text-stone-950 font-bold px-1 rounded">Admin</span>
+                </button>
+
+                {/* Devotee Receipt Portal */}
+                <button
+                  onClick={navigateToReceipts}
+                  className="px-2.5 py-1 rounded-full font-bold uppercase tracking-wider inline-flex items-center gap-1.5 transition-colors cursor-pointer text-[11px] bg-white/10 text-white hover:bg-white/20 border border-white/20 shadow-xs"
+                  title="Open Devotee Receipt Portal (/receipts - Admin Only)"
+                >
+                  <FileText className="w-3 h-3 text-amber-300" />
+                  <span className="hidden sm:inline">Receipts</span>
+                  <span className="text-[9px] bg-amber-400 text-stone-950 font-bold px-1 rounded">Admin</span>
+                </button>
+
+                {/* User Profile Badge */}
+                {userProfile && (
+                  <div
+                    className="px-2.5 py-1 rounded-full text-[11px] bg-white/15 text-white border border-white/20 inline-flex items-center gap-1.5 shadow-xs"
+                    title={`Logged in as ${userProfile.name} (Flat: ${userProfile.flat}, Mobile: ${userProfile.mobile}, Email: ${userProfile.email})`}
+                  >
+                    {userProfile.photoUrl ? (
+                      <img
+                        src={userProfile.photoUrl}
+                        alt={userProfile.name}
+                        className="w-4 h-4 rounded-full object-cover border border-amber-300 shrink-0"
+                      />
+                    ) : (
+                      <div className="w-4 h-4 rounded-full bg-amber-400 text-stone-900 flex items-center justify-center font-bold text-[9px] shrink-0">
+                        {(userProfile.name || 'A').charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                    <span className="font-bold max-w-[120px] truncate hidden sm:inline">
+                      {userProfile.name}
+                    </span>
+                    {userProfile.flat && (
+                      <span className="text-[10px] text-amber-200 font-mono hidden md:inline">
+                        [{userProfile.flat}]
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {/* Signout Button */}
+                <button
+                  onClick={handleLogout}
+                  className="px-2.5 py-1 rounded-full font-bold uppercase tracking-wider inline-flex items-center gap-1.5 transition-colors cursor-pointer text-[11px] bg-white/10 text-white hover:bg-white/20 border border-white/20 shadow-xs active:scale-95"
+                  title="Sign out of management portal"
+                >
+                  <LogOut className="w-3 h-3" />
+                  <span>Signout</span>
+                </button>
+              </>
             )}
-
-            {/* Save Button (Admin Only) */}
-            {isAdmin && (
-              <button
-                onClick={handleSaveAllToCloud}
-                disabled={isSaving || isRefreshing}
-                className={`px-3 py-1 rounded-full font-bold uppercase tracking-wider inline-flex items-center gap-1.5 transition-all cursor-pointer text-[11px] shadow-xs ${
-                  hasUnsavedChanges
-                    ? 'bg-emerald-600 hover:bg-emerald-500 text-white ring-2 ring-emerald-300 ring-offset-1 ring-offset-[#991B1B]'
-                    : 'bg-white/10 text-white/90 hover:bg-white/20 border border-white/20'
-                } disabled:opacity-50`}
-                title={hasUnsavedChanges ? 'Unsaved changes! Click to save modified data' : 'Save data'}
-              >
-                <Save className={`w-3 h-3 ${isSaving ? 'animate-bounce' : ''}`} />
-                <span>{isSaving ? 'Saving...' : hasUnsavedChanges ? 'Save *' : 'Save'}</span>
-              </button>
-            )}
-
-            {/* Eldorado Kannadigara Balaga Page (In Dev - strictly Admin only) */}
-            {isAdmin && (
-              <button
-                onClick={navigateToBalagaInDev}
-                className="px-2.5 py-1 rounded-full font-bold uppercase tracking-wider inline-flex items-center gap-1.5 transition-colors cursor-pointer text-[11px] bg-white/10 text-white hover:bg-white/20 border border-white/20 shadow-xs"
-                title="Open Eldorado Kannadigara Balaga Page (/homepageindevelop - Admin Only)"
-              >
-                <Sparkles className="w-3 h-3 text-amber-300" />
-                <span className="hidden sm:inline">Balaga Page</span>
-                <span className="text-[9px] bg-amber-400 text-stone-950 font-bold px-1 rounded">Admin</span>
-              </button>
-            )}
-
-            {/* Direct Devotee Sevas Booking Portal Quick Switch (Admin Only) */}
-            {isAdmin && (
-              <button
-                onClick={navigateToSevas}
-                className="px-2.5 py-1 rounded-full font-bold uppercase tracking-wider inline-flex items-center gap-1.5 transition-colors cursor-pointer text-[11px] bg-white/10 text-white hover:bg-white/20 border border-white/20 shadow-xs"
-                title="Open Devotee Seva Booking Portal (/ganeshotsavasevas - Admin Only)"
-              >
-                <Sparkles className="w-3 h-3 text-amber-300" />
-                <span className="hidden sm:inline">Seva Portal</span>
-                <span className="text-[9px] bg-amber-400 text-stone-950 font-bold px-1 rounded">Admin</span>
-              </button>
-            )}
-
-            {/* Direct Devotee Receipt Portal Quick Switch (Admin Only) */}
-            {isAdmin && (
-              <button
-                onClick={navigateToReceipts}
-                className="px-2.5 py-1 rounded-full font-bold uppercase tracking-wider inline-flex items-center gap-1.5 transition-colors cursor-pointer text-[11px] bg-amber-400 text-stone-950 hover:bg-amber-300 shadow-xs"
-                title="Open Devotee Receipt Portal (/receipts - Admin Only)"
-              >
-                <FileText className="w-3 h-3 text-[#991B1B]" />
-                <span>Devotee Receipts</span>
-                <span className="text-[9px] bg-[#991B1B] text-white font-bold px-1 rounded">Admin</span>
-              </button>
-            )}
-
-            {/* User Profile Badge (Name, Flat & Role) */}
-            {userProfile && (
-              <div
-                className="px-2.5 py-1 rounded-full text-[11px] bg-white/15 text-white border border-white/20 inline-flex items-center gap-1.5 shadow-xs"
-                title={`Logged in as ${userProfile.name} (Flat: ${userProfile.flat}, Mobile: ${userProfile.mobile}, Email: ${userProfile.email})`}
-              >
-                <div className="w-4 h-4 rounded-full bg-amber-400 text-stone-900 flex items-center justify-center font-bold text-[9px]">
-                  {userProfile.name.charAt(0).toUpperCase()}
-                </div>
-                <span className="font-bold max-w-[120px] truncate hidden sm:inline">
-                  {userProfile.name}
-                </span>
-                <span className="text-[10px] text-amber-200 font-mono hidden md:inline">
-                  [{userProfile.flat}]
-                </span>
-              </div>
-            )}
-
-            {/* Signout Button */}
-            <button
-              onClick={handleLogout}
-              className="px-2.5 py-1 rounded-full font-bold uppercase tracking-wider inline-flex items-center gap-1.5 transition-colors cursor-pointer text-[11px] bg-white/10 text-white hover:bg-white/20 border border-white/20 shadow-xs active:scale-95"
-              title="Sign out of management portal"
-            >
-              <LogOut className="w-3 h-3" />
-              <span>Signout</span>
-            </button>
           </div>
         </div>
 
@@ -1858,7 +2106,10 @@ export function App() {
 
                 {/* Admin Tab 4: Settings */}
                 <button
-                  onClick={() => setActiveTab('settings')}
+                  onClick={() => {
+                    setActiveTab('settings');
+                    setSettingsSubTab('general');
+                  }}
                   className={`px-3.5 py-2 rounded-t font-semibold transition-all inline-flex items-center gap-2 cursor-pointer border-b-2 whitespace-nowrap ${
                     activeTab === 'settings'
                       ? 'bg-[#FDFBF7] text-[#991B1B] border-amber-400 shadow-xs'
@@ -1869,9 +2120,9 @@ export function App() {
                   <span>Settings</span>
                 </button>
               </>
-            ) : (
+            ) : isReadOnly ? (
               <>
-                {/* Non-Admin Tab 1: Income & Expenditure statement */}
+                {/* Read-Only Tab 1: Income & Expenditure statement */}
                 <button
                   onClick={() => setActiveTab('statement')}
                   className={`px-3.5 py-2 rounded-t font-semibold transition-all inline-flex items-center gap-2 cursor-pointer border-b-2 whitespace-nowrap ${
@@ -1884,7 +2135,23 @@ export function App() {
                   <span>Income &amp; Expenditure statement</span>
                 </button>
 
-                {/* Non-Admin Tab 2: Expenditure(payments) */}
+                {/* Read-Only Tab 2: Income(receipts) (Complete View) */}
+                <button
+                  onClick={() => setActiveTab('income')}
+                  className={`px-3.5 py-2 rounded-t font-semibold transition-all inline-flex items-center gap-2 cursor-pointer border-b-2 whitespace-nowrap ${
+                    activeTab === 'income'
+                      ? 'bg-[#FDFBF7] text-[#991B1B] border-amber-400 shadow-xs'
+                      : 'text-white/85 hover:text-white hover:bg-red-900/50 border-transparent'
+                  }`}
+                >
+                  <Coins className="w-4 h-4" />
+                  <span>Income(receipts)</span>
+                  <span className="bg-amber-400 text-[#991B1B] text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold">
+                    ₹{fmt(totalIncome)}
+                  </span>
+                </button>
+
+                {/* Read-Only Tab 3: Expenditure(payments) */}
                 <button
                   onClick={() => setActiveTab('expenditure')}
                   className={`px-3.5 py-2 rounded-t font-semibold transition-all inline-flex items-center gap-2 cursor-pointer border-b-2 whitespace-nowrap ${
@@ -1899,44 +2166,36 @@ export function App() {
                     ₹{fmt(exAct)}
                   </span>
                 </button>
-
-                {/* Non-Admin Tab 3: Voluntary Contributions Resident (Their Flat receipts) */}
+              </>
+            ) : (
+              /* UNASSIGNED / BASIC USERS: STRICTLY ONLY 2 TABS */
+              <>
+                {/* Unassigned Tab 1: Income & Expenditure statement */}
                 <button
-                  onClick={() => {
-                    setActiveTab('income');
-                    setActiveIncomeSubTab('donations');
-                  }}
+                  onClick={() => setActiveTab('statement')}
                   className={`px-3.5 py-2 rounded-t font-semibold transition-all inline-flex items-center gap-2 cursor-pointer border-b-2 whitespace-nowrap ${
-                    activeTab === 'income' && activeIncomeSubTab === 'donations'
+                    activeTab === 'statement'
                       ? 'bg-[#FDFBF7] text-[#991B1B] border-amber-400 shadow-xs'
                       : 'text-white/85 hover:text-white hover:bg-red-900/50 border-transparent'
                   }`}
                 >
-                  <Coins className="w-4 h-4" />
-                  <span>Voluntary Contributions Resident</span>
-                  {userProfile?.flat && (
-                    <span className="bg-amber-400 text-[#991B1B] text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold">
-                      Flat {userProfile.flat}
-                    </span>
-                  )}
+                  <FileText className="w-4 h-4" />
+                  <span>Income &amp; Expenditure statement</span>
                 </button>
 
-                {/* Non-Admin Tab 4: Seva List (Read-Only) */}
+                {/* Unassigned Tab 2: Expenditure(payments) */}
                 <button
-                  onClick={() => {
-                    setActiveTab('income');
-                    setActiveIncomeSubTab('sevas');
-                  }}
+                  onClick={() => setActiveTab('expenditure')}
                   className={`px-3.5 py-2 rounded-t font-semibold transition-all inline-flex items-center gap-2 cursor-pointer border-b-2 whitespace-nowrap ${
-                    activeTab === 'income' && activeIncomeSubTab === 'sevas'
+                    activeTab === 'expenditure'
                       ? 'bg-[#FDFBF7] text-[#991B1B] border-amber-400 shadow-xs'
                       : 'text-white/85 hover:text-white hover:bg-red-900/50 border-transparent'
                   }`}
                 >
-                  <Sparkles className="w-4 h-4" />
-                  <span>Seva Offerings List</span>
-                  <span className="bg-amber-200/90 text-amber-950 text-[10px] px-1.5 py-0.2 rounded-full font-semibold">
-                    Read-Only
+                  <CreditCard className="w-4 h-4" />
+                  <span>Expenditure(payments)</span>
+                  <span className="bg-white/20 text-white text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold">
+                    ₹{fmt(exAct)}
                   </span>
                 </button>
               </>
@@ -1944,8 +2203,8 @@ export function App() {
           </div>
         </div>
 
-        {/* 3. FLOATING SUB-LEVEL NAVIGATION TABS (Admin Only) */}
-        {isAdmin && activeTab === 'income' && (
+        {/* 3. FLOATING SUB-LEVEL NAVIGATION TABS (Admin & Read-Only Complete) */}
+        {(isAdmin || isReadOnly) && activeTab === 'income' && (
           <div className="bg-[#F8EFE5] border-t border-red-800/40 border-b border-stone-300 shadow-md overflow-x-auto no-scrollbar">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2 flex items-center gap-1.5 sm:gap-2">
               {/* Sub-tab 1: Voluntary Contributions Resident */}
@@ -2003,24 +2262,22 @@ export function App() {
                 </button>
               )}
 
-              {/* Sub-tab 4: sevas (Admin Only) */}
-              {isAdmin && (
-                <button
-                  onClick={() => setActiveIncomeSubTab('sevas')}
-                  className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
-                    activeIncomeSubTab === 'sevas'
-                      ? 'bg-[#991B1B] text-white shadow-xs'
-                      : 'bg-white text-stone-700 hover:bg-stone-200 border border-stone-300'
-                  }`}
-                >
-                  <span>Sevas</span>
-                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
-                    activeIncomeSubTab === 'sevas' ? 'bg-white/25 text-white' : 'bg-stone-100 text-stone-600'
-                  }`}>
-                    {sevas.length}
-                  </span>
-                </button>
-              )}
+              {/* Sub-tab 4: sevas */}
+              <button
+                onClick={() => setActiveIncomeSubTab('sevas')}
+                className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                  activeIncomeSubTab === 'sevas'
+                    ? 'bg-[#991B1B] text-white shadow-xs'
+                    : 'bg-white text-stone-700 hover:bg-stone-200 border border-stone-300'
+                }`}
+              >
+                <span>Sevas</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                  activeIncomeSubTab === 'sevas' ? 'bg-white/25 text-white' : 'bg-stone-100 text-stone-600'
+                }`}>
+                  {sevas.length}
+                </span>
+              </button>
 
               {/* Sub-tab 5: Hundi */}
               <button
@@ -2079,6 +2336,33 @@ export function App() {
 
       {/* 4. MAIN BODY CONTAINER */}
       <main id="mainAppContent" className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 pt-6">
+        {/* Banner for Unassigned / Basic Devotee Users */}
+        {isUnassigned && (
+          <div className="mb-5 bg-gradient-to-r from-amber-50 via-white to-amber-50 border-2 border-amber-300 rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="p-1 rounded-full bg-amber-400 text-stone-900">
+                  <Sparkles className="w-4 h-4" />
+                </span>
+                <h3 className="font-serif font-bold text-stone-900 text-sm sm:text-base">
+                  High-Level Summary View
+                </h3>
+              </div>
+              <p className="text-xs text-stone-600">
+                You are viewing summary Income &amp; Expenditure statements and expenditures. Need itemized contribution receipts, vendor bill proofs, or audit ledgers?
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setRequestDetailsModalOpen(true)}
+              className="bg-[#991B1B] hover:bg-[#7F1D1D] text-white font-bold text-xs uppercase tracking-wider px-4 py-2.5 rounded-xl shadow-xs transition-colors inline-flex items-center justify-center gap-2 cursor-pointer shrink-0"
+            >
+              <PhoneCall className="w-3.5 h-3.5 text-amber-300" />
+              <span>Contact Us for More Details</span>
+            </button>
+          </div>
+        )}
+
         {/* TAB 1: Income & Expenditure Statement */}
         {activeTab === 'statement' && (
           <StatementView
@@ -2118,7 +2402,7 @@ export function App() {
               />
             )}
 
-            {activeIncomeSubTab === 'sponsorship' && isAdmin && (
+            {activeIncomeSubTab === 'sponsorship' && (isAdmin || isReadOnly) && (
               <SponsorshipView
                 sponsors={sponsors}
                 isAdmin={isAdmin}
@@ -2131,7 +2415,7 @@ export function App() {
               />
             )}
 
-            {activeIncomeSubTab === 'stalls' && isAdmin && (
+            {activeIncomeSubTab === 'stalls' && (isAdmin || isReadOnly) && (
               <CommercialStallsView
                 stalls={commercialStalls}
                 isAdmin={isAdmin}
@@ -2163,7 +2447,7 @@ export function App() {
               />
             )}
 
-            {activeIncomeSubTab === 'hundi' && isAdmin && (
+            {activeIncomeSubTab === 'hundi' && (isAdmin || isReadOnly) && (
               <HundiView
                 hundi={hundi}
                 isAdmin={isAdmin}
@@ -2172,7 +2456,7 @@ export function App() {
               />
             )}
 
-            {activeIncomeSubTab === 'auctions' && isAdmin && (
+            {activeIncomeSubTab === 'auctions' && (isAdmin || isReadOnly) && (
               <AuctionsView
                 auctions={auctions}
                 isAdmin={isAdmin}
@@ -2198,13 +2482,16 @@ export function App() {
         )}
 
         {/* TAB 4: Settings (Admin Only) */}
-        {activeTab === 'settings' && (
+        {activeTab === 'settings' && isAdmin && (
           <SettingsView
             settings={settings}
             isAdmin={isAdmin}
+            defaultSubTab={settingsSubTab}
+            currentAdminEmail={currentEmail}
             onSaveSettings={handleSaveSettings}
             onExportExcel={handleExportExcel}
             onSaveHTML={handleSaveHTML}
+            onOpenAdminManagement={() => setAdminManagementModalOpen(true)}
             onClearAllData={async () => {
               try {
                 localStorage.clear();
@@ -2242,7 +2529,58 @@ export function App() {
         modalQrRef={modalQrRef}
       />
 
-      {/* 6. REAL-TIME CLOUD SYNC TOAST NOTIFICATION */}
+      {/* 6. ADMIN DEVOTEE ROLES MANAGEMENT MODAL */}
+      <AdminManagementModal
+        isOpen={adminManagementModalOpen}
+        onClose={() => setAdminManagementModalOpen(false)}
+        settings={settings}
+        onSaveSettings={handleSaveSettings}
+        currentAdminEmail={currentEmail}
+      />
+
+      {/* 7. DEVOTEE DETAILED ACCESS REQUEST / CONTACT US MODAL */}
+      <RequestDetailsModal
+        isOpen={requestDetailsModalOpen}
+        onClose={() => setRequestDetailsModalOpen(false)}
+        userProfile={userProfile}
+        settings={settings}
+        onRequestSubmitted={() => {
+          setSyncToast({
+            message: 'Your access request has been sent to the festival administrator.',
+            type: 'success'
+          });
+          setTimeout(() => setSyncToast(null), 4000);
+        }}
+      />
+
+      {/* 8. FESTIVAL VIDEO & GRAND DARSHAN MODAL */}
+      {darshanVideoModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 overflow-y-auto animate-in fade-in">
+          <div className="bg-stone-950 border-2 border-amber-400 rounded-2xl max-w-4xl w-full overflow-hidden shadow-2xl space-y-0 my-4">
+            <div className="bg-[#991B1B] text-white p-3.5 px-5 flex items-center justify-between border-b border-amber-400 shrink-0">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-amber-300" />
+                <h3 className="font-serif font-black text-sm sm:text-base text-amber-200">
+                  ಶ್ರೀ ಗಣೇಶೋತ್ಸವ ೨೦೨೬ ಮಹಾದರ್ಶನ &bull; Grand Festival Darshan Video
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDarshanVideoModalOpen(false)}
+                className="p-1 rounded-lg text-white/80 hover:text-white hover:bg-white/20 transition-colors cursor-pointer"
+                title="Close video"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-3 sm:p-5">
+              <GaneshaFestivalVideoShowcase />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 8. REAL-TIME CLOUD SYNC TOAST NOTIFICATION */}
       {syncToast && (
         <div
           className={`fixed bottom-4 right-4 z-50 bg-stone-900/95 text-white text-xs px-4 py-3 rounded-xl shadow-2xl border flex items-center gap-2.5 backdrop-blur-md max-w-md transition-all animate-in fade-in slide-in-from-bottom-3 duration-200 ${

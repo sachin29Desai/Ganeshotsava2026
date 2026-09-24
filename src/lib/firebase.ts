@@ -922,6 +922,49 @@ export async function cloudGetUserProfile(email: string): Promise<UserProfile | 
   }
 }
 
+export async function cloudGetUserProfileByPhone(phone: string): Promise<UserProfile | null> {
+  try {
+    const cleaned = phone.replace(/\D/g, '');
+    if (!cleaned) return null;
+    const snap = await getDocs(collection(db, 'user_profiles'));
+    for (const docSnap of snap.docs) {
+      const data = docSnap.data() as UserProfile;
+      const userMobile = (data.mobile || '').replace(/\D/g, '');
+      if (userMobile === cleaned || (cleaned.length >= 10 && userMobile.endsWith(cleaned.slice(-10)))) {
+        return data;
+      }
+    }
+    return null;
+  } catch (err) {
+    console.error('Error fetching user profile by phone:', err);
+    return null;
+  }
+}
+
+export async function cloudRequestDetailedAccess(email: string, notes?: string): Promise<void> {
+  try {
+    const emailKey = email.toLowerCase().trim();
+    const docRef = doc(db, 'user_profiles', emailKey);
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      await setDoc(
+        docRef,
+        {
+          ...snap.data(),
+          accessRequested: true,
+          accessRequestNotes: notes || 'Devotee requested full access to financial details and bills.',
+          accessRequestedAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        },
+        { merge: true }
+      );
+    }
+  } catch (err) {
+    console.error('Error updating access request in Firestore:', err);
+    throw err;
+  }
+}
+
 export async function cloudGetAllUserProfiles(): Promise<UserProfile[]> {
   try {
     const snap = await getDocs(collection(db, 'user_profiles'));
@@ -946,6 +989,16 @@ export async function cloudUpdateUserRole(email: string, role: UserRole): Promis
     }
   } catch (err) {
     console.error('Error updating user role in Firestore:', err);
+    throw err;
+  }
+}
+
+export async function cloudDeleteUserProfile(email: string): Promise<void> {
+  try {
+    const emailKey = email.toLowerCase().trim();
+    await deleteDoc(doc(db, 'user_profiles', emailKey));
+  } catch (err) {
+    console.error('Error deleting user profile from Firestore:', err);
     throw err;
   }
 }

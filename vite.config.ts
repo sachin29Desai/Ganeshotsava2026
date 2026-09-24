@@ -132,7 +132,7 @@ function emailOtpPlugin(): Plugin {
           req.on('end', async () => {
             try {
               const data = JSON.parse(body || '{}');
-              const { email, otp, orgName } = data;
+              const { email, otp, orgName, magicLink } = data;
 
               if (!email || !otp) {
                 res.statusCode = 400;
@@ -142,29 +142,42 @@ function emailOtpPlugin(): Plugin {
               }
 
               const org = orgName || 'Eldorado Kannadigara Balaga — Ganeshotsava 2026';
-              const subject = `Your Ganeshotsava 2026 Verification OTP: ${otp}`;
+              const subject = `Your Ganeshotsava 2026 Sign-In Link & OTP: ${otp}`;
               const htmlContent = `
                 <div style="font-family: Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; border: 1px solid #e5e7eb; border-radius: 12px; background-color: #ffffff;">
                   <div style="text-align: center; border-bottom: 2px solid #991b1b; padding-bottom: 16px; margin-bottom: 20px;">
                     <h2 style="color: #991b1b; margin: 0; font-size: 22px;">🌺 ${org}</h2>
-                    <p style="color: #6b7280; font-size: 13px; margin: 4px 0 0 0;">Devotee & Resident Portal Verification</p>
+                    <p style="color: #6b7280; font-size: 13px; margin: 4px 0 0 0;">Devotee & Resident Portal Sign-In</p>
                   </div>
                   <p style="color: #374151; font-size: 15px; line-height: 1.5;">
                     Namaskara / Hello,
                   </p>
                   <p style="color: #374151; font-size: 14px; line-height: 1.5;">
-                    Your 6-digit One-Time Password (OTP) for logging into the <strong>Ganeshotsava 2026</strong> portal is:
+                    You requested sign-in to the <strong>Ganeshotsava 2026</strong> portal for <strong>${email}</strong>.
                   </p>
-                  <div style="text-align: center; margin: 28px 0;">
-                    <span style="display: inline-block; font-size: 32px; font-weight: 800; letter-spacing: 8px; color: #991b1b; background-color: #fef2f2; border: 2px dashed #dc2626; padding: 12px 28px; border-radius: 10px; font-family: monospace;">
+                  ${magicLink ? `
+                  <div style="text-align: center; margin: 24px 0 16px 0;">
+                    <a href="${magicLink}" style="display: inline-block; background-color: #991b1b; color: #ffffff; text-decoration: none; padding: 13px 28px; font-weight: 800; border-radius: 8px; font-size: 15px; letter-spacing: 0.5px;">
+                      🚀 Click Here to Sign In Automatically
+                    </a>
+                  </div>
+                  <p style="text-align: center; color: #6b7280; font-size: 12px; margin-bottom: 24px;">
+                    (Instant 1-click login — no password or confirmation needed)
+                  </p>
+                  ` : ''}
+                  <p style="color: #374151; font-size: 13px; line-height: 1.5; margin-bottom: 8px;">
+                    Or enter this 6-digit verification code (OTP) on the login page:
+                  </p>
+                  <div style="text-align: center; margin: 16px 0 24px 0;">
+                    <span style="display: inline-block; font-size: 32px; font-weight: 800; letter-spacing: 8px; color: #991b1b; background-color: #fef2f2; border: 2px dashed #dc2626; padding: 10px 24px; border-radius: 10px; font-family: monospace;">
                       ${otp}
                     </span>
                   </div>
                   <p style="color: #4b5563; font-size: 13px; line-height: 1.5;">
-                    ⏱️ This OTP is valid for <strong>10 minutes</strong>. Please enter this code on the login page to proceed.
+                    ⏱️ This link and OTP are valid for <strong>10 minutes</strong>.
                   </p>
                   <p style="color: #9ca3af; font-size: 12px; line-height: 1.4; border-top: 1px solid #f3f4f6; padding-top: 14px; margin-top: 24px;">
-                    If you did not request this OTP, you can safely ignore this email.<br/>
+                    If you did not request this sign-in link, you can safely ignore this email.<br/>
                     <em>Ganapati Bappa Morya! 🙏</em>
                   </p>
                 </div>

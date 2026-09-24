@@ -61,6 +61,7 @@ import { BalagaNominateModal } from './balaga/BalagaNominateModal';
 import { BalagaPolicyModals } from './balaga/BalagaPolicyModals';
 import { BalagaLoginView } from './balaga/BalagaLoginView';
 import { BalagaEventDetailView } from './balaga/BalagaEventDetailView';
+import { GaneshaFestivalVideoShowcase } from './GaneshaFestivalVideoShowcase';
 import { auth, onAuthStateChanged, firebaseSignOut, type User } from '../lib/firebase';
 
 interface CommunityHomeViewProps {
@@ -663,6 +664,27 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
                     </button>
                   </div>
                 </div>
+              </div>
+            </section>
+
+            {/* SRI GANESHOTSAVA FESTIVAL DARSHAN VIDEO */}
+            <section className="max-w-6xl mx-auto px-4 sm:px-6">
+              <div className="space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <div className="inline-flex items-center gap-1.5 bg-red-600 text-yellow-300 text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full border border-yellow-400">
+                      <Sparkles className="w-3 h-3" />
+                      <span>ಶ್ರೀ ಗಣೇಶ ಮಹಾದರ್ಶನ • Live Darshan Video</span>
+                    </div>
+                    <h2 className="text-xl sm:text-2xl font-serif font-black tracking-tight text-stone-900 dark:text-stone-100 mt-1">
+                      Sri Ganeshotsava Festival Darshan &amp; Alankara
+                    </h2>
+                    <p className={`text-xs ${isDark ? 'text-stone-400' : 'text-stone-600'}`}>
+                      Watch the divine celebration video of Sri Vighnaharta Ganesha in the grand royal pandal decorated with peacock, sacred cow, and fresh marigold garlands.
+                    </p>
+                  </div>
+                </div>
+                <GaneshaFestivalVideoShowcase />
               </div>
             </section>
 

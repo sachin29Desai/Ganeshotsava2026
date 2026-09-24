@@ -106,7 +106,7 @@ export interface AuctionItem {
   notes?: string;
 }
 
-export type UserRole = 'admin' | 'sponsor' | 'volunteer' | 'resident';
+export type UserRole = 'admin' | 'member' | 'viewer' | 'read_only' | 'unassigned' | 'sponsor' | 'volunteer' | 'resident';
 
 export interface UserProfile {
   email: string;
@@ -114,10 +114,14 @@ export interface UserProfile {
   flat: string;
   mobile: string;
   role: UserRole;
+  photoUrl?: string; // Captured photo / selfie data URL
   username?: string;
   preferences?: string;
   createdAt?: string;
   updatedAt?: string;
+  accessRequested?: boolean; // When user clicks "Request for details"
+  accessRequestNotes?: string;
+  accessRequestedAt?: string;
 }
 
 export interface AppSettings {

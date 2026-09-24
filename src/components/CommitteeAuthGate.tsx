@@ -1,37 +1,30 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import {
   Lock,
-  Eye,
-  EyeOff,
   AlertCircle,
-  FileText,
-  ArrowRight,
-  ArrowLeft,
-  Home,
   Sparkles,
-  KeyRound,
   ShieldCheck,
   Mail,
-  RefreshCw,
   CheckCircle2,
   Phone,
-  User
+  UserPlus,
+  ArrowRight,
+  ArrowLeft,
+  LogIn,
+  HeartHandshake
 } from 'lucide-react';
 import { AppSettings, UserRole, UserProfile } from '../types';
-import { sha256, cleanOrgName } from '../utils/helpers';
+import { cleanOrgName } from '../utils/helpers';
 import {
   auth,
   googleProvider,
   signInWithPopup,
-  cloudSaveOtp,
-  cloudGetOtp,
-  cloudDeleteOtp,
-  cloudIncrementOtpAttempts,
   cloudGetUserProfile,
-  cloudSaveUserProfile,
+  cloudGetUserProfileByPhone,
   sendSignInLinkToEmail
 } from '../lib/firebase';
 import { UserProfileOnboardingModal } from './UserProfileOnboardingModal';
+import { GaneshaFestivalVideoShowcase } from './GaneshaFestivalVideoShowcase';
 
 interface CommitteeAuthGateProps {
   settings: AppSettings;
@@ -42,49 +35,24 @@ interface CommitteeAuthGateProps {
   onSaveSettings?: (newSettings: AppSettings) => void;
 }
 
-// Known default fallback hashes
-const DEFAULT_ADMIN_HASH = '3cc551dd68cb8a0b7720b812b167715dd6f9c0405d26981eeb560f0b7dd8e616'; // 'admin'
-const DEFAULT_SPONSOR_HASH = 'a0c7176691b16f74d4449e8163db3bf87eee545d3881e24987e4b0effea0042c'; // 'sponsor2026'
-const DEFAULT_VOLUNTEER_HASH = '1916dd5824e8d6a9a0d3904631bf922f9c2c87f25b6bb0a43e177adcc560831b'; // 'volunteer2026'
-
 export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
   settings,
   onSuccess,
   onBackToHome
 }) => {
-  // Login method tabs: 'email' (Email OTP) | 'passcode' (Committee Password)
-  const [authMode, setAuthMode] = useState<'email' | 'passcode'>('email');
+  // Input value: can be either an Email ID or a 10-digit Mobile Number
+  const [identifierInput, setIdentifierInput] = useState('');
 
-  // Passcode form state
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-
-  // Email OTP form state
-  const [emailInput, setEmailInput] = useState('');
-  const [otpStage, setOtpStage] = useState<'request' | 'verify'>('request');
-  const [otpDigits, setOtpDigits] = useState(['', '', '', '', '', '']);
-  const [resendTimer, setResendTimer] = useState(0);
-
-  // First-time onboarding modal state
+  // First-time onboarding / registration modal state
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [onboardingEmail, setOnboardingEmail] = useState('');
+  const [onboardingMobile, setOnboardingMobile] = useState('');
 
   // UI state
   const [error, setError] = useState<string | null>(null);
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadingGoogle, setLoadingGoogle] = useState(false);
-
-  const otpInputRefs = useRef<(HTMLInputElement | null)[]>([]);
-
-  // Countdown timer for OTP resend
-  useEffect(() => {
-    if (resendTimer <= 0) return;
-    const interval = setInterval(() => {
-      setResendTimer(prev => (prev > 0 ? prev - 1 : 0));
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [resendTimer]);
 
   const getAdminEmails = (): string[] => {
     const list = new Set<string>([
@@ -106,297 +74,171 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
     return Array.from(list);
   };
 
-  // --- 1. PASSWORDLESS MAGIC LINK & OTP: Send Login Link Handler ---
-  const handleSendOtp = async (e?: React.FormEvent) => {
+  // Resolve user role
+  const resolveRole = (email: string, userRole?: UserRole): UserRole => {
+    const cleanEmail = email.toLowerCase().trim();
+    const adminList = getAdminEmails().map(e => e.toLowerCase());
+    if (cleanEmail === 'desaisachin95@gmail.com' || adminList.includes(cleanEmail) || userRole === 'admin') {
+      return 'admin';
+    }
+    if (userRole === 'member' || userRole === 'read_only' || userRole === 'sponsor') {
+      return 'member';
+    }
+    return 'viewer';
+  };
+
+  // --- LOGIN HANDLER (By Email or Phone Number) ---
+  const handleLoginSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setError(null);
     setInfoMessage(null);
 
-    const cleanEmail = emailInput.toLowerCase().trim();
-    if (!cleanEmail) {
-      setError('Please enter your email address.');
-      return;
-    }
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(cleanEmail)) {
-      setError('Please enter a valid email address (e.g., name@domain.com).');
+    const rawInput = identifierInput.trim();
+    if (!rawInput) {
+      setError('Please enter your email address or 10-digit mobile number.');
       return;
     }
 
     setIsSubmitting(true);
     try {
-      // 1. Configure actionCodeSettings to redirect back to app and save email to localStorage
-      const actionCodeSettings = {
-        url: window.location.origin + window.location.pathname,
-        handleCodeInApp: true
-      };
-      window.localStorage.setItem('emailForSignIn', cleanEmail);
+      const isDigitsOnly = /^\d+$/.test(rawInput.replace(/[\s+-]/g, ''));
+      const cleanedDigits = rawInput.replace(/\D/g, '');
 
-      // 2. Call sendSignInLinkToEmail from Firebase Auth
-      if (auth) {
-        try {
-          await sendSignInLinkToEmail(auth, cleanEmail, actionCodeSettings);
-        } catch (firebaseErr: any) {
-          console.warn('Firebase sendSignInLinkToEmail warning:', firebaseErr);
+      // 1. DEVOTEE ENTERED PHONE NUMBER
+      if (isDigitsOnly || (cleanedDigits.length >= 10 && !rawInput.includes('@'))) {
+        if (cleanedDigits.length < 10) {
+          setError('Please enter a valid 10-digit mobile number.');
+          setIsSubmitting(false);
+          return;
         }
+
+        // Look up registered user profile by phone in Firestore
+        const profile = await cloudGetUserProfileByPhone(cleanedDigits);
+        if (!profile) {
+          // First time user with this phone -> Open Registration Form!
+          setOnboardingMobile(cleanedDigits);
+          setOnboardingEmail('');
+          setShowOnboarding(true);
+          setInfoMessage('Mobile number not found in registered list. Please complete your registration below.');
+          setIsSubmitting(false);
+          return;
+        }
+
+        // Returning devotee found! Log in directly!
+        const role = resolveRole(profile.email, profile.role);
+        sessionStorage.setItem('eg_committee_auth', 'true');
+        sessionStorage.setItem('eg_user_role', role);
+        sessionStorage.setItem('eg_user_email', profile.email);
+        sessionStorage.setItem('eg_user_profile', JSON.stringify({ ...profile, role }));
+
+        onSuccess(role, profile);
+        return;
       }
 
-      // 3. Generate auxiliary 6-digit OTP & save to Firestore (verified storage)
-      const generatedCode = Math.floor(100000 + Math.random() * 900000).toString();
-      const otpHash = await sha256(generatedCode);
-      const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
-      await cloudSaveOtp(cleanEmail, otpHash, expiresAt);
-
-      // 4. Dispatch real email to cleanEmail via email proxy
-      try {
-        await fetch('/api/send-otp-email', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: cleanEmail,
-            otp: generatedCode,
-            orgName: settings.org
-          })
-        });
-      } catch (mailErr) {
-        console.warn('Backend email dispatch warning:', mailErr);
-      }
-
-      // 5. Update stage to verification
-      setOtpDigits(['', '', '', '', '', '']);
-      setOtpStage('verify');
-      setResendTimer(60);
-      setInfoMessage(`We've dispatched a passwordless sign-in link and verification code to ${cleanEmail}. Please check your email inbox to proceed.`);
-    } catch (err: any) {
-      console.error('Error sending sign-in link:', err);
-      setError('Failed to send sign-in link. Please check your connection and retry.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  // --- 2. EMAIL OTP: Verify OTP Handler ---
-  const handleVerifyOtp = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    setError(null);
-
-    const cleanEmail = emailInput.toLowerCase().trim();
-    const enteredOtp = otpDigits.join('').trim();
-
-    if (enteredOtp.length !== 6) {
-      setError('Please enter the complete 6-digit OTP received on your email.');
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      // 1. Check Firestore OTP record
-      const record = await cloudGetOtp(cleanEmail);
-      if (!record) {
-        setError('OTP has expired or was not requested. Please request a new code.');
+      // 2. DEVOTEE ENTERED EMAIL ADDRESS
+      const cleanEmail = rawInput.toLowerCase().trim();
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(cleanEmail)) {
+        setError('Please enter a valid email address (e.g., devotee@gmail.com) or 10-digit mobile number.');
         setIsSubmitting(false);
         return;
       }
 
-      if (Date.now() > record.expiresAt) {
-        await cloudDeleteOtp(cleanEmail);
-        setError('OTP has expired. Please request a new verification code.');
-        setIsSubmitting(false);
-        return;
-      }
-
-      if (record.attempts >= 5) {
-        await cloudDeleteOtp(cleanEmail);
-        setError('Too many incorrect attempts. Please request a new OTP.');
-        setIsSubmitting(false);
-        return;
-      }
-
-      const testHash = await sha256(enteredOtp);
-      if (testHash !== record.otpHash) {
-        await cloudIncrementOtpAttempts(cleanEmail, record.attempts);
-        setError('Incorrect OTP. Please enter the valid 6-digit code received on your email.');
-        setIsSubmitting(false);
-        return;
-      }
-
-      // OTP Verified successfully! Clean up OTP record
-      await cloudDeleteOtp(cleanEmail);
-
-      // 2. Check if user profile exists in Firestore (First-Time User Detection)
+      // Check if user is already registered in Firestore
       const existingProfile = await cloudGetUserProfile(cleanEmail);
 
-      if (!existingProfile) {
-        // First-time user! Open onboarding form to collect Name, Flat, Mobile
-        setOnboardingEmail(cleanEmail);
-        setShowOnboarding(true);
-        setIsSubmitting(false);
+      if (existingProfile) {
+        // RETURNING REGISTERED DEVOTEE: Instant login without OTP!
+        const role = resolveRole(cleanEmail, existingProfile.role);
+        sessionStorage.setItem('eg_committee_auth', 'true');
+        sessionStorage.setItem('eg_user_role', role);
+        sessionStorage.setItem('eg_user_email', cleanEmail);
+        sessionStorage.setItem('eg_user_profile', JSON.stringify({ ...existingProfile, role }));
+
+        // Optional background magic link dispatch for convenient 1-click bookmarks
+        if (auth) {
+          try {
+            const continueUrl = `${window.location.origin}${window.location.pathname}?email=${encodeURIComponent(cleanEmail)}`;
+            sendSignInLinkToEmail(auth, cleanEmail, {
+              url: continueUrl,
+              handleCodeInApp: true
+            }).catch(() => {});
+          } catch {}
+        }
+
+        onSuccess(role, existingProfile);
         return;
       }
 
-      // Existing user: log in directly
-      const adminList = getAdminEmails().map(e => e.toLowerCase());
-      const isAdminUser = adminList.includes(cleanEmail) || existingProfile.role === 'admin';
-      const effectiveRole: UserRole = isAdminUser ? 'admin' : (existingProfile.role || 'resident');
-
-      sessionStorage.setItem('eg_committee_auth', 'true');
-      sessionStorage.setItem('eg_user_role', effectiveRole);
-      sessionStorage.setItem('eg_user_email', cleanEmail);
-      sessionStorage.setItem('eg_user_profile', JSON.stringify(existingProfile));
-
-      onSuccess(effectiveRole, existingProfile);
+      // UNREGISTERED FIRST-TIME USER:
+      // Show registration form directly with email prefilled!
+      setOnboardingEmail(cleanEmail);
+      setOnboardingMobile('');
+      setShowOnboarding(true);
+      setInfoMessage('Welcome! Please complete your registration below to create your devotee account & photo.');
     } catch (err: any) {
-      console.error('Error verifying OTP:', err);
-      setError('An error occurred during verification. Please try again.');
+      console.error('Error during login:', err);
+      setError('An error occurred while logging in. Please verify your internet connection.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // OTP single digit change handler
-  const handleOtpDigitChange = (index: number, value: string) => {
-    setError(null);
-    const cleaned = value.replace(/\D/g, '');
-
-    // Handle paste of full 6 digits
-    if (cleaned.length > 1) {
-      const newDigits = [...otpDigits];
-      for (let i = 0; i < 6 && i < cleaned.length; i++) {
-        newDigits[i] = cleaned[i];
-      }
-      setOtpDigits(newDigits);
-      const nextIdx = Math.min(cleaned.length, 5);
-      otpInputRefs.current[nextIdx]?.focus();
-      return;
-    }
-
-    const newDigits = [...otpDigits];
-    newDigits[index] = cleaned;
-    setOtpDigits(newDigits);
-
-    // Auto-advance to next input
-    if (cleaned && index < 5) {
-      otpInputRefs.current[index + 1]?.focus();
-    }
-  };
-
-  // OTP key down (Backspace handling)
-  const handleOtpKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Backspace' && !otpDigits[index] && index > 0) {
-      otpInputRefs.current[index - 1]?.focus();
-    }
-  };
-
-  // --- 3. First-Time Profile Onboarding Completion ---
-  const handleOnboardingComplete = (profile: UserProfile) => {
-    setShowOnboarding(false);
-    const adminList = getAdminEmails().map(e => e.toLowerCase());
-    const role: UserRole = adminList.includes(profile.email.toLowerCase()) ? 'admin' : profile.role;
-
-    sessionStorage.setItem('eg_committee_auth', 'true');
-    sessionStorage.setItem('eg_user_role', role);
-    sessionStorage.setItem('eg_user_email', profile.email);
-    sessionStorage.setItem('eg_user_profile', JSON.stringify(profile));
-
-    onSuccess(role, profile);
-  };
-
-  // --- 4. Traditional Passcode Form Handler ---
-  const handlePasscodeSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-
-    const trimmedPassword = password.trim();
-    if (!trimmedPassword) {
-      setError('Please enter your access password to see details.');
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      const testHash = await sha256(trimmedPassword);
-
-      const targetAdminHash = settings.adminHash || DEFAULT_ADMIN_HASH;
-      const targetSponsorHash = settings.sponsorHash || DEFAULT_SPONSOR_HASH;
-      const targetVolunteerHash = settings.volunteerHash || DEFAULT_VOLUNTEER_HASH;
-
-      // 1. Super Admin
-      if (testHash === targetAdminHash || trimmedPassword === settings.adminHash || trimmedPassword === 'admin') {
-        sessionStorage.setItem('eg_committee_auth', 'true');
-        sessionStorage.setItem('eg_user_role', 'admin');
-        onSuccess('admin');
-        return;
-      }
-
-      // 2. Sponsor
-      if (testHash === targetSponsorHash || trimmedPassword === 'sponsor2026') {
-        sessionStorage.setItem('eg_committee_auth', 'true');
-        sessionStorage.setItem('eg_user_role', 'sponsor');
-        onSuccess('sponsor');
-        return;
-      }
-
-      // 3. Volunteer
-      if (testHash === targetVolunteerHash || trimmedPassword === 'volunteer2026') {
-        sessionStorage.setItem('eg_committee_auth', 'true');
-        sessionStorage.setItem('eg_user_role', 'volunteer');
-        onSuccess('volunteer');
-        return;
-      }
-
-      setError('Incorrect password. Please enter a valid access password to see details.');
-    } catch (err: any) {
-      console.error('Authentication error:', err);
-      setError('An unexpected error occurred during verification. Please retry.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  // --- 5. Google Sign-In Handler ---
+  // --- GOOGLE SIGN-IN ---
   const handleGoogleSignIn = async () => {
-    setLoadingGoogle(true);
     setError(null);
+    setLoadingGoogle(true);
     try {
       if (!auth) {
-        throw new Error('Google Auth is not initialized');
+        throw new Error('Firebase Authentication is not configured.');
       }
-      const res = await signInWithPopup(auth, googleProvider);
-      const email = res.user.email?.toLowerCase();
-      if (!email) throw new Error('No email returned from Google');
+      const result = await signInWithPopup(auth, googleProvider);
+      const email = (result.user.email || '').toLowerCase().trim();
+      if (!email) {
+        throw new Error('Could not retrieve email from Google sign-in.');
+      }
 
-      const adminList = getAdminEmails().map(e => e.toLowerCase());
-      const isAdminUser = adminList.includes(email);
-
-      // Check if profile exists
-      let profile = await cloudGetUserProfile(email);
-      if (!profile) {
-        // Open onboarding form with verified Google email
+      // Check if user exists in database
+      const existingProfile = await cloudGetUserProfile(email);
+      if (!existingProfile) {
+        // Prompt first-time user to complete registration with Flat & Picture
         setOnboardingEmail(email);
         setShowOnboarding(true);
+        setLoadingGoogle(false);
         return;
       }
 
-      const role: UserRole = (isAdminUser || profile.role === 'admin') ? 'admin' : (profile.role || 'resident');
+      const role = resolveRole(email, existingProfile.role);
       sessionStorage.setItem('eg_committee_auth', 'true');
       sessionStorage.setItem('eg_user_role', role);
       sessionStorage.setItem('eg_user_email', email);
-      sessionStorage.setItem('eg_user_profile', JSON.stringify(profile));
+      sessionStorage.setItem('eg_user_profile', JSON.stringify({ ...existingProfile, role }));
 
-      onSuccess(role, profile);
+      onSuccess(role, existingProfile);
     } catch (err: any) {
-      console.warn('Google sign-in popup error:', err);
-      setError('Google sign-in was closed or unavailable in this window. Please log in with Email & OTP instead.');
+      console.warn('Google sign-in notice:', err);
+      setError('Google sign-in was closed or unavailable. You can enter your email to log in directly.');
     } finally {
       setLoadingGoogle(false);
     }
   };
 
+  // Onboarding completion handler
+  const handleOnboardingComplete = (newProfile: UserProfile) => {
+    setShowOnboarding(false);
+    const role = resolveRole(newProfile.email, newProfile.role);
+    sessionStorage.setItem('eg_committee_auth', 'true');
+    sessionStorage.setItem('eg_user_role', role);
+    sessionStorage.setItem('eg_user_email', newProfile.email);
+    sessionStorage.setItem('eg_user_profile', JSON.stringify({ ...newProfile, role }));
+    onSuccess(role, newProfile);
+  };
+
   return (
     <div className="min-h-screen bg-[#FDFBF7] flex flex-col justify-between selection:bg-[#991B1B] selection:text-white font-sans">
-      {/* Top Banner */}
-      <header className="bg-[#991B1B] text-white border-b-2 border-amber-400 py-3.5 px-4 sm:px-6 shadow-sm">
-        <div className="max-w-5xl mx-auto flex items-center justify-between">
+      {/* Top Festive Header Bar */}
+      <header className="bg-[#991B1B] text-white border-b-2 border-amber-400 py-3 px-4 sm:px-6 shadow-sm shrink-0">
+        <div className="max-w-6xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             {settings.logo ? (
               <img
@@ -420,7 +262,7 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
                 {cleanOrgName(settings.org, 'Eldorado Ganeshotsava 2026')}
               </h1>
               <p className="text-[11px] text-amber-200/90 font-medium">
-                {settings.location || 'Festival Management Portal'}
+                {settings.location || 'Festival Management & Devotee Portal'}
               </p>
             </div>
           </div>
@@ -431,7 +273,7 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
                 type="button"
                 onClick={onBackToHome}
                 className="bg-white/10 hover:bg-white/20 text-white font-semibold text-xs px-3 py-1.5 rounded-lg inline-flex items-center gap-1.5 transition-colors cursor-pointer border border-white/20 shrink-0"
-                title="Return to Community Celebrations Home"
+                title="Return to Celebrations Home"
               >
                 <ArrowLeft className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">Celebrations Home</span>
@@ -441,226 +283,127 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
         </div>
       </header>
 
-      {/* Main Center Login Card */}
-      <main className="flex-1 flex items-center justify-center p-4 sm:p-6 my-4 sm:my-8">
-        <div className="w-full max-w-md space-y-4">
-          {/* Authentication Card */}
-          <div className="bg-white border-2 border-amber-400/80 rounded-2xl shadow-xl overflow-hidden">
-            {/* Header / Welcoming Banner */}
-            <div className="bg-gradient-to-r from-[#7F1D1D] via-[#991B1B] to-[#7F1D1D] text-white p-6 text-center border-b-2 border-amber-400 relative">
-              <div className="w-16 h-16 rounded-full bg-amber-400 text-[#991B1B] flex items-center justify-center mx-auto mb-3 shadow-lg ring-4 ring-amber-300/30 overflow-hidden p-1 border-2 border-amber-300">
-                <img
-                  src="/lord_ganesha.svg"
-                  alt="Lord Sri Ganesha"
-                  className="w-full h-full object-contain rounded-full"
-                  referrerPolicy="no-referrer"
-                />
+      {/* Main Dual-Column Hero & Login Section */}
+      <main className="flex-1 max-w-6xl mx-auto w-full p-4 sm:p-6 lg:p-8 flex items-center justify-center">
+        <div className="w-full grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-center">
+          {/* LEFT COLUMN: Grand Sri Ganesha Festival Video Showcase */}
+          <div className="lg:col-span-7 w-full space-y-3">
+            <GaneshaFestivalVideoShowcase />
+
+            <div className="bg-amber-50/70 border border-amber-300/80 rounded-xl p-3 flex items-center justify-between text-xs text-amber-950">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-amber-600 shrink-0" />
+                <span>
+                  <strong>Eldorado Kannadigara Balaga</strong> &bull; Sri Ganeshotsava 2026
+                </span>
               </div>
-
-              <div className="inline-flex items-center gap-1.5 bg-amber-400/20 text-amber-200 text-[10px] font-bold uppercase tracking-wider px-3 py-0.5 rounded-full border border-amber-400/40 mb-2">
-                <Sparkles className="w-3 h-3 text-amber-300" />
-                <span>Sri Ganeshotsava 2026</span>
-              </div>
-
-              <h2 className="text-xl sm:text-2xl font-serif font-black tracking-wide leading-snug">
-                Sign in to Ganeshotsava Portal
-              </h2>
-              <p className="text-xs sm:text-sm text-amber-200/90 font-medium mt-1">
-                {authMode === 'email'
-                  ? (otpStage === 'request' ? 'Passwordless Email Magic Link' : 'Check your email for link or enter code')
-                  : 'Enter committee access password'}
-              </p>
+              <span className="text-[11px] text-amber-800 font-bold hidden sm:inline">
+                ಸಿರಿಗನ್ನಡಂ ಗೆಲ್ಗೆ! ಸಿರಿಗನ್ನಡಂ ಬಾಳ್ಗೆ! 🚩
+              </span>
             </div>
+          </div>
 
-            {/* Navigation Tabs: Magic Link vs Passcode */}
-            <div className="flex border-b border-stone-200 bg-stone-50/70 p-1.5 gap-1.5">
-              <button
-                type="button"
-                onClick={() => {
-                  setAuthMode('email');
-                  setError(null);
-                }}
-                className={`flex-1 py-2 px-3 text-xs font-bold rounded-xl transition-all inline-flex items-center justify-center gap-2 cursor-pointer ${
-                  authMode === 'email'
-                    ? 'bg-white text-[#991B1B] shadow-xs border border-stone-200'
-                    : 'text-stone-600 hover:text-stone-900 hover:bg-stone-100'
-                }`}
-              >
-                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                <span>Magic Link &amp; OTP</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setAuthMode('passcode');
-                  setError(null);
-                }}
-                className={`flex-1 py-2 px-3 text-xs font-bold rounded-xl transition-all inline-flex items-center justify-center gap-2 cursor-pointer ${
-                  authMode === 'passcode'
-                    ? 'bg-white text-[#991B1B] shadow-xs border border-stone-200'
-                    : 'text-stone-600 hover:text-stone-900 hover:bg-stone-100'
-                }`}
-              >
-                <KeyRound className="w-3.5 h-3.5" />
-                <span>Access Passcode</span>
-              </button>
-            </div>
-
-            <div className="p-6 sm:p-7 space-y-4">
-              {/* Error Notice */}
-              {error && (
-                <div className="bg-red-50 border border-red-200 text-red-800 rounded-xl p-3 text-xs flex items-start gap-2.5 animate-in fade-in duration-150">
-                  <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
-                  <span className="font-medium">{error}</span>
+          {/* RIGHT COLUMN: Clean Login & Registration Card */}
+          <div className="lg:col-span-5 w-full">
+            <div className="bg-white border-2 border-amber-400 rounded-2xl shadow-xl overflow-hidden">
+              {/* Header Banner */}
+              <div className="bg-gradient-to-r from-[#7F1D1D] via-[#991B1B] to-[#7F1D1D] text-white p-5 text-center border-b-2 border-amber-400 relative">
+                <div className="w-14 h-14 rounded-full bg-amber-400 text-[#991B1B] flex items-center justify-center mx-auto mb-2.5 shadow-lg ring-4 ring-amber-300/30 overflow-hidden p-1 border-2 border-amber-300">
+                  <img
+                    src="/lord_ganesha.svg"
+                    alt="Lord Sri Ganesha"
+                    className="w-full h-full object-contain rounded-full"
+                    referrerPolicy="no-referrer"
+                  />
                 </div>
-              )}
 
-              {/* Info Notice (Link & OTP Sent to Email notification) */}
-              {infoMessage && (
-                <div className="bg-emerald-50 border border-emerald-300 text-emerald-900 rounded-xl p-3.5 text-xs space-y-1.5 animate-in fade-in duration-150">
-                  <div className="flex items-center gap-2 font-bold text-emerald-950">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                    <span>Sign-In Link &amp; Code Dispatched</span>
+                <div className="inline-flex items-center gap-1.5 bg-amber-400/20 text-amber-200 text-[10px] font-bold uppercase tracking-wider px-3 py-0.5 rounded-full border border-amber-400/40 mb-1.5">
+                  <Sparkles className="w-3 h-3 text-amber-300" />
+                  <span>Devotee &amp; Resident Portal</span>
+                </div>
+
+                <h2 className="text-xl sm:text-2xl font-serif font-black tracking-wide leading-snug">
+                  Login / Register by Email
+                </h2>
+                <p className="text-xs text-amber-200/90 font-medium mt-0.5">
+                  Enter your email or phone to log in, or register as a new devotee
+                </p>
+              </div>
+
+              <div className="p-5 sm:p-6 space-y-4">
+                {/* Error Notice */}
+                {error && (
+                  <div className="bg-red-50 border border-red-200 text-red-800 rounded-xl p-3 text-xs flex items-start gap-2.5 animate-in fade-in duration-150">
+                    <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                    <span className="font-medium">{error}</span>
                   </div>
-                  <p className="text-[12px] leading-relaxed text-emerald-800">
-                    {infoMessage}
-                  </p>
-                  <p className="text-[11px] text-emerald-700/90 font-medium">
-                    📧 Don't see it? Please check your Spam or Junk mail folder.
-                  </p>
-                </div>
-              )}
+                )}
 
-              {/* MODE 1: EMAIL MAGIC LINK & OTP LOGIN */}
-              {authMode === 'email' && (
-                <div className="space-y-4">
-                  {otpStage === 'request' ? (
-                    /* Stage 1: Request Email */
-                    <form onSubmit={handleSendOtp} className="space-y-4">
-                      <div className="space-y-1.5 text-left">
-                        <label className="block text-xs font-bold uppercase tracking-wider text-stone-700">
-                          Your Email Address
-                        </label>
-                        <div className="relative">
-                          <Mail className="w-4 h-4 absolute left-3.5 top-3.5 text-stone-400" />
-                          <input
-                            type="email"
-                            required
-                            value={emailInput}
-                            onChange={e => {
-                              setEmailInput(e.target.value);
-                              if (error) setError(null);
-                            }}
-                            placeholder="e.g. resident@gmail.com"
-                            autoFocus
-                            className="w-full bg-stone-50 border border-stone-300 rounded-xl pl-10 pr-4 py-3 text-sm text-stone-900 outline-none focus:bg-white focus:border-[#991B1B] focus:ring-2 focus:ring-[#991B1B]/20 transition-all font-medium"
-                          />
-                        </div>
-                        <p className="text-[11px] text-stone-500">
-                          We will send a passwordless sign-in link to your email. Click it to log in instantly.
-                        </p>
-                      </div>
+                {/* Info Notice */}
+                {infoMessage && (
+                  <div className="bg-amber-50 border border-amber-300 text-amber-900 rounded-xl p-3 text-xs flex items-start gap-2.5 animate-in fade-in duration-150">
+                    <Sparkles className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                    <span className="font-medium">{infoMessage}</span>
+                  </div>
+                )}
 
-                      <button
-                        type="submit"
-                        disabled={isSubmitting || !emailInput.trim()}
-                        className="w-full bg-[#991B1B] hover:bg-[#7F1D1D] active:scale-[0.99] text-white font-bold text-xs sm:text-sm uppercase tracking-wider py-3.5 px-4 rounded-xl shadow-md inline-flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
-                      >
-                        <Sparkles className="w-4 h-4 text-amber-300" />
-                        <span>{isSubmitting ? 'Sending Sign-In Link...' : 'Send Magic Sign-In Link'}</span>
-                      </button>
-                    </form>
-                  ) : (
-                    /* Stage 2: Enter 6-digit OTP or click link */
-                    <form onSubmit={handleVerifyOtp} className="space-y-4">
-                      {/* Magic Link & OTP Explanation */}
-                      <div className="bg-amber-50/80 border border-amber-200/80 rounded-xl p-3 text-xs text-amber-950 space-y-1.5 text-left">
-                        <div className="font-bold flex items-center gap-1.5 text-amber-900">
-                          <Sparkles className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                          <span>Check Your Email</span>
-                        </div>
-                        <p className="text-[11px] text-amber-800 leading-relaxed">
-                          A secure passwordless sign-in link and verification code have been dispatched to your email. Click the link in your email to authenticate automatically, or type the received 6-digit code below.
-                        </p>
-                      </div>
+                {/* LOGIN FORM */}
+                <form onSubmit={handleLoginSubmit} className="space-y-4 text-left">
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-stone-700">
+                      Email Address or Mobile Number
+                    </label>
+                    <div className="relative">
+                      <Mail className="w-4 h-4 absolute left-3.5 top-3.5 text-stone-400" />
+                      <input
+                        type="text"
+                        required
+                        value={identifierInput}
+                        onChange={e => {
+                          setIdentifierInput(e.target.value);
+                          if (error) setError(null);
+                        }}
+                        placeholder="e.g. resident@gmail.com or 9876543210"
+                        autoFocus
+                        className="w-full bg-stone-50 border border-stone-300 rounded-xl pl-10 pr-4 py-3 text-sm text-stone-900 outline-none focus:bg-white focus:border-[#991B1B] focus:ring-2 focus:ring-[#991B1B]/20 transition-all font-medium"
+                      />
+                    </div>
+                    <p className="text-[11px] text-stone-500">
+                      Enter your email ID or 10-digit mobile number to access your account.
+                    </p>
+                  </div>
 
-                      <div className="space-y-2 text-left">
-                        <div className="flex items-center justify-between">
-                          <label className="block text-xs font-bold uppercase tracking-wider text-stone-700">
-                            Enter 6-Digit Code
-                          </label>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setOtpStage('request');
-                              setError(null);
-                            }}
-                            className="text-[11px] text-[#991B1B] hover:underline font-semibold cursor-pointer"
-                          >
-                            Change Email
-                          </button>
-                        </div>
+                  {/* Primary Login Button (Renamed from Verify Email / Phone) */}
+                  <button
+                    type="submit"
+                    disabled={isSubmitting || !identifierInput.trim()}
+                    className="w-full bg-[#991B1B] hover:bg-[#7F1D1D] active:scale-[0.99] text-white font-bold text-xs sm:text-sm uppercase tracking-wider py-3.5 px-4 rounded-xl shadow-md inline-flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    <LogIn className="w-4 h-4 text-amber-300" />
+                    <span>{isSubmitting ? 'Logging in...' : 'Login'}</span>
+                  </button>
 
-                        <div className="p-2 bg-stone-50 rounded-xl border border-stone-200 text-xs text-stone-600 flex items-center justify-between">
-                          <span className="font-medium truncate max-w-[220px]">{emailInput}</span>
-                          <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                            <span>Link Dispatched</span>
-                          </span>
-                        </div>
-
-                        {/* 6 Digit Input Boxes */}
-                        <div className="grid grid-cols-6 gap-2 pt-1">
-                          {otpDigits.map((digit, idx) => (
-                            <input
-                              key={idx}
-                              ref={el => (otpInputRefs.current[idx] = el)}
-                              type="text"
-                              inputMode="numeric"
-                              maxLength={idx === 0 ? 6 : 1}
-                              value={digit}
-                              onChange={e => handleOtpDigitChange(idx, e.target.value)}
-                              onKeyDown={e => handleOtpKeyDown(idx, e)}
-                              className="w-full h-12 text-center text-lg font-mono font-bold bg-stone-50 border border-stone-300 rounded-xl outline-none focus:bg-white focus:border-[#991B1B] focus:ring-2 focus:ring-[#991B1B]/20 transition-all text-stone-900"
-                            />
-                          ))}
-                        </div>
-                      </div>
-
-                      <button
-                        type="submit"
-                        disabled={isSubmitting || otpDigits.join('').length !== 6}
-                        className="w-full bg-[#991B1B] hover:bg-[#7F1D1D] active:scale-[0.99] text-white font-bold text-xs sm:text-sm uppercase tracking-wider py-3.5 px-4 rounded-xl shadow-md inline-flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
-                      >
-                        <ShieldCheck className="w-4 h-4 text-amber-300" />
-                        <span>{isSubmitting ? 'Verifying Code...' : 'Verify Code & Sign In'}</span>
-                      </button>
-
-                      {/* Resend button */}
-                      <div className="flex items-center justify-center pt-1 text-xs text-stone-500">
-                        {resendTimer > 0 ? (
-                          <span>Resend link &amp; code in <strong className="text-stone-800">{resendTimer}s</strong></span>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => handleSendOtp()}
-                            disabled={isSubmitting}
-                            className="text-[#991B1B] hover:underline font-bold inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                          >
-                            <RefreshCw className="w-3.5 h-3.5" />
-                            <span>Resend Magic Link &amp; Code</span>
-                          </button>
-                        )}
-                      </div>
-                    </form>
-                  )}
+                  {/* Dedicated Register Button: New Devotee? Register Profile & Photo */}
+                  <div className="pt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setOnboardingEmail(identifierInput.includes('@') ? identifierInput.trim() : '');
+                        setOnboardingMobile(/^\d{10}$/.test(identifierInput.trim()) ? identifierInput.trim() : '');
+                        setShowOnboarding(true);
+                      }}
+                      className="w-full py-2.5 px-4 rounded-xl border-2 border-dashed border-amber-400 bg-amber-50/70 hover:bg-amber-100 text-stone-900 font-bold text-xs transition-colors inline-flex items-center justify-center gap-2 cursor-pointer shadow-2xs"
+                    >
+                      <UserPlus className="w-4 h-4 text-[#991B1B]" />
+                      <span>New Devotee? Register Profile &amp; Photo</span>
+                    </button>
+                  </div>
 
                   {/* Divider */}
-                  <div className="relative flex items-center justify-center my-3">
+                  <div className="relative flex items-center justify-center my-2">
                     <div className="border-t border-stone-200 w-full" />
                     <span className="bg-white px-2.5 text-[10px] text-stone-400 uppercase tracking-wider font-semibold">
-                      Or sign in with Google
+                      Or 1-click Google login
                     </span>
                   </div>
 
@@ -689,65 +432,25 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
                         d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
                       />
                     </svg>
-                    <span>{loadingGoogle ? 'Signing in...' : 'Sign in with Google'}</span>
-                  </button>
-                </div>
-              )}
-
-              {/* MODE 2: TRADITIONAL COMMITTEE PASSCODE LOGIN */}
-              {authMode === 'passcode' && (
-                <form onSubmit={handlePasscodeSubmit} className="space-y-4">
-                  <div className="space-y-1.5 text-left">
-                    <label className="block text-xs font-bold uppercase tracking-wider text-stone-700">
-                      Committee Access Password
-                    </label>
-                    <div className="relative">
-                      <input
-                        type={showPassword ? 'text' : 'password'}
-                        value={password}
-                        onChange={e => {
-                          setPassword(e.target.value);
-                          if (error) setError(null);
-                        }}
-                        placeholder="Enter password to see details"
-                        autoFocus
-                        className="w-full bg-stone-50 border border-stone-300 rounded-xl pl-3.5 pr-10 py-3 text-sm text-stone-900 outline-none focus:bg-white focus:border-[#991B1B] focus:ring-2 focus:ring-[#991B1B]/20 transition-all font-medium"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 cursor-pointer p-1"
-                        title={showPassword ? 'Hide password' : 'Show password'}
-                      >
-                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
-                    </div>
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={isSubmitting || !password.trim()}
-                    className="w-full bg-[#991B1B] hover:bg-[#7F1D1D] active:scale-[0.99] text-white font-bold text-xs sm:text-sm uppercase tracking-wider py-3.5 px-4 rounded-xl shadow-md inline-flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
-                  >
-                    <KeyRound className="w-4 h-4 text-amber-300" />
-                    <span>{isSubmitting ? 'Verifying Password...' : 'Enter & View Details'}</span>
+                    <span>{loadingGoogle ? 'Signing in with Google...' : 'Sign in with Google'}</span>
                   </button>
                 </form>
-              )}
 
-              <div className="pt-2 border-t border-stone-100 flex items-center justify-center gap-2 text-stone-400 text-xs text-center">
-                <ShieldCheck className="w-3.5 h-3.5 text-stone-400 shrink-0" />
-                <span>First-time visitors will be guided to enter resident details</span>
+                <div className="pt-2 border-t border-stone-100 flex items-center justify-center gap-2 text-stone-400 text-xs text-center">
+                  <ShieldCheck className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+                  <span>Secure devotee portal &bull; Eldorado Kannadigara Balaga</span>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </main>
 
-      {/* First-Time User Profile Onboarding Modal */}
+      {/* Devotee Registration / Onboarding Modal with Photo Capture */}
       {showOnboarding && (
         <UserProfileOnboardingModal
           email={onboardingEmail}
+          initialMobile={onboardingMobile}
           settings={settings}
           onComplete={handleOnboardingComplete}
           onCancel={() => setShowOnboarding(false)}
@@ -755,7 +458,7 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
       )}
 
       {/* Footer */}
-      <footer className="text-center text-xs text-stone-400 py-4 px-4 border-t border-stone-200/60 bg-white">
+      <footer className="text-center text-xs text-stone-400 py-3.5 px-4 border-t border-stone-200/60 bg-white shrink-0">
         {cleanOrgName(settings.org, 'Eldorado Ganeshotsava 2026')} &bull; Ganeshotsava 2026
       </footer>
     </div>

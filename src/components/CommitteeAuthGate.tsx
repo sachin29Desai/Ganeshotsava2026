@@ -11,7 +11,8 @@ import {
   ArrowRight,
   ArrowLeft,
   LogIn,
-  HeartHandshake
+  HeartHandshake,
+  Check
 } from 'lucide-react';
 import { AppSettings, UserRole, UserProfile } from '../types';
 import { cleanOrgName } from '../utils/helpers';
@@ -47,6 +48,9 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [onboardingEmail, setOnboardingEmail] = useState('');
   const [onboardingMobile, setOnboardingMobile] = useState('');
+
+  // Thank You modal state on complete registration
+  const [showThankYou, setShowThankYou] = useState<UserProfile | null>(null);
 
   // UI state
   const [error, setError] = useState<string | null>(null);
@@ -87,7 +91,7 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
     return 'viewer';
   };
 
-  // --- LOGIN HANDLER (By Email or Phone Number) ---
+  // --- LOGIN HANDLER (For Existing Users Only) ---
   const handleLoginSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setError(null);
@@ -95,7 +99,7 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
 
     const rawInput = identifierInput.trim();
     if (!rawInput) {
-      setError('Please enter your email address or 10-digit mobile number.');
+      setError('Please enter your registered email address or 10-digit mobile number.');
       return;
     }
 
@@ -112,14 +116,10 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
           return;
         }
 
-        // Look up registered user profile by phone in Firestore
+        // Look up registered user profile in database
         const profile = await cloudGetUserProfileByPhone(cleanedDigits);
         if (!profile) {
-          // First time user with this phone -> Open Registration Form!
-          setOnboardingMobile(cleanedDigits);
-          setOnboardingEmail('');
-          setShowOnboarding(true);
-          setInfoMessage('Mobile number not found in registered list. Please complete your registration below.');
+          setError('Devotee profile not found for this mobile number. If you are a new devotee, please click the "Register" button below.');
           setIsSubmitting(false);
           return;
         }
@@ -144,38 +144,43 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
         return;
       }
 
-      // Check if user is already registered in Firestore
+      const adminList = getAdminEmails().map(e => e.toLowerCase());
+      const isSuperAdmin = cleanEmail === 'desaisachin95@gmail.com' || adminList.includes(cleanEmail);
+
+      // Check if user is already registered in database
       const existingProfile = await cloudGetUserProfile(cleanEmail);
 
-      if (existingProfile) {
-        // RETURNING REGISTERED DEVOTEE: Instant login without OTP!
-        const role = resolveRole(cleanEmail, existingProfile.role);
+      if (existingProfile || isSuperAdmin) {
+        // RETURNING REGISTERED DEVOTEE or Admin: Instant login & dispatch verification link
+        const profile = existingProfile || {
+          email: cleanEmail,
+          name: isSuperAdmin ? 'Sachin Desai (Admin)' : 'Devotee',
+          flat: 'Admin Desk',
+          mobile: '',
+          role: 'admin' as UserRole
+        };
+        const role = resolveRole(cleanEmail, profile.role);
         sessionStorage.setItem('eg_committee_auth', 'true');
         sessionStorage.setItem('eg_user_role', role);
         sessionStorage.setItem('eg_user_email', cleanEmail);
-        sessionStorage.setItem('eg_user_profile', JSON.stringify({ ...existingProfile, role }));
+        sessionStorage.setItem('eg_user_profile', JSON.stringify({ ...profile, role }));
 
-        // Optional background magic link dispatch for convenient 1-click bookmarks
         if (auth) {
           try {
             const continueUrl = `${window.location.origin}${window.location.pathname}?email=${encodeURIComponent(cleanEmail)}`;
-            sendSignInLinkToEmail(auth, cleanEmail, {
+            await sendSignInLinkToEmail(auth, cleanEmail, {
               url: continueUrl,
               handleCodeInApp: true
-            }).catch(() => {});
+            });
           } catch {}
         }
 
-        onSuccess(role, existingProfile);
+        onSuccess(role, profile);
         return;
       }
 
       // UNREGISTERED FIRST-TIME USER:
-      // Show registration form directly with email prefilled!
-      setOnboardingEmail(cleanEmail);
-      setOnboardingMobile('');
-      setShowOnboarding(true);
-      setInfoMessage('Welcome! Please complete your registration below to create your devotee account & photo.');
+      setError('We could not find a devotee profile with this email address. If you are a new resident, please click the "Register" button below to create your account.');
     } catch (err: any) {
       console.error('Error during login:', err);
       setError('An error occurred while logging in. Please verify your internet connection.');
@@ -190,7 +195,7 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
     setLoadingGoogle(true);
     try {
       if (!auth) {
-        throw new Error('Firebase Authentication is not configured.');
+        throw new Error('Authentication services are currently unavailable.');
       }
       const result = await signInWithPopup(auth, googleProvider);
       const email = (result.user.email || '').toLowerCase().trim();
@@ -201,7 +206,7 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
       // Check if user exists in database
       const existingProfile = await cloudGetUserProfile(email);
       if (!existingProfile) {
-        // Prompt first-time user to complete registration with Flat & Picture
+        // Prompt first-time user to complete registration
         setOnboardingEmail(email);
         setShowOnboarding(true);
         setLoadingGoogle(false);
@@ -223,15 +228,40 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
     }
   };
 
-  // Onboarding completion handler
-  const handleOnboardingComplete = (newProfile: UserProfile) => {
+  // Onboarding completion handler -> Shows Custom Thank You Modal first
+  const handleOnboardingComplete = async (newProfile: UserProfile) => {
     setShowOnboarding(false);
+    
+    // Automatically trigger passwordless verification link in background for the new user
+    if (auth && newProfile.email) {
+      try {
+        const continueUrl = `${window.location.origin}${window.location.pathname}?email=${encodeURIComponent(newProfile.email)}`;
+        await sendSignInLinkToEmail(auth, newProfile.email, {
+          url: continueUrl,
+          handleCodeInApp: true
+        });
+      } catch (err) {
+        console.warn('Onboarding magic link error:', err);
+      }
+    }
+
+    // Cache session storage values
     const role = resolveRole(newProfile.email, newProfile.role);
     sessionStorage.setItem('eg_committee_auth', 'true');
     sessionStorage.setItem('eg_user_role', role);
     sessionStorage.setItem('eg_user_email', newProfile.email);
     sessionStorage.setItem('eg_user_profile', JSON.stringify({ ...newProfile, role }));
-    onSuccess(role, newProfile);
+
+    // Open Thank You Dialog
+    setShowThankYou(newProfile);
+  };
+
+  const handleThankYouConfirm = () => {
+    if (showThankYou) {
+      const role = resolveRole(showThankYou.email, showThankYou.role);
+      onSuccess(role, showThankYou);
+      setShowThankYou(null);
+    }
   };
 
   return (
@@ -288,7 +318,7 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
         <div className="w-full grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-center">
           {/* LEFT COLUMN: Grand Sri Ganesha Festival Video Showcase */}
           <div className="lg:col-span-7 w-full space-y-3">
-            <GaneshaFestivalVideoShowcase />
+            <GaneshaFestivalVideoShowcase settings={settings} />
 
             <div className="bg-amber-50/70 border border-amber-300/80 rounded-xl p-3 flex items-center justify-between text-xs text-amber-950">
               <div className="flex items-center gap-2">
@@ -369,21 +399,21 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
                       />
                     </div>
                     <p className="text-[11px] text-stone-500">
-                      Enter your email ID or 10-digit mobile number to access your account.
+                      Existing users: Enter your registered email ID or 10-digit mobile number to login.
                     </p>
                   </div>
 
-                  {/* Primary Login Button (Renamed from Verify Email / Phone) */}
+                  {/* Primary Login Button (Only for existing users) */}
                   <button
                     type="submit"
                     disabled={isSubmitting || !identifierInput.trim()}
                     className="w-full bg-[#991B1B] hover:bg-[#7F1D1D] active:scale-[0.99] text-white font-bold text-xs sm:text-sm uppercase tracking-wider py-3.5 px-4 rounded-xl shadow-md inline-flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
                   >
                     <LogIn className="w-4 h-4 text-amber-300" />
-                    <span>{isSubmitting ? 'Logging in...' : 'Login'}</span>
+                    <span>{isSubmitting ? 'Verifying Devotee...' : 'Login'}</span>
                   </button>
 
-                  {/* Dedicated Register Button: New Devotee? Register Profile & Photo */}
+                  {/* Dedicated Register Button: Register */}
                   <div className="pt-1">
                     <button
                       type="button"
@@ -395,7 +425,7 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
                       className="w-full py-2.5 px-4 rounded-xl border-2 border-dashed border-amber-400 bg-amber-50/70 hover:bg-amber-100 text-stone-900 font-bold text-xs transition-colors inline-flex items-center justify-center gap-2 cursor-pointer shadow-2xs"
                     >
                       <UserPlus className="w-4 h-4 text-[#991B1B]" />
-                      <span>New Devotee? Register Profile &amp; Photo</span>
+                      <span>Register</span>
                     </button>
                   </div>
 
@@ -446,7 +476,7 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
         </div>
       </main>
 
-      {/* Devotee Registration / Onboarding Modal with Photo Capture */}
+      {/* Devotee Registration / Onboarding Modal */}
       {showOnboarding && (
         <UserProfileOnboardingModal
           email={onboardingEmail}
@@ -455,6 +485,43 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
           onComplete={handleOnboardingComplete}
           onCancel={() => setShowOnboarding(false)}
         />
+      )}
+
+      {/* Thank You dialog upon successful registration */}
+      {showThankYou && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white border-2 border-amber-400 rounded-2xl max-w-md w-full p-6 text-center space-y-4 shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center mx-auto border border-emerald-300">
+              <Check className="w-8 h-8 text-emerald-600" />
+            </div>
+            
+            <h3 className="text-xl font-serif font-black text-stone-900 leading-snug">
+              Thank You for Registering!
+            </h3>
+            
+            <p className="text-xs text-stone-600 leading-relaxed">
+              Welcome, <strong className="text-stone-900">{showThankYou.name}</strong>! Your profile (Flat {showThankYou.flat}) has been registered securely in our devotee database.
+            </p>
+
+            <div className="p-3 bg-amber-50/70 border border-amber-300/80 rounded-xl text-left text-[11px] text-amber-950 space-y-1">
+              <span className="font-bold flex items-center gap-1 text-amber-900">
+                <Mail className="w-3.5 h-3.5 text-[#991B1B]" />
+                <span>Verification Link Sent</span>
+              </span>
+              <p className="leading-relaxed">
+                We have sent a secure sign-in / verification link to <strong className="font-semibold text-stone-900">{showThankYou.email}</strong>. Please check your inbox (and spam folder) and click the link to verify your email.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleThankYouConfirm}
+              className="w-full py-3 bg-[#991B1B] hover:bg-[#7F1D1D] text-white font-bold text-xs sm:text-sm uppercase tracking-wider rounded-xl shadow-md cursor-pointer transition-colors"
+            >
+              Proceed to Devotee Portal
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Footer */}

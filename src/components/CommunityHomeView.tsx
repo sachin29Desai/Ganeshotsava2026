@@ -69,6 +69,8 @@ interface CommunityHomeViewProps {
   contributions: Contribution[];
   onNavigateToGaneshotsava: () => void;
   onNavigateToReceipts: () => void;
+  isAdmin?: boolean;
+  onUpdateSettings?: (cfg: AppSettings) => void;
 }
 
 export type CommunityPageTab =
@@ -86,7 +88,9 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
   settings,
   contributions,
   onNavigateToGaneshotsava,
-  onNavigateToReceipts
+  onNavigateToReceipts,
+  isAdmin = false,
+  onUpdateSettings
 }) => {
   // Theme state synced with localStorage
   const [isDark, setIsDark] = useState<boolean>(() => {
@@ -684,7 +688,11 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
                     </p>
                   </div>
                 </div>
-                <GaneshaFestivalVideoShowcase />
+                <GaneshaFestivalVideoShowcase
+                  settings={settings}
+                  isAdmin={isAdmin}
+                  onUpdateSettings={onUpdateSettings}
+                />
               </div>
             </section>
 

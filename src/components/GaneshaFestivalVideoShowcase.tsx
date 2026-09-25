@@ -10,77 +10,102 @@ import {
   Upload,
   Video as VideoIcon,
   Flame,
-  Bell,
-  Heart,
-  ExternalLink,
-  X
+  X,
+  Plus,
+  Trash2,
+  ChevronLeft,
+  ChevronRight,
+  ImageIcon
 } from 'lucide-react';
+import { AppSettings } from '../types';
 
 interface GaneshaFestivalVideoShowcaseProps {
   compact?: boolean;
   className?: string;
-  onExploreEvents?: () => void;
+  isAdmin?: boolean;
+  settings?: AppSettings;
+  onUpdateSettings?: (cfg: AppSettings) => void;
+}
+
+interface MediaItem {
+  id: string;
+  type: 'video' | 'photo';
+  url: string;
+  caption?: string;
 }
 
 export const GaneshaFestivalVideoShowcase: React.FC<GaneshaFestivalVideoShowcaseProps> = ({
   compact = false,
   className = '',
-  onExploreEvents
+  isAdmin = false,
+  settings,
+  onUpdateSettings
 }) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const videoFileInputRef = useRef<HTMLInputElement | null>(null);
+  const photoFileInputRef = useRef<HTMLInputElement | null>(null);
 
+  // Compile full media list from Settings database
+  const getMediaList = (): MediaItem[] => {
+    const list: MediaItem[] = [];
+    
+    // Add custom admin videos
+    if (settings?.adminVideos && Array.isArray(settings.adminVideos)) {
+      settings.adminVideos.forEach((url, i) => {
+        if (url) list.push({ id: `v_${i}`, type: 'video', url });
+      });
+    }
+    
+    // Add custom admin photos
+    if (settings?.adminPhotos && Array.isArray(settings.adminPhotos)) {
+      settings.adminPhotos.forEach((url, i) => {
+        if (url) list.push({ id: `p_${i}`, type: 'photo', url });
+      });
+    }
+
+    // Default fallback if no admin media is configured
+    if (list.length === 0) {
+      list.push({
+        id: 'default_video',
+        type: 'video',
+        url: '/ganesha_festival_darshan.mp4',
+        caption: 'Grand Festival Darshan Video'
+      });
+    }
+
+    return list;
+  };
+
+  const mediaItems = getMediaList();
+  const [currentIndex, setCurrentIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(true);
   const [isMuted, setIsMuted] = useState(true);
-  const [showFlowers, setShowFlowers] = useState(false);
-  const [videoSrc, setVideoSrc] = useState<string>(() => {
-    try {
-      const custom = localStorage.getItem('ekb_custom_festival_video');
-      if (custom) return custom;
-    } catch {}
-    return '/ganesha_festival_darshan.mp4';
-  });
   const [videoError, setVideoError] = useState(false);
-  const [showVideoModal, setShowVideoModal] = useState(false);
-  const [customUrlInput, setCustomUrlInput] = useState('');
-  const [bellRinging, setBellRinging] = useState(false);
+  
+  // Admin Media Management Modal
+  const [showAdminModal, setShowAdminModal] = useState(false);
+  const [newVideoUrl, setNewVideoUrl] = useState('');
+  const [newPhotoUrl, setNewPhotoUrl] = useState('');
+  const [saveStatus, setSaveStatus] = useState<string | null>(null);
 
-  // Play Bell Sound using Web Audio API
-  const playTempleBellSound = () => {
-    try {
-      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-      if (!AudioContextClass) return;
-      const ctx = new AudioContextClass();
+  const currentMedia = mediaItems[currentIndex] || mediaItems[0];
 
-      // Polyphonic bell harmonic frequencies
-      const frequencies = [587.33, 880.0, 1174.66, 1760.0];
-      const now = ctx.currentTime;
-
-      frequencies.forEach((freq, idx) => {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-
-        osc.type = idx === 0 ? 'sine' : 'triangle';
-        osc.frequency.setValueAtTime(freq, now);
-
-        gain.gain.setValueAtTime(0.25 / (idx + 1), now);
-        gain.gain.exponentialRampToValueAtTime(0.0001, now + 2.5);
-
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-
-        osc.start(now);
-        osc.stop(now + 2.6);
+  // Auto-play / restart on media item switch
+  useEffect(() => {
+    setVideoError(false);
+    setIsPlaying(true);
+    if (currentMedia.type === 'video' && videoRef.current) {
+      videoRef.current.load();
+      videoRef.current.play().catch(() => {
+        // Handle browsers block of non-muted autoplay
+        setIsMuted(true);
+        if (videoRef.current) {
+          videoRef.current.muted = true;
+          videoRef.current.play().catch(err => console.warn('Autoplay failed:', err));
+        }
       });
-
-      setBellRinging(true);
-      setShowFlowers(true);
-      setTimeout(() => setBellRinging(false), 800);
-      setTimeout(() => setShowFlowers(false), 4000);
-    } catch (e) {
-      console.warn('Audio synthesis notice:', e);
     }
-  };
+  }, [currentIndex, currentMedia.url]);
 
   const togglePlay = () => {
     if (!videoRef.current) return;
@@ -108,70 +133,101 @@ export const GaneshaFestivalVideoShowcase: React.FC<GaneshaFestivalVideoShowcase
   const handleRestart = () => {
     if (!videoRef.current) return;
     videoRef.current.currentTime = 0;
-    videoRef.current.play();
-    setIsPlaying(true);
+    videoRef.current.play().then(() => setIsPlaying(true)).catch(() => {});
   };
 
-  // Handle Video File Upload
-  const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePrevMedia = () => {
+    setCurrentIndex((prev) => (prev === 0 ? mediaItems.length - 1 : prev - 1));
+  };
+
+  const handleNextMedia = () => {
+    setCurrentIndex((prev) => (prev === mediaItems.length - 1 ? 0 : prev + 1));
+  };
+
+  // Admin database save trigger
+  const saveMediaToDatabase = async (updatedVideos: string[], updatedPhotos: string[]) => {
+    if (!onUpdateSettings || !settings) return;
+    setSaveStatus('Saving...');
+    try {
+      const updatedSettings: AppSettings = {
+        ...settings,
+        adminVideos: updatedVideos,
+        adminPhotos: updatedPhotos
+      };
+      await onUpdateSettings(updatedSettings);
+      setSaveStatus('Media saved securely to devotee portal database!');
+      setTimeout(() => setSaveStatus(null), 3500);
+    } catch (err) {
+      console.error(err);
+      setSaveStatus('Failed to save to database. Check connection.');
+    }
+  };
+
+  // Add custom links
+  const handleAddVideoUrl = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newVideoUrl.trim()) return;
+    const currentVideos = settings?.adminVideos || [];
+    const updated = [...currentVideos, newVideoUrl.trim()];
+    const currentPhotos = settings?.adminPhotos || [];
+    saveMediaToDatabase(updated, currentPhotos);
+    setNewVideoUrl('');
+  };
+
+  const handleAddPhotoUrl = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPhotoUrl.trim()) return;
+    const currentPhotos = settings?.adminPhotos || [];
+    const updated = [...currentPhotos, newPhotoUrl.trim()];
+    const currentVideos = settings?.adminVideos || [];
+    saveMediaToDatabase(currentVideos, updated);
+    setNewPhotoUrl('');
+  };
+
+  // Base64 file uploads
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, type: 'video' | 'photo') => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const objectUrl = URL.createObjectURL(file);
-    setVideoSrc(objectUrl);
-    setVideoError(false);
-    setIsPlaying(true);
-
-    // Save as data URL in local storage if reasonably sized, or keep objectUrl
-    if (file.size < 15 * 1024 * 1024) {
-      const reader = new FileReader();
-      reader.onload = (event: any) => {
-        try {
-          localStorage.setItem('ekb_custom_festival_video', event.target.result);
-        } catch {}
-      };
-      reader.readAsDataURL(file);
+    // Reject extremely large files to respect local/session storage limits
+    if (file.size > 8 * 1024 * 1024) {
+      alert('Selected file is too large (> 8MB). Please choose a compressed file or use a direct URL link.');
+      return;
     }
 
-    if (videoRef.current) {
-      videoRef.current.load();
-      videoRef.current.play().catch(e => console.warn(e));
-    }
+    const reader = new FileReader();
+    reader.onload = (event: any) => {
+      const dataUrl = event.target.result;
+      if (type === 'video') {
+        const currentVideos = settings?.adminVideos || [];
+        saveMediaToDatabase([...currentVideos, dataUrl], settings?.adminPhotos || []);
+      } else {
+        const currentPhotos = settings?.adminPhotos || [];
+        saveMediaToDatabase(settings?.adminVideos || [], [...currentPhotos, dataUrl]);
+      }
+    };
+    reader.readAsDataURL(file);
   };
 
-  const handleSaveCustomUrl = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!customUrlInput.trim()) return;
-    const url = customUrlInput.trim();
-    setVideoSrc(url);
-    try {
-      localStorage.setItem('ekb_custom_festival_video', url);
-    } catch {}
-    setShowVideoModal(false);
-    setCustomUrlInput('');
-    if (videoRef.current) {
-      videoRef.current.load();
-      videoRef.current.play().catch(e => console.warn(e));
+  // Remove item
+  const handleRemoveMedia = (indexToRemove: number, type: 'video' | 'photo') => {
+    if (type === 'video') {
+      const currentVideos = settings?.adminVideos || [];
+      const updated = currentVideos.filter((_, i) => i !== indexToRemove);
+      saveMediaToDatabase(updated, settings?.adminPhotos || []);
+    } else {
+      const currentPhotos = settings?.adminPhotos || [];
+      const updated = currentPhotos.filter((_, i) => i !== indexToRemove);
+      saveMediaToDatabase(settings?.adminVideos || [], updated);
     }
-  };
-
-  const handleResetDefaultVideo = () => {
-    try {
-      localStorage.removeItem('ekb_custom_festival_video');
-    } catch {}
-    setVideoSrc('/ganesha_festival_darshan.mp4');
-    setShowVideoModal(false);
-    if (videoRef.current) {
-      videoRef.current.load();
-      videoRef.current.play().catch(e => console.warn(e));
-    }
+    setCurrentIndex(0);
   };
 
   return (
     <div
       className={`relative rounded-2xl overflow-hidden border-2 border-amber-400 bg-stone-950 text-white shadow-xl flex flex-col ${className}`}
     >
-      {/* Top Festive Header Bar */}
+      {/* Top Header Bar */}
       <div className="bg-gradient-to-r from-[#7F1D1D] via-[#991B1B] to-[#7F1D1D] px-3.5 py-2.5 flex items-center justify-between border-b border-amber-400/80 z-10 shrink-0">
         <div className="flex items-center gap-2">
           <span className="p-1 rounded-lg bg-amber-400 text-stone-950 shadow-xs">
@@ -180,161 +236,134 @@ export const GaneshaFestivalVideoShowcase: React.FC<GaneshaFestivalVideoShowcase
           <div>
             <div className="flex items-center gap-2">
               <h3 className="font-serif font-black text-xs sm:text-sm tracking-wide text-amber-200">
-                ಶ್ರೀ ಗಣೇಶೋತ್ಸವ ಮಹಾದರ್ಶನ
+                ಶ್ರೀ ಗಣೇಶೋತ್ಸವ ಮಹಾದರ್ಶನ shree ganehotsava 2026
               </h3>
               <span className="text-[10px] font-bold uppercase bg-amber-400/30 text-amber-300 px-2 py-0.5 rounded-full border border-amber-400/50 hidden xs:inline">
                 Live Darshan
               </span>
             </div>
             <p className="text-[10px] text-amber-100/80 font-medium truncate max-w-[220px] sm:max-w-none">
-              Eldorado Ganeshotsava 2026 • Royal Pandal Celebration
+              Eldorado Ganeshotsava 2026
             </p>
           </div>
         </div>
 
-        {/* Quick Action Buttons */}
-        <div className="flex items-center gap-1.5">
-          {/* Bell / Aarti Chime */}
+        {/* Change / Upload Video Settings (Admin Only or custom overlay) */}
+        {isAdmin && (
           <button
             type="button"
-            onClick={playTempleBellSound}
-            className={`p-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer inline-flex items-center gap-1 shadow-2xs ${
-              bellRinging
-                ? 'bg-amber-400 text-stone-950 border-amber-300 scale-105'
-                : 'bg-white/10 hover:bg-white/20 text-amber-300 border-white/20'
-            }`}
-            title="Ring temple bell and shower sacred flowers!"
-          >
-            <Bell className={`w-3.5 h-3.5 ${bellRinging ? 'animate-bounce' : ''}`} />
-            <span className="text-[10px] hidden sm:inline">Aarti Bell</span>
-          </button>
-
-          {/* Change / Upload Video Settings */}
-          <button
-            type="button"
-            onClick={() => setShowVideoModal(true)}
-            className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-amber-200 text-xs transition-colors cursor-pointer border border-white/20"
-            title="Upload or change festival video"
+            onClick={() => setShowAdminModal(true)}
+            className="p-1.5 rounded-lg bg-amber-400 hover:bg-amber-300 text-stone-950 text-xs font-bold transition-all cursor-pointer border border-amber-300 flex items-center gap-1"
+            title="Devotee Portal Media Manager"
           >
             <VideoIcon className="w-3.5 h-3.5" />
+            <span className="text-[10px] hidden sm:inline">Manage Media</span>
           </button>
-        </div>
+        )}
       </div>
 
-      {/* Video Container Frame */}
+      {/* Main Showcase Container */}
       <div className="relative w-full aspect-video sm:aspect-16/10 bg-black overflow-hidden flex items-center justify-center group">
-        {/* The Video Element */}
-        <video
-          ref={videoRef}
-          src={videoSrc}
-          autoPlay
-          loop
-          muted={isMuted}
-          playsInline
-          poster="/Gemini_Generated_Image_jforcsjforcsjfor.png"
-          onError={() => setVideoError(true)}
-          className="w-full h-full object-cover sm:object-contain transition-transform duration-700 group-hover:scale-[1.02]"
-        />
+        {currentMedia.type === 'video' ? (
+          <video
+            ref={videoRef}
+            src={currentMedia.url}
+            autoPlay
+            loop
+            muted={isMuted}
+            playsInline
+            onError={() => setVideoError(true)}
+            className="w-full h-full object-cover sm:object-contain transition-transform duration-700 group-hover:scale-[1.01]"
+          />
+        ) : (
+          <img
+            src={currentMedia.url}
+            alt="Festival Celebration"
+            className="w-full h-full object-cover sm:object-contain transition-transform duration-700 group-hover:scale-[1.01]"
+          />
+        )}
+
+        {/* Navigation arrows if multiple items exist */}
+        {mediaItems.length > 1 && (
+          <>
+            <button
+              onClick={handlePrevMedia}
+              className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/50 hover:bg-black/80 text-white flex items-center justify-center transition-colors cursor-pointer z-20"
+              title="Previous Media"
+            >
+              <ChevronLeft className="w-5 h-5 text-amber-300" />
+            </button>
+            <button
+              onClick={handleNextMedia}
+              className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/50 hover:bg-black/80 text-white flex items-center justify-center transition-colors cursor-pointer z-20"
+              title="Next Media"
+            >
+              <ChevronRight className="w-5 h-5 text-amber-300" />
+            </button>
+          </>
+        )}
 
         {/* Fallback Display if video cannot load */}
-        {videoError && (
-          <div className="absolute inset-0 bg-stone-900/90 flex flex-col items-center justify-center p-4 text-center space-y-2">
-            <img
-              src="/Gemini_Generated_Image_jforcsjforcsjfor.png"
-              alt="Lord Sri Ganesha"
-              className="w-24 h-24 object-contain rounded-xl border border-amber-400 shadow-md"
-            />
+        {videoError && currentMedia.type === 'video' && (
+          <div className="absolute inset-0 bg-stone-900/95 flex flex-col items-center justify-center p-4 text-center space-y-2">
+            <VideoIcon className="w-12 h-12 text-amber-400" />
             <p className="text-xs text-amber-200 font-bold">
-              Lord Sri Ganesha Festival Darshan
+              Darshan Video URL Unreachable
             </p>
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="px-3 py-1.5 bg-[#991B1B] text-white text-xs font-bold rounded-lg border border-amber-400 cursor-pointer"
-            >
-              Upload Festival Video File
-            </button>
+            <p className="text-[10px] text-stone-400 max-w-xs">
+              This video stream may be offline. Admin can replace this with another direct URL or upload a compressed file.
+            </p>
           </div>
         )}
 
-        {/* Flower Shower Animation Overlay */}
-        {showFlowers && (
-          <div className="absolute inset-0 pointer-events-none overflow-hidden z-20">
-            {Array.from({ length: 24 }).map((_, i) => (
-              <div
-                key={i}
-                className="absolute text-lg sm:text-2xl animate-fall"
-                style={{
-                  left: `${(i * 4.2) % 96}%`,
-                  top: `-${(i * 12) % 40}px`,
-                  animationDuration: `${1.8 + (i % 3) * 0.4}s`,
-                  animationDelay: `${(i % 5) * 0.15}s`,
-                  opacity: 0.9
-                }}
+        {/* Bottom Video Controls Overlay (Only for videos) */}
+        {currentMedia.type === 'video' && (
+          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/95 via-black/50 to-transparent p-3 flex items-center justify-between z-10 opacity-90 sm:opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={togglePlay}
+                className="p-2 rounded-full bg-white/20 hover:bg-white/30 text-white backdrop-blur-xs transition-colors cursor-pointer"
+                title={isPlaying ? 'Pause' : 'Play'}
               >
-                {i % 3 === 0 ? '🌸' : i % 3 === 1 ? '🌼' : '🌺'}
-              </div>
-            ))}
+                {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 fill-current" />}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleRestart}
+                className="p-2 rounded-full bg-white/20 hover:bg-white/30 text-white backdrop-blur-xs transition-colors cursor-pointer"
+                title="Restart"
+              >
+                <RotateCcw className="w-4 h-4" />
+              </button>
+
+              <button
+                type="button"
+                onClick={toggleMute}
+                className="p-2 rounded-full bg-white/20 hover:bg-white/30 text-white backdrop-blur-xs transition-colors cursor-pointer"
+                title={isMuted ? 'Unmute' : 'Mute'}
+              >
+                {isMuted ? <VolumeX className="w-4 h-4 text-amber-300" /> : <Volume2 className="w-4 h-4" />}
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleFullscreen}
+                className="p-2 rounded-full bg-white/20 hover:bg-white/30 text-white backdrop-blur-xs transition-colors cursor-pointer"
+                title="Fullscreen"
+              >
+                <Maximize2 className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         )}
 
-        {/* Bottom Video Controls Overlay */}
-        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent p-3 flex items-center justify-between z-10 opacity-90 sm:opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-          <div className="flex items-center gap-2">
-            {/* Play / Pause */}
-            <button
-              type="button"
-              onClick={togglePlay}
-              className="p-2 rounded-full bg-white/20 hover:bg-white/30 text-white backdrop-blur-xs transition-colors cursor-pointer"
-              title={isPlaying ? 'Pause video' : 'Play video'}
-            >
-              {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 fill-current" />}
-            </button>
-
-            {/* Restart */}
-            <button
-              type="button"
-              onClick={handleRestart}
-              className="p-2 rounded-full bg-white/20 hover:bg-white/30 text-white backdrop-blur-xs transition-colors cursor-pointer"
-              title="Restart video"
-            >
-              <RotateCcw className="w-4 h-4" />
-            </button>
-
-            {/* Mute / Unmute */}
-            <button
-              type="button"
-              onClick={toggleMute}
-              className="p-2 rounded-full bg-white/20 hover:bg-white/30 text-white backdrop-blur-xs transition-colors cursor-pointer"
-              title={isMuted ? 'Unmute' : 'Mute'}
-            >
-              {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-            </button>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {/* Aarti Flower Shower Button */}
-            <button
-              type="button"
-              onClick={() => {
-                setShowFlowers(true);
-                setTimeout(() => setShowFlowers(false), 3500);
-              }}
-              className="px-2.5 py-1 rounded-full bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold text-[10px] uppercase tracking-wider backdrop-blur-xs transition-colors cursor-pointer shadow-xs inline-flex items-center gap-1"
-            >
-              <Sparkles className="w-3 h-3 text-stone-950" />
-              <span>Offer Flowers</span>
-            </button>
-
-            {/* Fullscreen */}
-            <button
-              type="button"
-              onClick={handleFullscreen}
-              className="p-2 rounded-full bg-white/20 hover:bg-white/30 text-white backdrop-blur-xs transition-colors cursor-pointer"
-              title="Fullscreen"
-            >
-              <Maximize2 className="w-4 h-4" />
-            </button>
-          </div>
+        {/* Media indicator counts */}
+        <div className="absolute top-3 right-3 bg-black/60 px-2.5 py-1 rounded-full text-[10px] font-bold text-amber-300 backdrop-blur-xs z-10">
+          {currentIndex + 1} / {mediaItems.length}
         </div>
       </div>
 
@@ -342,99 +371,198 @@ export const GaneshaFestivalVideoShowcase: React.FC<GaneshaFestivalVideoShowcase
       <div className="bg-stone-900/90 px-3.5 py-2 flex items-center justify-between text-[11px] text-stone-300 border-t border-stone-800">
         <span className="flex items-center gap-1.5 truncate">
           <Sparkles className="w-3 h-3 text-amber-400 shrink-0" />
-          <span>Alankara: Royal Peacock &amp; Nandi Seva with Fresh Marigolds</span>
+          <span>
+            {currentMedia.type === 'video' ? '📺 Darshan Video' : '📸 Celebration Photo'}
+            {currentMedia.caption ? ` - ${currentMedia.caption}` : ''}
+          </span>
         </span>
-
-        <button
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
-          className="text-amber-400 hover:text-amber-300 font-bold text-[10px] uppercase tracking-wider underline cursor-pointer shrink-0 ml-2"
-        >
-          Change Video
-        </button>
       </div>
 
-      {/* Hidden File Input for Video Upload */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="video/mp4,video/webm,video/quicktime,video/*"
-        className="hidden"
-        onChange={handleVideoUpload}
-      />
-
-      {/* Modal: Change / Upload Festival Video */}
-      {showVideoModal && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-stone-900 border-2 border-amber-400 rounded-2xl max-w-md w-full p-5 text-white space-y-4 shadow-2xl">
+      {/* Modal: Admin Media Manager */}
+      {showAdminModal && isAdmin && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-stone-900 border-2 border-amber-400 rounded-2xl max-w-2xl w-full p-5 sm:p-6 text-white space-y-4 shadow-2xl my-4">
             <div className="flex items-center justify-between border-b border-stone-700 pb-3">
               <div className="flex items-center gap-2">
                 <span className="p-1.5 bg-[#991B1B] text-amber-300 rounded-lg">
                   <VideoIcon className="w-4 h-4" />
                 </span>
                 <h4 className="font-bold text-sm text-amber-200">
-                  Festival Darshan Video Options
+                  Devotee Portal Media Settings (Admin Only)
                 </h4>
               </div>
               <button
                 type="button"
-                onClick={() => setShowVideoModal(false)}
+                onClick={() => {
+                  setShowAdminModal(false);
+                  setSaveStatus(null);
+                }}
                 className="text-stone-400 hover:text-white p-1 rounded-lg cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <p className="text-xs text-stone-300 leading-relaxed">
-              Upload your own festival celebration video (MP4/MOV from your phone or camera) or provide an external video link to display for all devotees.
-            </p>
+            {saveStatus && (
+              <div className="p-3 rounded-xl bg-amber-950/60 border border-amber-400 text-amber-200 text-xs">
+                {saveStatus}
+              </div>
+            )}
 
-            <div className="space-y-3">
-              {/* Option 1: File Upload */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Left Form: Add Video */}
+              <div className="space-y-3 bg-stone-950 p-3.5 rounded-xl border border-stone-800">
+                <h5 className="text-xs font-bold uppercase tracking-wider text-amber-300 flex items-center gap-1.5">
+                  <VideoIcon className="w-3.5 h-3.5" />
+                  <span>Configure Videos</span>
+                </h5>
+                
+                <form onSubmit={handleAddVideoUrl} className="space-y-2">
+                  <label className="block text-[10px] text-stone-400 uppercase tracking-wider">
+                    Add Video Direct URL
+                  </label>
+                  <div className="flex gap-1.5">
+                    <input
+                      type="url"
+                      placeholder="https://example.com/festival_video.mp4"
+                      value={newVideoUrl}
+                      onChange={e => setNewVideoUrl(e.target.value)}
+                      className="flex-1 bg-stone-850 border border-stone-700 rounded-lg px-2.5 py-1.5 text-xs text-white outline-none focus:border-amber-400"
+                    />
+                    <button
+                      type="submit"
+                      className="px-2.5 py-1.5 bg-amber-400 hover:bg-amber-300 text-stone-950 text-xs font-bold rounded-lg cursor-pointer"
+                    >
+                      Add
+                    </button>
+                  </div>
+                </form>
+
+                <div className="pt-1.5">
+                  <span className="block text-[10px] text-stone-400 uppercase tracking-wider mb-1">
+                    Or Upload MP4 File
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => videoFileInputRef.current?.click()}
+                    className="w-full py-1.5 px-3 bg-stone-850 hover:bg-stone-800 border border-stone-700 rounded-lg text-xs font-semibold text-stone-200 inline-flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <Upload className="w-3.5 h-3.5 text-amber-300" />
+                    <span>Upload Video (&lt; 8MB)</span>
+                  </button>
+                  <input
+                    ref={videoFileInputRef}
+                    type="file"
+                    accept="video/mp4,video/*"
+                    className="hidden"
+                    onChange={(e) => handleFileUpload(e, 'video')}
+                  />
+                </div>
+              </div>
+
+              {/* Right Form: Add Photo */}
+              <div className="space-y-3 bg-stone-950 p-3.5 rounded-xl border border-stone-800">
+                <h5 className="text-xs font-bold uppercase tracking-wider text-amber-300 flex items-center gap-1.5">
+                  <ImageIcon className="w-3.5 h-3.5" />
+                  <span>Configure Photos</span>
+                </h5>
+                
+                <form onSubmit={handleAddPhotoUrl} className="space-y-2">
+                  <label className="block text-[10px] text-stone-400 uppercase tracking-wider">
+                    Add Photo Direct URL
+                  </label>
+                  <div className="flex gap-1.5">
+                    <input
+                      type="url"
+                      placeholder="https://example.com/celebration.jpg"
+                      value={newPhotoUrl}
+                      onChange={e => setNewPhotoUrl(e.target.value)}
+                      className="flex-1 bg-stone-850 border border-stone-700 rounded-lg px-2.5 py-1.5 text-xs text-white outline-none focus:border-amber-400"
+                    />
+                    <button
+                      type="submit"
+                      className="px-2.5 py-1.5 bg-amber-400 hover:bg-amber-300 text-stone-950 text-xs font-bold rounded-lg cursor-pointer"
+                    >
+                      Add
+                    </button>
+                  </div>
+                </form>
+
+                <div className="pt-1.5">
+                  <span className="block text-[10px] text-stone-400 uppercase tracking-wider mb-1">
+                    Or Upload Photo File
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => photoFileInputRef.current?.click()}
+                    className="w-full py-1.5 px-3 bg-stone-850 hover:bg-stone-800 border border-stone-700 rounded-lg text-xs font-semibold text-stone-200 inline-flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <Upload className="w-3.5 h-3.5 text-amber-300" />
+                    <span>Upload Image (&lt; 8MB)</span>
+                  </button>
+                  <input
+                    ref={photoFileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => handleFileUpload(e, 'photo')}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Current Media Items List with Delete */}
+            <div className="space-y-2">
+              <h5 className="text-xs font-bold uppercase tracking-wider text-stone-300">
+                Configure Active Showcase Media Items ({mediaItems.length})
+              </h5>
+              <div className="bg-stone-950 border border-stone-850 rounded-xl max-h-40 overflow-y-auto divide-y divide-stone-850 p-1">
+                {mediaItems.map((item, i) => {
+                  const isDefault = item.id === 'default_video';
+                  return (
+                    <div key={item.id} className="flex items-center justify-between p-2 text-xs">
+                      <span className="truncate max-w-[400px] text-stone-300 flex items-center gap-2">
+                        {item.type === 'video' ? '📺' : '📸'}
+                        <span className="font-mono text-[10px] bg-stone-800 text-amber-400 px-1.5 py-0.5 rounded">
+                          {item.type}
+                        </span>
+                        <span className="truncate">{item.url}</span>
+                      </span>
+                      {!isDefault ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const typePrefix = item.id.split('_')[0];
+                            const idx = parseInt(item.id.split('_')[1], 10);
+                            handleRemoveMedia(idx, typePrefix === 'v' ? 'video' : 'photo');
+                          }}
+                          className="p-1 rounded text-red-400 hover:text-red-300 hover:bg-red-500/10 cursor-pointer"
+                          title="Remove media item"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      ) : (
+                        <span className="text-[10px] text-stone-500 font-bold uppercase tracking-wider">
+                          Official Fallback
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-stone-800">
               <button
                 type="button"
                 onClick={() => {
-                  setShowVideoModal(false);
-                  fileInputRef.current?.click();
+                  setShowAdminModal(false);
+                  setSaveStatus(null);
                 }}
-                className="w-full py-3 px-4 rounded-xl bg-[#991B1B] hover:bg-[#7F1D1D] text-white font-bold text-xs uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-colors cursor-pointer border border-amber-400 shadow-md"
+                className="px-4 py-2 bg-stone-800 hover:bg-stone-700 text-stone-200 text-xs font-bold uppercase rounded-lg transition-colors cursor-pointer"
               >
-                <Upload className="w-4 h-4 text-amber-300" />
-                <span>Upload Video from Device (.mp4 / .mov)</span>
+                Close Settings Window
               </button>
-
-              {/* Option 2: Custom URL */}
-              <form onSubmit={handleSaveCustomUrl} className="space-y-2 pt-2 border-t border-stone-800">
-                <label className="block text-[11px] font-bold uppercase tracking-wider text-stone-400">
-                  Or Paste Direct Video URL
-                </label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="url"
-                    placeholder="https://example.com/festival_video.mp4"
-                    value={customUrlInput}
-                    onChange={e => setCustomUrlInput(e.target.value)}
-                    className="flex-1 bg-stone-800 border border-stone-700 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-amber-400"
-                  />
-                  <button
-                    type="submit"
-                    className="px-3 py-2 bg-amber-400 hover:bg-amber-300 text-stone-950 text-xs font-bold uppercase rounded-xl transition-colors cursor-pointer shrink-0"
-                  >
-                    Save URL
-                  </button>
-                </div>
-              </form>
-
-              {/* Reset to Default Video */}
-              <div className="pt-2 text-center">
-                <button
-                  type="button"
-                  onClick={handleResetDefaultVideo}
-                  className="text-xs text-stone-400 hover:text-amber-300 underline cursor-pointer"
-                >
-                  Reset to Official 2026 Festival Darshan Video
-                </button>
-              </div>
             </div>
           </div>
         </div>

@@ -355,13 +355,14 @@ export function App() {
   // 2. Member (Read-Only Complete Data: can view all records across all modules, cannot create/edit/delete)
   const isMember = isAuthenticated && !isAdmin && (userRole === 'member' || userRole === 'read_only' || userRole === 'sponsor');
   // 3. Viewer (Only Income & Expenditure Statement and Expenditure payments with high-level details only)
-  const isViewer = isAuthenticated && !isAdmin && !isMember;
+  const isViewer = (!isAuthenticated) || (isAuthenticated && !isAdmin && !isMember);
 
   // Backward compatibility aliases
   const isReadOnly = isMember;
   const isUnassigned = isViewer;
 
   const [settingsSubTab, setSettingsSubTab] = useState<'general' | 'users'>('general');
+  const [showLoginGate, setShowLoginGate] = useState(false);
 
   // Modals state
   const [adminManagementModalOpen, setAdminManagementModalOpen] = useState(false);
@@ -1635,6 +1636,8 @@ export function App() {
         contributions={contributions}
         onNavigateToGaneshotsava={navigateToGaneshotsava}
         onNavigateToReceipts={navigateToReceipts}
+        isAdmin={isAdmin}
+        onUpdateSettings={handleSaveSettings}
       />
     );
   }
@@ -1753,13 +1756,17 @@ export function App() {
     );
   }
 
-  // D. If not authenticated, require Committee Authentication before showing financial data, statements, or expenses!
-  if (!isAuthenticated) {
+  // D. If showLoginGate is active, show the login page
+  if (showLoginGate) {
     return (
       <CommitteeAuthGate
         settings={settings}
-        onSuccess={handleLoginSuccess}
+        onSuccess={(role, profile) => {
+          handleLoginSuccess(role, profile);
+          setShowLoginGate(false);
+        }}
         onSaveSettings={handleSaveSettings}
+        onBackToHome={() => setShowLoginGate(false)}
       />
     );
   }
@@ -1874,14 +1881,23 @@ export function App() {
                 )}
 
                 {/* Only Logout option seen by basic unassigned users */}
-                <button
-                  onClick={handleLogout}
-                  className="px-3 py-1 rounded-full font-bold uppercase tracking-wider inline-flex items-center gap-1.5 transition-colors cursor-pointer text-[11px] bg-white/10 text-white hover:bg-white/20 border border-white/20 shadow-xs active:scale-95"
-                  title="Sign out of portal"
-                >
-                  <LogOut className="w-3 h-3" />
-                  <span>Logout</span>
-                </button>
+                {isAuthenticated ? (
+                  <button
+                    onClick={handleLogout}
+                    className="px-3 py-1 rounded-full font-bold uppercase tracking-wider inline-flex items-center gap-1.5 transition-colors cursor-pointer text-[11px] bg-white/10 text-white hover:bg-white/20 border border-white/20 shadow-xs active:scale-95"
+                    title="Sign out of portal"
+                  >
+                    <LogOut className="w-3 h-3" />
+                    <span>Logout</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => setShowLoginGate(true)}
+                    className="px-3.5 py-1.5 rounded-full font-bold uppercase tracking-wider inline-flex items-center gap-1.5 transition-all cursor-pointer text-[11px] bg-amber-400 text-stone-950 hover:bg-amber-300 shadow-md active:scale-95"
+                  >
+                    <span>Login / Register</span>
+                  </button>
+                )}
               </>
             ) : isReadOnly ? (
               /* 2. READ-ONLY COMPLETE USERS */
@@ -2601,7 +2617,7 @@ export function App() {
               <div className="flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-amber-300" />
                 <h3 className="font-serif font-black text-sm sm:text-base text-amber-200">
-                  ಶ್ರೀ ಗಣೇಶೋತ್ಸವ ೨೦೨೬ ಮಹಾದರ್ಶನ &bull; Grand Festival Darshan Video
+                  ಶ್ರೀ ಗಣೇಶೋತ್ಸವ ಮಹಾದರ್ಶನ shree ganehotsava 2026
                 </h3>
               </div>
               <button
@@ -2614,7 +2630,11 @@ export function App() {
               </button>
             </div>
             <div className="p-3 sm:p-5">
-              <GaneshaFestivalVideoShowcase />
+              <GaneshaFestivalVideoShowcase
+                settings={settings}
+                isAdmin={isAdmin}
+                onUpdateSettings={handleSaveSettings}
+              />
             </div>
           </div>
         </div>

@@ -20,10 +20,12 @@ import {
   ChevronRight,
   FileSpreadsheet,
   AlertTriangle,
-  ShieldCheck
+  ShieldCheck,
+  Sparkles,
+  Lightbulb
 } from 'lucide-react';
 import { Expense, ExpenseBill } from '../types';
-import { fmt, fmtDate, today, getExpenseBalance, getExpenseActual, compressImageFile, formatBytes } from '../utils/helpers';
+import { fmt, fmtDate, today, getExpenseBalance, getExpenseActual, compressImageFile, formatBytes, getLightingAndDecorationExpense } from '../utils/helpers';
 
 interface ExpenditureViewProps {
   expenses: Expense[];
@@ -104,6 +106,9 @@ export const ExpenditureView: React.FC<ExpenditureViewProps> = ({
   const totalBal = expenses.reduce((s, r) => s + getExpenseBalance(r), 0);
   const totalAct = expenses.reduce((s, r) => s + getExpenseActual(r), 0);
   const totalAttachedBills = expenses.reduce((sum, e) => sum + getExpenseBills(e).length, 0);
+
+  // Key Vendor: Lighting & Decoration
+  const lightingData = getLightingAndDecorationExpense(expenses);
 
   const filtered = expenses.filter(e => {
     const s = search.toLowerCase();
@@ -523,6 +528,60 @@ export const ExpenditureView: React.FC<ExpenditureViewProps> = ({
           </div>
         </div>
 
+        {/* Lighting & Decoration Vendor Info Banner */}
+        {lightingData.item && (
+          <div className="mx-4 sm:mx-6 mt-4 mb-2 p-3.5 rounded-xl bg-gradient-to-r from-amber-50 via-white to-amber-50 border-2 border-amber-300 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-amber-400 text-stone-900 flex items-center justify-center shrink-0 shadow-xs border border-amber-300">
+                <Lightbulb className="w-4 h-4 text-[#991B1B]" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[10px] font-bold uppercase tracking-wider bg-amber-200 text-amber-950 px-2 py-0.5 rounded">
+                    Key Vendor Info
+                  </span>
+                  <span className="text-xs font-bold text-stone-800">
+                    {lightingData.item.item}
+                  </span>
+                  {lightingData.totalBal > 0 ? (
+                    <span className="text-[10px] bg-red-100 text-red-800 font-bold px-2 py-0.5 rounded-full border border-red-200">
+                      Amount to be Paid: ₹ {fmt(lightingData.totalBal)}
+                    </span>
+                  ) : (
+                    <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full border border-emerald-200">
+                      ✓ Settled
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11px] text-stone-600 mt-0.5">
+                  Agreed Contract: <strong className="font-mono text-stone-800">₹ {fmt(lightingData.totalEst)}</strong> | Advance Paid: <strong className="font-mono text-emerald-700">₹ {fmt(lightingData.totalAdv)}</strong> | Pending to Vendor: <strong className="font-mono text-[#991B1B]">₹ {fmt(lightingData.totalBal)}</strong>
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0 self-end md:self-auto">
+              {search ? (
+                <button
+                  type="button"
+                  onClick={() => setSearch('')}
+                  className="text-xs bg-stone-100 hover:bg-stone-200 text-stone-700 px-3 py-1.5 rounded font-semibold cursor-pointer border border-stone-300 transition-colors"
+                >
+                  Clear Filter
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setSearch(lightingData.item?.item || 'Lighting')}
+                  className="text-xs bg-amber-100 hover:bg-amber-200 text-amber-950 px-3 py-1.5 rounded font-semibold cursor-pointer border border-amber-300 transition-colors inline-flex items-center gap-1"
+                  title="Filter table to Lighting & Decoration"
+                >
+                  <span>Filter Row in Table</span>
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Table */}
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
@@ -561,7 +620,14 @@ export const ExpenditureView: React.FC<ExpenditureViewProps> = ({
                     <tr key={e.id} className="hover:bg-amber-50/30 transition-colors group">
                       <td className="py-3 px-4 text-stone-400 text-xs text-center">{idx + 1}</td>
                       <td className="py-3 px-4">
-                        <div className="font-semibold text-stone-900">{e.item}</div>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-semibold text-stone-900">{e.item}</span>
+                          {(e.id === lightingData.item?.id || /light|lighting|decoration/i.test(e.item)) && (
+                            <span className="text-[9px] bg-amber-100 text-amber-900 font-bold px-1.5 py-0.2 rounded border border-amber-300">
+                              ✨ Lighting &amp; Decoration
+                            </span>
+                          )}
+                        </div>
                         {e.notes && (
                           <div className="text-[11px] text-stone-500 italic mt-0.5 line-clamp-1">{e.notes}</div>
                         )}

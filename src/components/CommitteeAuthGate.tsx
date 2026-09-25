@@ -48,7 +48,7 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
   onSuccess,
   onBackToHome
 }) => {
-  // Input value: can be either an Email ID or a 10-digit Mobile Number
+  // Input value: only Email ID is accepted
   const [identifierInput, setIdentifierInput] = useState('');
 
   // First-time onboarding / registration modal state
@@ -60,7 +60,7 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
   const [showThankYou, setShowThankYou] = useState<UserProfile | null>(null);
   const [mailDeliveryFailed, setMailDeliveryFailed] = useState(false);
 
-  // OTP login & verification states
+  // Verification link / OTP login states
   const [otpSentState, setOtpSentState] = useState<string | null>(null);
   const [otpInput, setOtpInput] = useState('');
   const [verifyingOtp, setVerifyingOtp] = useState(false);
@@ -227,7 +227,7 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
     }
   };
 
-  // --- LOGIN HANDLER (For Existing Users Only) ---
+  // --- LOGIN HANDLER ---
   const handleLoginSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setError(null);
@@ -235,103 +235,59 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
 
     const rawInput = identifierInput.trim();
     if (!rawInput) {
-      setError('Please enter your registered email address or 10-digit mobile number.');
+      setError('Please enter your registered email address.');
+      return;
+    }
+
+    // Only email is accepted (reject phone numbers or invalid formats)
+    const cleanEmail = rawInput.toLowerCase().trim();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(cleanEmail)) {
+      setError('Please enter a valid email address (e.g. resident@gmail.com). Mobile number login is not accepted.');
       return;
     }
 
     setIsSubmitting(true);
     try {
-      const isDigitsOnly = /^\d+$/.test(rawInput.replace(/[\s+-]/g, ''));
-      const cleanedDigits = rawInput.replace(/\D/g, '');
-
-      // 1. DEVOTEE ENTERED PHONE NUMBER
-      if (isDigitsOnly || (cleanedDigits.length >= 10 && !rawInput.includes('@'))) {
-        if (cleanedDigits.length < 10) {
-          setError('Please enter a valid 10-digit mobile number.');
-          setIsSubmitting(false);
-          return;
-        }
-
-        // Look up registered user profile in database
-        const profile = await cloudGetUserProfileByPhone(cleanedDigits);
-        if (!profile) {
-          setError('Devotee profile not found for this mobile number. If you are a new devotee, please click the "Register" button below.');
-          setIsSubmitting(false);
-          return;
-        }
-
-        // Check if devotee is verified
-        const isProfileAdmin = profile.role === 'admin' || getAdminEmails().map(e => e.toLowerCase()).includes(profile.email.toLowerCase());
-        if (profile.status === 'unverified' && !isProfileAdmin) {
-          await triggerOtpSendFlow(profile.email);
-          return;
-        }
-
-        // Returning devotee found! Log in directly!
-        const role = resolveRole(profile.email, profile.role);
-        sessionStorage.setItem('eg_committee_auth', 'true');
-        sessionStorage.setItem('eg_user_role', role);
-        sessionStorage.setItem('eg_user_email', profile.email);
-        sessionStorage.setItem('eg_user_profile', JSON.stringify({ ...profile, role }));
-
-        onSuccess(role, profile);
-        return;
-      }
-
-      // 2. DEVOTEE ENTERED EMAIL ADDRESS
-      const cleanEmail = rawInput.toLowerCase().trim();
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(cleanEmail)) {
-        setError('Please enter a valid email address (e.g., devotee@gmail.com) or 10-digit mobile number.');
-        setIsSubmitting(false);
-        return;
-      }
-
       const adminList = getAdminEmails().map(e => e.toLowerCase());
-      const isSuperAdmin = cleanEmail === 'desaisachin95@gmail.com' || adminList.includes(cleanEmail);
+      const isSuperAdmin = cleanEmail === 'desaisachin95@gmail.com' || cleanEmail === 'kannadigara.balaga.eldorado@gmail.com' || adminList.includes(cleanEmail);
 
       // Check if user is already registered in database
       const existingProfile = await cloudGetUserProfile(cleanEmail);
 
-      if (existingProfile || isSuperAdmin) {
-        // RETURNING REGISTERED DEVOTEE or Admin: Instant login & dispatch verification link
-        const profile = existingProfile || {
+      const isAdminUser = isSuperAdmin || (existingProfile && existingProfile.role === 'admin');
+      const isMemberUser = existingProfile && (existingProfile.role === 'member' || existingProfile.role === 'read_only' || existingProfile.role === 'sponsor');
+
+      // 1. FOR ADMIN AND MEMBERS: Log in directly by verifying email is already registered!
+      if (isAdminUser || isMemberUser) {
+        const role: UserRole = isAdminUser ? 'admin' : 'member';
+        const profile: UserProfile = existingProfile || {
           email: cleanEmail,
-          name: isSuperAdmin ? 'Sachin Desai (Admin)' : 'Devotee',
-          flat: 'Admin Desk',
+          name: isSuperAdmin ? 'Sachin Desai (Admin)' : (role === 'admin' ? 'Admin' : 'Member'),
+          flat: role === 'admin' ? 'Admin Desk' : 'Member',
           mobile: '',
-          role: 'admin' as UserRole,
+          role: role,
           status: 'verified' as const
         };
 
-        // Check if devotee is verified
-        if (profile.status === 'unverified' && !isSuperAdmin) {
-          await triggerOtpSendFlow(cleanEmail);
-          return;
+        if (profile.status !== 'verified') {
+          profile.status = 'verified';
+          cloudSaveUserProfile(profile).catch(() => {});
         }
 
-        const role = resolveRole(cleanEmail, profile.role);
         sessionStorage.setItem('eg_committee_auth', 'true');
         sessionStorage.setItem('eg_user_role', role);
         sessionStorage.setItem('eg_user_email', cleanEmail);
         sessionStorage.setItem('eg_user_profile', JSON.stringify({ ...profile, role }));
 
-        if (auth) {
-          try {
-            const continueUrl = `${window.location.origin}${window.location.pathname}?email=${encodeURIComponent(cleanEmail)}`;
-            await sendSignInLinkToEmail(auth, cleanEmail, {
-              url: continueUrl,
-              handleCodeInApp: true
-            });
-          } catch {}
-        }
-
         onSuccess(role, profile);
         return;
       }
 
-      // UNREGISTERED FIRST-TIME USER:
-      setError('We could not find a devotee profile with this email address. If you are a new resident, please click the "Register" button below to create your account.');
+      // 2. FOR OTHERS (devotees / residents / unassigned users):
+      // The login should happen by clicking verification link!
+      await triggerOtpSendFlow(cleanEmail);
+      setInfoMessage(`Verification link sent! A sign-in verification link has been dispatched to ${cleanEmail}. Please check your inbox and click the verification link to log in.`);
     } catch (err: any) {
       console.error('Error during login:', err);
       setError('An error occurred while logging in. Please verify your internet connection.');
@@ -512,10 +468,10 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
                 </div>
 
                 <h2 className="text-xl sm:text-2xl font-serif font-black tracking-wide leading-snug">
-                  Login / Register by Email
+                  Sign In by Email
                 </h2>
                 <p className="text-xs text-amber-200/90 font-medium mt-0.5">
-                  Enter your email or phone to log in, or register as a new devotee
+                  Admins &amp; Members log in directly. Others log in via verification link.
                 </p>
               </div>
 
@@ -539,24 +495,32 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
                 {/* LOGIN / OTP CONDITIONAL FORM */}
                 {otpSentState ? (
                   <form onSubmit={handleVerifyOtp} className="space-y-4 text-left animate-in fade-in duration-200">
-                    <div className="p-3.5 bg-amber-50/70 border border-amber-300 rounded-xl space-y-1">
-                      <span className="font-bold text-xs text-amber-900 flex items-center gap-1.5">
-                        <Mail className="w-3.5 h-3.5 text-[#991B1B]" />
-                        <span>Verification Code Sent</span>
-                      </span>
-                      <p className="text-[11px] text-amber-950 leading-relaxed">
-                        We have dispatched a secure 6-digit code and a 1-click magic link to <strong className="font-semibold text-stone-900">{otpSentState}</strong>.
+                    <div className="p-3.5 bg-amber-50/80 border border-amber-300 rounded-xl space-y-1.5">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-full bg-amber-400 text-stone-900 flex items-center justify-center shrink-0">
+                          <Mail className="w-3.5 h-3.5 text-[#991B1B]" />
+                        </div>
+                        <div>
+                          <span className="font-bold text-xs text-amber-950 uppercase tracking-wider block">
+                            Verification Link Sent!
+                          </span>
+                          <span className="text-[11px] text-stone-600 block">
+                            Sent to <strong className="font-semibold text-stone-900">{otpSentState}</strong>
+                          </span>
+                        </div>
+                      </div>
+                      <p className="text-[11px] text-stone-700 leading-relaxed pt-1.5 border-t border-amber-200">
+                        Please check your email and <strong>click the verification link</strong> to log in directly to the portal.
                       </p>
                     </div>
 
                     <div className="space-y-1.5">
                       <label className="block text-xs font-bold uppercase tracking-wider text-stone-700">
-                        Enter 6-Digit Verification Code
+                        Or Enter 6-Digit Code from Email
                       </label>
                       <input
                         type="text"
                         maxLength={6}
-                        required
                         value={otpInput}
                         onChange={e => {
                           const val = e.target.value.replace(/\D/g, '');
@@ -565,10 +529,10 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
                         }}
                         placeholder="e.g. 123456"
                         autoFocus
-                        className="w-full bg-stone-50 border border-stone-300 rounded-xl px-4 py-3.5 text-center text-xl font-mono font-black tracking-[8px] text-[#991B1B] outline-none focus:bg-white focus:border-[#991B1B] focus:ring-2 focus:ring-[#991B1B]/20 transition-all"
+                        className="w-full bg-stone-50 border border-stone-300 rounded-xl px-4 py-3 text-center text-xl font-mono font-black tracking-[8px] text-[#991B1B] outline-none focus:bg-white focus:border-[#991B1B] focus:ring-2 focus:ring-[#991B1B]/20 transition-all"
                       />
                       <p className="text-[10px] text-stone-500">
-                        Code expires in 10 minutes. Please check your inbox and spam folder.
+                        You can also enter the 6-digit code received in your email above.
                       </p>
                     </div>
 
@@ -578,7 +542,7 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
                       className="w-full bg-[#991B1B] hover:bg-[#7F1D1D] active:scale-[0.99] text-white font-bold text-xs sm:text-sm uppercase tracking-wider py-3.5 px-4 rounded-xl shadow-md inline-flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
                     >
                       <ShieldCheck className="w-4 h-4 text-amber-300" />
-                      <span>{verifyingOtp ? 'Verifying Code...' : 'Verify & Sign In'}</span>
+                      <span>{verifyingOtp ? 'Verifying Code...' : 'Verify Code & Sign In'}</span>
                     </button>
 
                     {/* Resend / Sandbox Options */}
@@ -590,7 +554,7 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
                         className="w-full py-2.5 bg-stone-50 hover:bg-stone-100 border border-stone-300 rounded-xl text-stone-700 font-bold text-xs transition-all inline-flex items-center justify-center gap-1.5 cursor-pointer shadow-3xs"
                       >
                         <RefreshCw className={`w-3.5 h-3.5 ${isSubmitting ? 'animate-spin text-[#991B1B]' : 'text-stone-500'}`} />
-                        <span>Resend Verification Email</span>
+                        <span>Resend Verification Link</span>
                       </button>
 
                       <button
@@ -610,36 +574,36 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
                   <form onSubmit={handleLoginSubmit} className="space-y-4 text-left">
                     <div className="space-y-1.5">
                       <label className="block text-xs font-bold uppercase tracking-wider text-stone-700">
-                        Email Address or Mobile Number
+                        Email Address
                       </label>
                       <div className="relative">
                         <Mail className="w-4 h-4 absolute left-3.5 top-3.5 text-stone-400" />
                         <input
-                          type="text"
+                          type="email"
                           required
                           value={identifierInput}
                           onChange={e => {
                             setIdentifierInput(e.target.value);
                             if (error) setError(null);
                           }}
-                          placeholder="e.g. resident@gmail.com or 9876543210"
+                          placeholder="e.g. resident@gmail.com"
                           autoFocus
                           className="w-full bg-stone-50 border border-stone-300 rounded-xl pl-10 pr-4 py-3 text-sm text-stone-900 outline-none focus:bg-white focus:border-[#991B1B] focus:ring-2 focus:ring-[#991B1B]/20 transition-all font-medium"
                         />
                       </div>
                       <p className="text-[11px] text-stone-500">
-                        Existing users: Enter your registered email ID or 10-digit mobile number to login.
+                        Admins &amp; Members login directly. Others will receive a verification link by email.
                       </p>
                     </div>
 
-                    {/* Primary Login Button (Only for existing users) */}
+                    {/* Primary Login Button */}
                     <button
                       type="submit"
                       disabled={isSubmitting || !identifierInput.trim()}
                       className="w-full bg-[#991B1B] hover:bg-[#7F1D1D] active:scale-[0.99] text-white font-bold text-xs sm:text-sm uppercase tracking-wider py-3.5 px-4 rounded-xl shadow-md inline-flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
                     >
                       <LogIn className="w-4 h-4 text-amber-300" />
-                      <span>{isSubmitting ? 'Verifying Devotee...' : 'Login'}</span>
+                      <span>{isSubmitting ? 'Verifying Email...' : 'Login with Email'}</span>
                     </button>
 
                     {/* Dedicated Register Button: Register */}
@@ -648,13 +612,13 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
                         type="button"
                         onClick={() => {
                           setOnboardingEmail(identifierInput.includes('@') ? identifierInput.trim() : '');
-                          setOnboardingMobile(/^\d{10}$/.test(identifierInput.trim()) ? identifierInput.trim() : '');
+                          setOnboardingMobile('');
                           setShowOnboarding(true);
                         }}
                         className="w-full py-2.5 px-4 rounded-xl border-2 border-dashed border-amber-400 bg-amber-50/70 hover:bg-amber-100 text-stone-900 font-bold text-xs transition-colors inline-flex items-center justify-center gap-2 cursor-pointer shadow-2xs"
                       >
                         <UserPlus className="w-4 h-4 text-[#991B1B]" />
-                        <span>Register</span>
+                        <span>Register as New Devotee</span>
                       </button>
                     </div>
 

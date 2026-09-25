@@ -10,10 +10,15 @@ import {
   Plus,
   PieChart,
   BarChart3,
-  ArrowUpDown
+  ArrowUpDown,
+  Sparkles,
+  Lightbulb,
+  CreditCard,
+  ArrowRight,
+  Info
 } from 'lucide-react';
 import { Expense, Contribution, Sponsor, CommercialStall, SevaBooking, HundiCollection, AuctionItem, AppSettings, UserRole } from '../types';
-import { fmt, getExpenseActual, cleanOrgName, fmtDate } from '../utils/helpers';
+import { fmt, getExpenseActual, getExpenseBalance, cleanOrgName, fmtDate, getLightingAndDecorationExpense } from '../utils/helpers';
 import { getStallFields } from './CommercialStallsView';
 
 interface StatementViewProps {
@@ -28,7 +33,8 @@ interface StatementViewProps {
   userRole?: UserRole;
   isAdmin?: boolean;
   isMember?: boolean;
-  onNavigateToTab?: (tab: 'donations' | 'sponsorship' | 'stalls' | 'sevas' | 'hundi' | 'auctions') => void;
+  onNavigateToTab?: (tab: 'donations' | 'sponsorship' | 'stalls' | 'sevas' | 'hundi' | 'auctions' | 'expenditure') => void;
+  onNavigateToExpenditure?: () => void;
   onPrintInvoice?: (stall: CommercialStall) => void;
   onAddStall?: () => void;
   onShareWhatsApp: () => void;
@@ -49,6 +55,7 @@ export const StatementView: React.FC<StatementViewProps> = ({
   isAdmin = false,
   isMember = false,
   onNavigateToTab,
+  onNavigateToExpenditure,
   onPrintInvoice,
   onAddStall,
   onPrint
@@ -56,6 +63,9 @@ export const StatementView: React.FC<StatementViewProps> = ({
   // Graph visual representation states
   const [chartType, setChartType] = useState<'donut' | 'bars' | 'vs'>('donut');
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+
+  // Lighting & Decoration Vendor Payable Calculation
+  const lightingData = getLightingAndDecorationExpense(expenses);
 
   // Determine if user has admin or member privileges to view detailed data breakdowns
   const canViewDetails = isAdmin || isMember || userRole === 'admin' || userRole === 'member' || userRole === 'read_only';
@@ -180,6 +190,14 @@ export const StatementView: React.FC<StatementViewProps> = ({
             </span>
             <span>Total disbursed &amp; settled</span>
           </div>
+          {lightingData.totalBal > 0 && (
+            <div className="mt-2.5 pt-2 border-t border-red-100 flex items-center justify-between text-xs">
+              <span className="text-stone-600 font-medium">Lighting &amp; Deco to pay:</span>
+              <span className="font-mono font-bold text-[#991B1B] bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded text-[11px]">
+                ₹ {fmt(lightingData.totalBal)}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Net Surplus / Deficit */}
@@ -215,6 +233,88 @@ export const StatementView: React.FC<StatementViewProps> = ({
             >
               {isSurplus ? '✓ Net Surplus' : '⚠ Net Deficit'}
             </span>
+          </div>
+        </div>
+      </div>
+
+      {/* 2.2. LIGHTING & DECORATION VENDOR PAYMENT INFO CALLOUT */}
+      <div className="bg-gradient-to-r from-amber-50/90 via-white to-amber-50/90 border-2 border-amber-300 rounded-xl p-4 sm:p-5 shadow-xs relative overflow-hidden">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div className="flex items-start gap-3.5 min-w-0">
+            <div className="w-10 h-10 rounded-xl bg-amber-400 text-stone-900 flex items-center justify-center shrink-0 shadow-xs border border-amber-300">
+              <Lightbulb className="w-5 h-5 text-[#991B1B]" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="bg-[#991B1B] text-white text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded">
+                  Expenditure Info
+                </span>
+                <span className="text-[11px] font-bold text-amber-950 uppercase tracking-wider">
+                  Lighting &amp; Decoration Vendor
+                </span>
+                {lightingData.totalBal > 0 ? (
+                  <span className="bg-amber-100 text-amber-900 border border-amber-300 text-[10px] font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-600 animate-pulse" />
+                    Amount to be Paid: ₹ {fmt(lightingData.totalBal)}
+                  </span>
+                ) : (
+                  <span className="bg-emerald-100 text-emerald-900 border border-emerald-300 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                    ✓ Vendor Fully Settled
+                  </span>
+                )}
+              </div>
+              <h3 className="text-base font-serif font-bold text-stone-900 mt-1">
+                {lightingData.item?.item || 'Lightings and Decorations and Event Management'}
+              </h3>
+              <p className="text-xs text-stone-600 mt-0.5">
+                Vendor contract for Sri Ganeshotsava 2026 illumination, pendal lightings, stage decoration &amp; event management.
+              </p>
+            </div>
+          </div>
+
+          {/* Breakdown & Quick Action */}
+          <div className="flex flex-wrap items-center gap-3 lg:justify-end shrink-0 pt-2 lg:pt-0 border-t lg:border-t-0 border-amber-200">
+            <div className="bg-white border border-stone-200 rounded-lg px-3 py-2 text-center shadow-2xs">
+              <div className="text-[9px] font-bold uppercase tracking-wider text-stone-500">
+                Agreed Contract
+              </div>
+              <div className="text-sm font-mono font-bold text-stone-800">
+                ₹ {fmt(lightingData.totalEst)}
+              </div>
+            </div>
+
+            <div className="bg-white border border-emerald-200 rounded-lg px-3 py-2 text-center shadow-2xs">
+              <div className="text-[9px] font-bold uppercase tracking-wider text-emerald-700">
+                Advance Paid
+              </div>
+              <div className="text-sm font-mono font-bold text-emerald-700">
+                ₹ {fmt(lightingData.totalAdv)}
+              </div>
+            </div>
+
+            <div className="bg-amber-100/90 border-2 border-amber-400 rounded-lg px-3.5 py-2 text-center shadow-2xs">
+              <div className="text-[9px] font-bold uppercase tracking-wider text-amber-950">
+                Amount to be Paid to Vendor
+              </div>
+              <div className="text-base sm:text-lg font-mono font-black text-[#991B1B]">
+                ₹ {fmt(lightingData.totalBal)}
+              </div>
+            </div>
+
+            {(onNavigateToTab || onNavigateToExpenditure) && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (onNavigateToExpenditure) onNavigateToExpenditure();
+                  else if (onNavigateToTab) onNavigateToTab('expenditure');
+                }}
+                className="bg-[#991B1B] hover:bg-[#7F1D1D] text-white text-xs font-bold uppercase tracking-wider px-3.5 py-2.5 rounded-lg shadow-xs transition-all cursor-pointer inline-flex items-center gap-1.5 shrink-0 self-stretch sm:self-auto justify-center"
+                title="Go to Expenditure tab to view vendor bills and payment records"
+              >
+                <span>View in Expenditure</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -621,6 +721,139 @@ export const StatementView: React.FC<StatementViewProps> = ({
           <div className="text-[10px] text-stone-400 mt-0.5">
             {auctions.length} item(s) • {getPercent(aucTot)}%
           </div>
+        </div>
+      </div>
+
+      {/* 4. EXPENDITURE & VENDOR PAYABLES HIGHLIGHT */}
+      <div className="bg-white border border-stone-200 rounded-xl p-4 shadow-2xs space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-stone-100 pb-2">
+          <div className="flex items-center gap-2">
+            <span className="p-1 rounded bg-red-50 text-red-700 border border-red-200">
+              <CreditCard className="w-3.5 h-3.5" />
+            </span>
+            <span className="text-xs font-bold uppercase tracking-wider text-stone-800">
+              Major Vendor Payables (Expenditure)
+            </span>
+          </div>
+          {(onNavigateToTab || onNavigateToExpenditure) && (
+            <button
+              onClick={() => {
+                if (onNavigateToExpenditure) onNavigateToExpenditure();
+                else if (onNavigateToTab) onNavigateToTab('expenditure');
+              }}
+              className="text-[11px] font-bold text-[#991B1B] hover:text-[#7F1D1D] inline-flex items-center gap-1 cursor-pointer self-start sm:self-auto"
+            >
+              <span>View All {expenses.length} Expense Heads</span>
+              <ArrowRight className="w-3 h-3" />
+            </button>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {/* Lighting & Decoration Featured Card */}
+          <div
+            onClick={() => {
+              if (onNavigateToExpenditure) onNavigateToExpenditure();
+              else if (onNavigateToTab) onNavigateToTab('expenditure');
+            }}
+            className={`p-3.5 rounded-lg border-2 border-amber-300 bg-amber-50/50 hover:bg-amber-50/80 transition-all ${
+              onNavigateToTab || onNavigateToExpenditure ? 'cursor-pointer hover:shadow-xs' : ''
+            }`}
+          >
+            <div className="flex items-center justify-between text-[10px] font-bold text-amber-950 uppercase tracking-wider mb-1">
+              <span className="flex items-center gap-1">
+                <Lightbulb className="w-3.5 h-3.5 text-[#991B1B]" />
+                <span>Lighting &amp; Decoration</span>
+              </span>
+              <span className="bg-amber-200 text-amber-950 px-1.5 py-0.2 rounded font-semibold text-[9px]">
+                Primary Vendor
+              </span>
+            </div>
+            <div className="flex items-baseline justify-between mt-1">
+              <div>
+                <span className="text-[10px] text-stone-500 block">Amount to be Paid</span>
+                <span className="text-lg font-mono font-black text-[#991B1B]">
+                  ₹ {fmt(lightingData.totalBal)}
+                </span>
+              </div>
+              <div className="text-right text-[11px] font-mono text-stone-600">
+                <div>Adv: ₹{fmt(lightingData.totalAdv)}</div>
+                <div className="text-[10px] text-stone-400">Total: ₹{fmt(lightingData.totalEst)}</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Pendal / Stage Card */}
+          {(() => {
+            const pendal = expenses.find(e => /pendal|pandal/i.test(e.item || ''));
+            const pendalBal = pendal ? getExpenseBalance(pendal) : 0;
+            const pendalAdv = Number(pendal?.adv || 0);
+            const pendalEst = Number(pendal?.est || 0);
+            return (
+              <div
+                onClick={() => {
+                  if (onNavigateToExpenditure) onNavigateToExpenditure();
+                  else if (onNavigateToTab) onNavigateToTab('expenditure');
+                }}
+                className={`p-3.5 rounded-lg border border-stone-200 bg-stone-50/50 hover:bg-stone-50 transition-all ${
+                  onNavigateToTab || onNavigateToExpenditure ? 'cursor-pointer hover:border-stone-300' : ''
+                }`}
+              >
+                <div className="flex items-center justify-between text-[10px] font-bold text-stone-700 uppercase tracking-wider mb-1">
+                  <span>Pendal &amp; Stage Setup</span>
+                  <span className="text-stone-400 text-[9px] font-mono">Vendor</span>
+                </div>
+                <div className="flex items-baseline justify-between mt-1">
+                  <div>
+                    <span className="text-[10px] text-stone-500 block">Amount to be Paid</span>
+                    <span className="text-base font-mono font-bold text-stone-900">
+                      ₹ {fmt(pendalBal)}
+                    </span>
+                  </div>
+                  <div className="text-right text-[11px] font-mono text-stone-600">
+                    <div>Adv: ₹{fmt(pendalAdv)}</div>
+                    <div className="text-[10px] text-stone-400">Total: ₹{fmt(pendalEst)}</div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Anna Prasadam Food Card */}
+          {(() => {
+            const food = expenses.find(e => /prasadam|food/i.test(e.item || ''));
+            const foodBal = food ? getExpenseBalance(food) : 0;
+            const foodAdv = Number(food?.adv || 0);
+            const foodEst = Number(food?.est || 0);
+            return (
+              <div
+                onClick={() => {
+                  if (onNavigateToExpenditure) onNavigateToExpenditure();
+                  else if (onNavigateToTab) onNavigateToTab('expenditure');
+                }}
+                className={`p-3.5 rounded-lg border border-stone-200 bg-stone-50/50 hover:bg-stone-50 transition-all ${
+                  onNavigateToTab || onNavigateToExpenditure ? 'cursor-pointer hover:border-stone-300' : ''
+                }`}
+              >
+                <div className="flex items-center justify-between text-[10px] font-bold text-stone-700 uppercase tracking-wider mb-1">
+                  <span>Anna Prasadam (Catering)</span>
+                  <span className="text-stone-400 text-[9px] font-mono">Vendor</span>
+                </div>
+                <div className="flex items-baseline justify-between mt-1">
+                  <div>
+                    <span className="text-[10px] text-stone-500 block">Amount to be Paid</span>
+                    <span className="text-base font-mono font-bold text-stone-900">
+                      ₹ {fmt(foodBal)}
+                    </span>
+                  </div>
+                  <div className="text-right text-[11px] font-mono text-stone-600">
+                    <div>Adv: ₹{fmt(foodAdv)}</div>
+                    <div className="text-[10px] text-stone-400">Total: ₹{fmt(foodEst)}</div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
         </div>
       </div>
 

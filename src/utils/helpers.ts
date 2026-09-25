@@ -71,7 +71,7 @@ export const DEFAULT_SEVAS: SevaCatalogueItem[] = [
 export const INITIAL_STATE: AppState = {
   expenses: [
     { id: '1788182059860', item: 'Ganesha Idol + Stone Work', est: 58000, adv: 0, bal: 58000, act: 58000 },
-    { id: '1788182074852', item: 'Lightings and Decorations and Event Management', est: 125000, adv: 0, bal: 125000, act: 125000 },
+    { id: '1788182074852', item: 'Lightings and Decorations and Event Management', est: 300000, adv: 215001, bal: 84999, act: 215001 },
     { id: '1788182092539', item: 'Pendal', est: 60000, adv: 0, bal: 60000, act: 60000 },
     { id: '1788182105355', item: 'Dhol', est: 75000, adv: 0, bal: 75000, act: 75000 },
     { id: '1788182119929', item: 'Pujari(Priest) + Pooja Items', est: 20000, adv: 0, bal: 20000, act: 20000 },
@@ -493,4 +493,27 @@ export async function prepareExpenseForStorage(expense: Expense): Promise<Expens
   }
 
   return finalExpense;
+}
+
+/**
+ * Retrieves lighting and decoration vendor expenditure metrics
+ */
+export function getLightingAndDecorationExpense(expenses: Expense[]) {
+  const matching = expenses.filter(e =>
+    /light|lighting|decoration/i.test(e.item || '')
+  );
+  const primary = matching[0] || null;
+  const totalEst = matching.reduce((s, e) => s + Number(e.est || 0), 0);
+  const totalAdv = matching.reduce((s, e) => s + Number(e.adv || 0), 0);
+  const totalBal = matching.reduce((s, e) => s + getExpenseBalance(e), 0);
+  const totalAct = matching.reduce((s, e) => s + getExpenseActual(e), 0);
+
+  return {
+    item: primary,
+    matching,
+    totalEst,
+    totalAdv,
+    totalBal,
+    totalAct
+  };
 }

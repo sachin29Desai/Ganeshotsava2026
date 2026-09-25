@@ -222,7 +222,7 @@ export const UserProfileOnboardingModal: React.FC<UserProfileOnboardingModalProp
                 />
               </div>
               <p className="text-[10px] text-stone-500">
-                You can use this mobile number or email ID to sign in anytime!
+                You can use your registered email ID to sign in anytime!
               </p>
             </div>
 

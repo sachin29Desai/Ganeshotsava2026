@@ -1106,7 +1106,7 @@ export function App() {
       const emailFromUrl = url.searchParams.get('email');
       const otpFromUrl = url.searchParams.get('otp');
 
-      if (isEmailLink || (emailFromUrl && otpFromUrl)) {
+      if (isEmailLink || emailFromUrl) {
         const savedEmail = (
           emailFromUrl ||
           window.localStorage.getItem('emailForSignIn') ||
@@ -2475,10 +2475,15 @@ export function App() {
             userRole={userRole || undefined}
             isAdmin={isAdmin}
             isMember={isMember || isReadOnly}
-            onNavigateToTab={!isUnassigned ? (subTab) => {
-              setActiveTab('income');
-              setActiveIncomeSubTab(subTab);
-            } : undefined}
+            onNavigateToTab={(targetTab) => {
+              if (targetTab === 'expenditure') {
+                setActiveTab('expenditure');
+              } else if (!isUnassigned) {
+                setActiveTab('income');
+                setActiveIncomeSubTab(targetTab as any);
+              }
+            }}
+            onNavigateToExpenditure={() => setActiveTab('expenditure')}
             onPrintInvoice={s => {
               setPrintData({ type: 'invoice', subType: 'stall', item: s });
               setReceiptModalOpen(true);

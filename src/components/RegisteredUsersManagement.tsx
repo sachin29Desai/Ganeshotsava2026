@@ -458,7 +458,7 @@ export const RegisteredUsersManagement: React.FC<RegisteredUsersManagementProps>
                   Register New Devotee Profile
                 </h3>
                 <p className="text-xs text-stone-500">
-                  Add devotee to the registered list so they can log in via email or mobile number.
+                  Add devotee to the registered list with their email address and role.
                 </p>
               </div>
             </div>
@@ -502,7 +502,7 @@ export const RegisteredUsersManagement: React.FC<RegisteredUsersManagementProps>
 
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-stone-700 mb-1">
-                  10-Digit Mobile Number (for phone login)
+                  10-Digit Mobile Number (optional)
                 </label>
                 <input
                   type="tel"

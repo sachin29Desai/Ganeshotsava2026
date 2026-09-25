@@ -45,41 +45,45 @@ export const GaneshaFestivalVideoShowcase: React.FC<GaneshaFestivalVideoShowcase
   const videoFileInputRef = useRef<HTMLInputElement | null>(null);
   const photoFileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Compile full media list: always ensure the video plays first, then the photo
+  // Compile full media list from Settings database
   const getMediaList = (): MediaItem[] => {
     const list: MediaItem[] = [];
 
-    // Ensure our primary video is first in the list
-    list.push({
-      id: 'default_video',
-      type: 'video',
-      url: '/ganesha_festival_darshan.mp4',
-      caption: 'Sri Ganesha Festival Grand Darshan Video'
-    });
-
-    // Ensure our beautiful altar photo is second in the list
-    list.push({
-      id: 'default_photo',
-      type: 'photo',
-      url: '/Gemini_Generated_Image_jforcsjforcsjfor.png',
-      caption: 'Sri Ganesha Divine Altar'
-    });
-
-    // Add any extra custom admin videos configured in settings
+    // 1. Add custom admin videos configured in settings first
     if (settings?.adminVideos && Array.isArray(settings.adminVideos)) {
       settings.adminVideos.forEach((url, i) => {
         if (url && url !== '/ganesha_festival_darshan.mp4') {
-          list.push({ id: `v_${i}`, type: 'video', url, caption: `Festival Video Showcase ${i + 1}` });
+          list.push({
+            id: `v_${i}`,
+            type: 'video',
+            url,
+            caption: `Festival Video Showcase ${i + 1}`
+          });
         }
       });
     }
 
-    // Add any extra custom admin photos configured in settings
+    // 2. Add custom admin photos configured in settings next
     if (settings?.adminPhotos && Array.isArray(settings.adminPhotos)) {
       settings.adminPhotos.forEach((url, i) => {
-        if (url && url !== '/Gemini_Generated_Image_jforcsjforcsjfor.png') {
-          list.push({ id: `p_${i}`, type: 'photo', url, caption: `Celebration Photo ${i + 1}` });
+        if (url) {
+          list.push({
+            id: `p_${i}`,
+            type: 'photo',
+            url,
+            caption: `Celebration Photo ${i + 1}`
+          });
         }
+      });
+    }
+
+    // 3. Absolute Fallback: if no custom media is configured, show the beautiful altar photo
+    if (list.length === 0) {
+      list.push({
+        id: 'default_photo',
+        type: 'photo',
+        url: '/Gemini_Generated_Image_jforcsjforcsjfor.png',
+        caption: 'Sri Ganesha Divine Altar'
       });
     }
 
@@ -117,15 +121,15 @@ export const GaneshaFestivalVideoShowcase: React.FC<GaneshaFestivalVideoShowcase
     }
   }, [currentIndex, currentMedia.url]);
 
-  // Auto-advance photos after 6 seconds
+  // Auto-advance photos after 6 seconds if multiple items exist
   useEffect(() => {
-    if (currentMedia.type === 'photo') {
+    if (currentMedia.type === 'photo' && mediaItems.length > 1) {
       const timer = setTimeout(() => {
         handleNextMedia();
       }, 6000);
       return () => clearTimeout(timer);
     }
-  }, [currentIndex, currentMedia.type]);
+  }, [currentIndex, currentMedia.type, mediaItems.length]);
 
   const togglePlay = () => {
     if (!videoRef.current) return;
@@ -289,9 +293,10 @@ export const GaneshaFestivalVideoShowcase: React.FC<GaneshaFestivalVideoShowcase
             ref={videoRef}
             src={currentMedia.url}
             autoPlay
+            loop={mediaItems.length === 1}
             muted={isMuted}
             playsInline
-            onEnded={handleNextMedia}
+            onEnded={mediaItems.length > 1 ? handleNextMedia : undefined}
             onError={() => setVideoError(true)}
             className="w-full h-full object-cover sm:object-contain transition-transform duration-700 group-hover:scale-[1.01]"
           />

@@ -124,6 +124,14 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
           return;
         }
 
+        // Check if devotee is verified
+        const isProfileAdmin = profile.role === 'admin' || getAdminEmails().map(e => e.toLowerCase()).includes(profile.email.toLowerCase());
+        if (profile.status === 'unverified' && !isProfileAdmin) {
+          setError(`Your profile is registered but pending email verification. A secure verification link was sent to your registered email: ${profile.email}. Please verify your email first to access devotee portal details.`);
+          setIsSubmitting(false);
+          return;
+        }
+
         // Returning devotee found! Log in directly!
         const role = resolveRole(profile.email, profile.role);
         sessionStorage.setItem('eg_committee_auth', 'true');
@@ -157,8 +165,26 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
           name: isSuperAdmin ? 'Sachin Desai (Admin)' : 'Devotee',
           flat: 'Admin Desk',
           mobile: '',
-          role: 'admin' as UserRole
+          role: 'admin' as UserRole,
+          status: 'verified' as const
         };
+
+        // Check if devotee is verified
+        if (profile.status === 'unverified' && !isSuperAdmin) {
+          if (auth) {
+            try {
+              const continueUrl = `${window.location.origin}${window.location.pathname}?email=${encodeURIComponent(cleanEmail)}`;
+              await sendSignInLinkToEmail(auth, cleanEmail, {
+                url: continueUrl,
+                handleCodeInApp: true
+              });
+            } catch {}
+          }
+          setError(`Your devotee profile is registered but pending email verification. We have sent a new verification link to your email: ${cleanEmail}. Please click that link to verify your email and access devotee portal details.`);
+          setIsSubmitting(false);
+          return;
+        }
+
         const role = resolveRole(cleanEmail, profile.role);
         sessionStorage.setItem('eg_committee_auth', 'true');
         sessionStorage.setItem('eg_user_role', role);
@@ -245,12 +271,20 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
       }
     }
 
-    // Cache session storage values
-    const role = resolveRole(newProfile.email, newProfile.role);
-    sessionStorage.setItem('eg_committee_auth', 'true');
-    sessionStorage.setItem('eg_user_role', role);
-    sessionStorage.setItem('eg_user_email', newProfile.email);
-    sessionStorage.setItem('eg_user_profile', JSON.stringify({ ...newProfile, role }));
+    // Cache session storage values ONLY if verified!
+    if (newProfile.status === 'verified') {
+      const role = resolveRole(newProfile.email, newProfile.role);
+      sessionStorage.setItem('eg_committee_auth', 'true');
+      sessionStorage.setItem('eg_user_role', role);
+      sessionStorage.setItem('eg_user_email', newProfile.email);
+      sessionStorage.setItem('eg_user_profile', JSON.stringify({ ...newProfile, role }));
+    } else {
+      // Clear any session cache to prevent unverified bypass
+      sessionStorage.removeItem('eg_committee_auth');
+      sessionStorage.removeItem('eg_user_role');
+      sessionStorage.removeItem('eg_user_email');
+      sessionStorage.removeItem('eg_user_profile');
+    }
 
     // Open Thank You Dialog
     setShowThankYou(newProfile);
@@ -259,6 +293,12 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
   const handleThankYouConfirm = () => {
     if (showThankYou) {
       const role = resolveRole(showThankYou.email, showThankYou.role);
+      if (showThankYou.status === 'unverified') {
+        setError(null);
+        setInfoMessage(`Registration successful! We have sent a secure verification link to ${showThankYou.email}. Please check your email inbox and click that link to verify your profile and access the devotee portal.`);
+        setShowThankYou(null);
+        return;
+      }
       onSuccess(role, showThankYou);
       setShowThankYou(null);
     }

@@ -76,10 +76,9 @@ export const UserProfileOnboardingModal: React.FC<UserProfileOnboardingModalProp
       }
 
       const adminList = getAdminEmails().map(e => e.toLowerCase());
-      const role: UserRole =
-        cleanEmail === 'desaisachin95@gmail.com' || adminList.includes(cleanEmail)
-          ? 'admin'
-          : 'viewer';
+      const isCustomAdmin = cleanEmail === 'desaisachin95@gmail.com' || adminList.includes(cleanEmail);
+      const role: UserRole = isCustomAdmin ? 'admin' : 'viewer';
+      const status = isCustomAdmin ? 'verified' : 'unverified';
 
       const newProfile: UserProfile = {
         email: cleanEmail,
@@ -87,6 +86,7 @@ export const UserProfileOnboardingModal: React.FC<UserProfileOnboardingModalProp
         flat: trimmedFlat,
         mobile: cleanedMobile,
         role,
+        status,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };

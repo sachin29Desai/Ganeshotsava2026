@@ -175,6 +175,7 @@ export const RegisteredUsersManagement: React.FC<RegisteredUsersManagementProps>
         flat: cleanFlat || 'General',
         mobile: cleanMobile,
         role: newUserRole,
+        status: 'verified', // Admin-registered devotees are instantly verified
         createdAt: new Date().toISOString()
       };
 
@@ -706,6 +707,33 @@ export const RegisteredUsersManagement: React.FC<RegisteredUsersManagementProps>
                           <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-stone-100 text-stone-800 border border-stone-200">
                             Flat {profile.flat}
                           </span>
+                        )}
+                        {profile.status === 'verified' ? (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                            <Check className="w-2.5 h-2.5" /> Verified
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              try {
+                                const updatedProfile = { ...profile, status: 'verified' as const, updatedAt: new Date().toISOString() };
+                                await cloudSaveUserProfile(updatedProfile);
+                                setProfiles(prev => prev.map(p => p.email.toLowerCase() === emailLower ? updatedProfile : p));
+                                setFeedback({ type: 'success', text: `✓ Manually verified ${profile.name || profile.email}.` });
+                                setTimeout(() => setFeedback(null), 4000);
+                              } catch (err) {
+                                console.error('Failed to verify user:', err);
+                                setFeedback({ type: 'error', text: 'Failed to verify user profile.' });
+                                setTimeout(() => setFeedback(null), 4000);
+                              }
+                            }}
+                            className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 hover:bg-amber-200 text-amber-800 border border-amber-300 flex items-center gap-1 cursor-pointer transition-colors shadow-3xs"
+                            title="Click to manually verify this devotee"
+                          >
+                            <Clock className="w-2.5 h-2.5 text-amber-700" />
+                            <span>Unverified (Verify)</span>
+                          </button>
                         )}
                         {isGlobalAdmin && (
                           <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-400 text-stone-950 flex items-center gap-1 shadow-2xs">

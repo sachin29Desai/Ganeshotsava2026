@@ -984,6 +984,14 @@ export function App() {
       const isSuperAdmin = verifiedEmail === 'desaisachin95@gmail.com' || adminEmails.includes(verifiedEmail);
 
       if (existingProfile) {
+        // Mark status as verified since they verified the email link successfully!
+        const verifiedProfile: UserProfile = {
+          ...existingProfile,
+          status: 'verified',
+          updatedAt: new Date().toISOString()
+        };
+        await cloudSaveUserProfile(verifiedProfile);
+
         // RETURNING REGISTERED USER:
         // AUTOMATIC LOGIN WITHOUT ASKING OR CONFIRMING EMAIL
         setPromptEmailForMagicLink(false);
@@ -1000,7 +1008,7 @@ export function App() {
           role = 'viewer';
         }
 
-        handleLoginSuccess(role, existingProfile);
+        handleLoginSuccess(role, verifiedProfile);
         setSyncToast({
           message: `Welcome back, ${existingProfile.name}! Logged in automatically.`,
           type: 'success'
@@ -1015,6 +1023,7 @@ export function App() {
           flat: 'Admin Desk',
           mobile: '',
           role: 'admin',
+          status: 'verified',
           createdAt: new Date().toISOString()
         };
         await cloudSaveUserProfile(adminProfile);
@@ -1740,13 +1749,24 @@ export function App() {
         onComplete={(newProfile) => {
           const adminEmails = getAdminEmailList();
           const role: UserRole = newProfile.role || (adminEmails.includes(newProfile.email.toLowerCase()) ? 'admin' : 'unassigned');
-          handleLoginSuccess(role, newProfile);
-          setFirstTimeOnboardingUser(null);
-          setSyncToast({
-            message: `Welcome to Ganeshotsava 2026, ${newProfile.name}! Your profile has been registered.`,
-            type: 'success'
+          const verifiedProfile: UserProfile = {
+            ...newProfile,
+            status: 'verified'
+          };
+          cloudSaveUserProfile(verifiedProfile).then(() => {
+            handleLoginSuccess(role, verifiedProfile);
+            setFirstTimeOnboardingUser(null);
+            setSyncToast({
+              message: `Welcome to Ganeshotsava 2026, ${newProfile.name}! Your profile has been registered and verified.`,
+              type: 'success'
+            });
+            setTimeout(() => setSyncToast(null), 4000);
+          }).catch((err) => {
+            console.error('Error saving verified profile:', err);
+            // Fallback: log them in anyway
+            handleLoginSuccess(role, verifiedProfile);
+            setFirstTimeOnboardingUser(null);
           });
-          setTimeout(() => setSyncToast(null), 4000);
         }}
         onCancel={() => {
           setFirstTimeOnboardingUser(null);

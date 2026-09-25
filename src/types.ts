@@ -114,6 +114,7 @@ export interface UserProfile {
   flat: string;
   mobile: string;
   role: UserRole;
+  status?: 'verified' | 'unverified';
   photoUrl?: string; // Captured photo / selfie data URL
   username?: string;
   preferences?: string;

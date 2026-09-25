@@ -68,8 +68,13 @@ export const DonationsView: React.FC<DonationsViewProps> = ({
   const effectiveFlat = (userProfile?.flat || nonAdminFlatInput).trim();
   const effectiveFlatClean = effectiveFlat.toLowerCase().replace(/[^a-z0-9]/g, '');
 
-  // For non-admin, filter strictly to their flat number
-  const baseContributions = isAdmin
+  const isMemberOrReadOnly = userProfile?.role === 'admin' || 
+                             userProfile?.role === 'member' || 
+                             userProfile?.role === 'read_only' || 
+                             userProfile?.role === 'sponsor';
+
+  // For non-admin & non-members, filter strictly to their flat number
+  const baseContributions = (isAdmin || isMemberOrReadOnly)
     ? contributions
     : effectiveFlatClean
     ? contributions.filter(c => {

@@ -45,31 +45,41 @@ export const GaneshaFestivalVideoShowcase: React.FC<GaneshaFestivalVideoShowcase
   const videoFileInputRef = useRef<HTMLInputElement | null>(null);
   const photoFileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Compile full media list from Settings database
+  // Compile full media list: always ensure the video plays first, then the photo
   const getMediaList = (): MediaItem[] => {
     const list: MediaItem[] = [];
-    
-    // Add custom admin videos
+
+    // Ensure our primary video is first in the list
+    list.push({
+      id: 'default_video',
+      type: 'video',
+      url: '/ganesha_festival_darshan.mp4',
+      caption: 'Sri Ganesha Festival Grand Darshan Video'
+    });
+
+    // Ensure our beautiful altar photo is second in the list
+    list.push({
+      id: 'default_photo',
+      type: 'photo',
+      url: '/Gemini_Generated_Image_jforcsjforcsjfor.png',
+      caption: 'Sri Ganesha Divine Altar'
+    });
+
+    // Add any extra custom admin videos configured in settings
     if (settings?.adminVideos && Array.isArray(settings.adminVideos)) {
       settings.adminVideos.forEach((url, i) => {
-        if (url) list.push({ id: `v_${i}`, type: 'video', url });
-      });
-    }
-    
-    // Add custom admin photos
-    if (settings?.adminPhotos && Array.isArray(settings.adminPhotos)) {
-      settings.adminPhotos.forEach((url, i) => {
-        if (url) list.push({ id: `p_${i}`, type: 'photo', url });
+        if (url && url !== '/ganesha_festival_darshan.mp4') {
+          list.push({ id: `v_${i}`, type: 'video', url, caption: `Festival Video Showcase ${i + 1}` });
+        }
       });
     }
 
-    // Default fallback if no admin media is configured
-    if (list.length === 0) {
-      list.push({
-        id: 'default_video',
-        type: 'video',
-        url: '/ganesha_festival_darshan.mp4',
-        caption: 'Grand Festival Darshan Video'
+    // Add any extra custom admin photos configured in settings
+    if (settings?.adminPhotos && Array.isArray(settings.adminPhotos)) {
+      settings.adminPhotos.forEach((url, i) => {
+        if (url && url !== '/Gemini_Generated_Image_jforcsjforcsjfor.png') {
+          list.push({ id: `p_${i}`, type: 'photo', url, caption: `Celebration Photo ${i + 1}` });
+        }
       });
     }
 
@@ -106,6 +116,16 @@ export const GaneshaFestivalVideoShowcase: React.FC<GaneshaFestivalVideoShowcase
       });
     }
   }, [currentIndex, currentMedia.url]);
+
+  // Auto-advance photos after 6 seconds
+  useEffect(() => {
+    if (currentMedia.type === 'photo') {
+      const timer = setTimeout(() => {
+        handleNextMedia();
+      }, 6000);
+      return () => clearTimeout(timer);
+    }
+  }, [currentIndex, currentMedia.type]);
 
   const togglePlay = () => {
     if (!videoRef.current) return;
@@ -269,9 +289,9 @@ export const GaneshaFestivalVideoShowcase: React.FC<GaneshaFestivalVideoShowcase
             ref={videoRef}
             src={currentMedia.url}
             autoPlay
-            loop
             muted={isMuted}
             playsInline
+            onEnded={handleNextMedia}
             onError={() => setVideoError(true)}
             className="w-full h-full object-cover sm:object-contain transition-transform duration-700 group-hover:scale-[1.01]"
           />

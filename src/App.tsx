@@ -1756,8 +1756,8 @@ export function App() {
     );
   }
 
-  // D. If showLoginGate is active, show the login page
-  if (showLoginGate) {
+  // D. If not authenticated, force show the login/registration gate (devotee landing/registration page)
+  if (!isAuthenticated) {
     return (
       <CommitteeAuthGate
         settings={settings}
@@ -1766,7 +1766,6 @@ export function App() {
           setShowLoginGate(false);
         }}
         onSaveSettings={handleSaveSettings}
-        onBackToHome={() => setShowLoginGate(false)}
       />
     );
   }
@@ -2419,10 +2418,10 @@ export function App() {
             userRole={userRole || undefined}
             isAdmin={isAdmin}
             isMember={isMember || isReadOnly}
-            onNavigateToTab={(subTab) => {
+            onNavigateToTab={!isUnassigned ? (subTab) => {
               setActiveTab('income');
               setActiveIncomeSubTab(subTab);
-            }}
+            } : undefined}
             onPrintInvoice={s => {
               setPrintData({ type: 'invoice', subType: 'stall', item: s });
               setReceiptModalOpen(true);

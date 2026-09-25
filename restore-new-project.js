@@ -19,9 +19,9 @@ async function restore() {
   const config = JSON.parse(fs.readFileSync('./firebase-applet-config.json', 'utf8'));
   const dump = JSON.parse(fs.readFileSync('./firestore-data-backup.json', 'utf8'));
 
-  console.log('Restoring data to target project:', config.projectId);
+  console.log('Restoring data to target project:', config.projectId, 'Database ID:', config.firestoreDatabaseId || '(default)');
   const app = initializeApp(config);
-  const db = getFirestore(app);
+  const db = getFirestore(app, config.firestoreDatabaseId);
 
   for (const [colName, records] of Object.entries(dump)) {
     if (!Array.isArray(records) || records.length === 0) continue;

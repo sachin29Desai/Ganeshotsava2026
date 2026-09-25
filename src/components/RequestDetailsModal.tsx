@@ -10,7 +10,8 @@ import {
   AlertCircle,
   Sparkles,
   HelpCircle,
-  FileText
+  FileText,
+  Users
 } from 'lucide-react';
 import { AppSettings, UserProfile } from '../types';
 import { cloudRequestDetailedAccess } from '../lib/firebase';
@@ -70,7 +71,7 @@ export const RequestDetailsModal: React.FC<RequestDetailsModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/65 backdrop-blur-xs animate-in fade-in duration-150">
-      <div className="bg-white rounded-2xl shadow-2xl border-2 border-amber-400 max-w-lg w-full overflow-hidden flex flex-col">
+      <div className="bg-white rounded-2xl shadow-2xl border-2 border-amber-400 max-w-xl w-full overflow-hidden flex flex-col">
         {/* Header */}
         <div className="bg-gradient-to-r from-[#7F1D1D] via-[#991B1B] to-[#7F1D1D] text-white p-5 text-center relative border-b-2 border-amber-400">
           <button
@@ -112,7 +113,8 @@ export const RequestDetailsModal: React.FC<RequestDetailsModalProps> = ({
             <h4 className="text-xs font-bold uppercase tracking-wider text-stone-700">
               Direct Committee Contact
             </h4>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+              {/* 1. Email Committee */}
               <a
                 href={`mailto:${committeeEmail}?subject=Ganeshotsava%202026%20Detailed%20Access%20Request&body=Hi%20Committee,%20I%20am%20${encodeURIComponent(userProfile?.name || '')}%20from%20Flat%20${encodeURIComponent(userProfile?.flat || '')}.%20Kindly%20provide%20me%20view%20access%20to%20complete%20festival%20financial%20data.`}
                 className="p-3 rounded-xl border border-stone-200 hover:border-[#991B1B] hover:bg-stone-50 transition-colors flex items-center gap-2.5 text-stone-800 group cursor-pointer"
@@ -128,8 +130,9 @@ export const RequestDetailsModal: React.FC<RequestDetailsModalProps> = ({
                 </div>
               </a>
 
+              {/* 2. WhatsApp Direct Chat with Helpline Phone */}
               <a
-                href={`https://wa.me/?text=${encodeURIComponent(
+                href={`https://wa.me/${helplinePhone.replace(/\D/g, '')}?text=${encodeURIComponent(
                   `Namaste Committee! I am ${userProfile?.name || 'a resident'} (Flat: ${userProfile?.flat || 'N/A'}, Mobile: ${userProfile?.mobile || 'N/A'}). I would like to request view access for complete Sri Ganeshotsava 2026 data and vouchers.`
                 )}`}
                 target="_blank"
@@ -140,9 +143,27 @@ export const RequestDetailsModal: React.FC<RequestDetailsModalProps> = ({
                   <MessageSquare className="w-4 h-4" />
                 </div>
                 <div className="min-w-0">
-                  <span className="font-bold block truncate text-emerald-900">WhatsApp Committee</span>
+                  <span className="font-bold block truncate text-emerald-900">WhatsApp Chat</span>
+                  <span className="text-[10px] text-stone-500 truncate block font-mono">
+                    {helplinePhone}
+                  </span>
+                </div>
+              </a>
+
+              {/* 3. WhatsApp Private Chat Group */}
+              <a
+                href="https://chat.whatsapp.com/Ganeshotsava2026PrivateGroup"
+                target="_blank"
+                rel="noreferrer"
+                className="p-3 rounded-xl border border-stone-200 hover:border-blue-600 hover:bg-blue-50 transition-colors flex items-center gap-2.5 text-stone-800 group cursor-pointer"
+              >
+                <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center shrink-0 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                  <Users className="w-4 h-4" />
+                </div>
+                <div className="min-w-0">
+                  <span className="font-bold block truncate text-blue-900 font-bold">WhatsApp Group</span>
                   <span className="text-[10px] text-stone-500 truncate block">
-                    Instant message to coordinators
+                    Join Private Chat
                   </span>
                 </div>
               </a>

@@ -404,6 +404,43 @@ export function App() {
   const hasUnsavedChangesRef = useRef(false);
   const [syncToast, setSyncToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
+  // Continuous security guard: Re-verify logged-in user profile on mount to handle admin deletions & role changes instantly
+  useEffect(() => {
+    if (isAuthenticated && currentEmail) {
+      cloudGetUserProfile(currentEmail)
+        .then(profile => {
+          if (!profile) {
+            console.warn('Devotee profile has been removed by administrator. Terminating session.');
+            handleLogout();
+            setSyncToast({ message: 'Your session has ended as your devotee profile was removed.', type: 'error' });
+            setTimeout(() => setSyncToast(null), 5000);
+          } else if (profile.status === 'unverified') {
+            console.warn('Devotee profile is now unverified. Terminating session.');
+            handleLogout();
+            setSyncToast({ message: 'Your profile is pending email verification. Please verify first.', type: 'error' });
+            setTimeout(() => setSyncToast(null), 5000);
+          } else {
+            // Profile exists and is verified. Sync any role/profile updates cleanly!
+            const adminEmails = getAdminEmailList().map(e => e.toLowerCase());
+            let updatedRole: UserRole = 'viewer';
+            if (profile.email.toLowerCase() === 'desaisachin95@gmail.com' || adminEmails.includes(profile.email.toLowerCase()) || profile.role === 'admin') {
+              updatedRole = 'admin';
+            } else if (profile.role === 'member' || profile.role === 'read_only' || profile.role === 'sponsor') {
+              updatedRole = 'member';
+            }
+            
+            setUserRole(updatedRole);
+            setUserProfile({ ...profile, role: updatedRole });
+            sessionStorage.setItem('eg_user_role', updatedRole);
+            sessionStorage.setItem('eg_user_profile', JSON.stringify({ ...profile, role: updatedRole }));
+          }
+        })
+        .catch(err => {
+          console.warn('Failed to verify session profile status:', err);
+        });
+    }
+  }, [isAuthenticated, currentEmail]);
+
   // --- Modals & Printing ---
   const [receiptModalOpen, setReceiptModalOpen] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);

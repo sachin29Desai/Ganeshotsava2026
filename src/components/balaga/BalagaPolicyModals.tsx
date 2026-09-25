@@ -246,7 +246,7 @@ export const BalagaPolicyModals: React.FC<BalagaPolicyModalsProps> = ({
                   <div>
                     <strong className="block text-stone-800 dark:text-stone-200">Authentication Token:</strong>
                     <span className={isDark ? 'text-stone-400' : 'text-stone-600'}>
-                      Keeps you logged in via secure Firebase Google Session for volunteer roster access.
+                      Keeps you logged in via secure Google Session for volunteer roster access.
                     </span>
                   </div>
                 </div>

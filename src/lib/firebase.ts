@@ -1053,3 +1053,19 @@ export async function cloudIncrementOtpAttempts(email: string, currentAttempts: 
   }
 }
 
+export async function sendOtpEmailApi(email: string, otp: string, magicLink: string, orgName: string) {
+  try {
+    const res = await fetch('/api/send-otp-email', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ email, otp, magicLink, orgName })
+    });
+    return await res.json();
+  } catch (err) {
+    console.warn('Failed to call send-otp-email proxy API:', err);
+    return { success: false, error: String(err) };
+  }
+}
+

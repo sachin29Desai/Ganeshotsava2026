@@ -388,7 +388,7 @@ tr:hover td{background:#FAFAF9}
       <div class="card-hdr"><h2>Organization Settings</h2></div>
       <div class="settings-grid">
         <div class="field"><label>Organization Name</label><input id="set_org" value="Eldorado"></div>
-        <div class="field"><label>Event Location</label><input id="set_location" value="Amphitheatre, Brigade Eldorado"></div>
+        <div class="field"><label>Event Location</label><input id="set_location" value="Eldorado ganeshotsava 2026"></div>
         <div class="field"><label>UPI ID</label><input id="set_upi" placeholder="yourname@upi"><small style="color:#78716C;font-size:11px">Generates instant UPI QR code on receipts</small></div>
         <div class="field"><label>UPI Payee Name</label><input id="set_payee" value="Eldorado Ganeshotsava"></div>
         <div class="field full">
@@ -572,7 +572,7 @@ tr:hover td{background:#FAFAF9}
           <h2 id="rcpOrg">Eldorado</h2>
           <h3>3rd Year Ganeshotsava</h3>
           <p>14th September – 18th September 2026</p>
-          <p id="rcpLoc">Amphitheatre, Brigade Eldorado</p>
+          <p id="rcpLoc">Eldorado ganeshotsava 2026</p>
         </div>
       </div>
       <div class="rcp-meta">
@@ -620,7 +620,7 @@ tr:hover td{background:#FAFAF9}
           <h2 id="invOrg">Eldorado</h2>
           <p>3rd Year Ganeshotsava</p>
           <p>14th September – 18th September 2026</p>
-          <p id="invLoc">Amphitheatre, Brigade Eldorado</p>
+          <p id="invLoc">Eldorado ganeshotsava 2026</p>
         </div>
         <div class="inv-meta">
           <div class="inv-no">SPONSORSHIP INVOICE</div>
@@ -694,7 +694,7 @@ const dbSave = (k, v) => {
 
 function cfgLoad() {
   const def = {
-    org: 'Eldorado', location: 'Amphitheatre, Brigade Eldorado',
+    org: 'Eldorado', location: 'Eldorado ganeshotsava 2026',
     upi: '', payee: 'Eldorado Ganeshotsava', logo: '', adminHash: ''
   };
   if (viewOnly && sharedData) return { ...def, org: sharedData.org || def.org, location: sharedData.location || def.location };
@@ -1563,7 +1563,7 @@ function saveSettings() {
 
 function applySettingsToForm(cfg) {
   document.getElementById('set_org').value = cfg.org || 'Eldorado';
-  document.getElementById('set_location').value = cfg.location || 'Amphitheatre, Brigade Eldorado';
+  document.getElementById('set_location').value = cfg.location || 'Eldorado ganeshotsava 2026';
   document.getElementById('set_upi').value = cfg.upi || '';
   document.getElementById('set_payee').value = cfg.payee || 'Eldorado Ganeshotsava';
   if (cfg.logo) {

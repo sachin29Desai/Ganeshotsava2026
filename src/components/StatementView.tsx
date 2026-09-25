@@ -272,6 +272,34 @@ export const StatementView: React.FC<StatementViewProps> = ({
           </div>
         </div>
 
+        {/* Unified Proportional Distribution Bar */}
+        {totalIncome > 0 && (
+          <div className="space-y-1.5 bg-stone-50/60 p-3.5 rounded-xl border border-stone-200/60 transition-all">
+            <div className="flex items-center justify-between text-[11px] font-bold text-stone-600 uppercase tracking-wider">
+              <span className="flex items-center gap-1.5">
+                <TrendingUp className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Unified Revenue Distribution Stream</span>
+              </span>
+              <span className="font-mono text-stone-400">100% Proportional Share</span>
+            </div>
+            <div className="h-4.5 w-full bg-stone-100 rounded-full overflow-hidden flex shadow-inner border border-stone-200/60">
+              {donutSegments.map((cat, idx) => (
+                <div
+                  key={cat.label}
+                  onMouseEnter={() => setHoveredIndex(idx)}
+                  onMouseLeave={() => setHoveredIndex(null)}
+                  className={`h-full transition-all duration-300 hover:brightness-95 cursor-pointer`}
+                  style={{
+                    width: `${cat.percentage}%`,
+                    backgroundColor: cat.color
+                  }}
+                  title={`${cat.label}: ${cat.percentage}% (₹${fmt(cat.value)})`}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* 1. DONUT/PIE CHART VIEW */}
         {chartType === 'donut' && (
           <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">

@@ -105,7 +105,7 @@ export const INITIAL_STATE: AppState = {
   auctions: [],
   settings: {
     org: 'Eldorado',
-    location: 'Amphitheatre, Brigade Eldorado',
+    location: 'Eldorado ganeshotsava 2026',
     upi: '',
     payee: 'Eldorado Ganeshotsava',
     logo: '',

@@ -60,7 +60,38 @@ async function startServer() {
       const cleanEmail = email.toLowerCase().trim();
       const org = orgName || 'Eldorado Kannadigara Balaga — Ganeshotsava 2026';
       const subject = `Your Ganeshotsava 2026 Sign-In Link & OTP: ${otp}`;
-      const fallbackMagicLink = magicLink || `https://ais-dev-p7a3udoouklbcodg3rdaay-1225695896.asia-east1.run.app?email=${encodeURIComponent(cleanEmail)}`;
+
+      // Dynamically detect the correct public or preview host from request referer or origin
+      let requestOrigin = '';
+      if (req.headers.referer) {
+        try {
+          const refUrl = new URL(req.headers.referer);
+          requestOrigin = refUrl.origin;
+        } catch (_) {}
+      }
+      if (!requestOrigin && req.headers.origin) {
+        requestOrigin = req.headers.origin as string;
+      }
+      
+      // Default fallback to the public Shared App URL so other users can always access it
+      if (!requestOrigin || requestOrigin.includes('localhost') || requestOrigin.includes('127.0.0.1')) {
+        requestOrigin = 'https://ais-pre-p7a3udoouklbcodg3rdaay-1225695896.asia-east1.run.app';
+      }
+
+      // If the incoming magicLink points to localhost or private dev URL, translate it to the correct public preview host
+      let resolvedMagicLink = magicLink || '';
+      if (resolvedMagicLink) {
+        try {
+          const magicUrl = new URL(resolvedMagicLink);
+          if (requestOrigin.includes('ais-pre-') && (magicUrl.origin.includes('localhost') || magicUrl.origin.includes('ais-dev-'))) {
+            resolvedMagicLink = `${requestOrigin}${magicUrl.pathname}${magicUrl.search}`;
+          }
+        } catch (_) {
+          resolvedMagicLink = '';
+        }
+      }
+
+      const fallbackMagicLink = resolvedMagicLink || `${requestOrigin}?email=${encodeURIComponent(cleanEmail)}`;
       
       const htmlContent = `
         <div style="font-family: Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; border: 1px solid #e5e7eb; border-radius: 12px; background-color: #ffffff;">

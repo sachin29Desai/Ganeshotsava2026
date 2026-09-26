@@ -132,12 +132,25 @@
   }
 
   /* Statement view print styling */
+  body.statement-print-active #mainAppContent > *:not(#statement-print-target),
+  body.statement-print-active #mainAppView > *:not(#mainAppContent) {
+    display: none !important;
+  }
+
   #statement-print-target {
     display: block !important;
     visibility: visible !important;
     width: 100% !important;
     margin: 0 auto !important;
     background: #ffffff !important;
+  }
+
+  /* Force SVG donut chart segments to print in full color on all browsers */
+  #statement-print-target svg circle,
+  #statement-print-target svg {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
   }
 
   @page {

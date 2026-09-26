@@ -96,16 +96,6 @@ export interface HundiCollection {
   notes?: string;
 }
 
-export interface AuctionItem {
-  id: string;
-  invNo: string;
-  det: string;
-  act: number;
-  by: string;
-  date: string;
-  notes?: string;
-}
-
 export type UserRole = 'admin' | 'member' | 'viewer' | 'read_only' | 'unassigned' | 'sponsor' | 'volunteer' | 'resident';
 
 export interface UserProfile {
@@ -149,13 +139,11 @@ export interface AppState {
   sevas: SevaBooking[];
   sevaCatalogue: SevaCatalogueItem[];
   hundi: HundiCollection[];
-  auctions: AuctionItem[];
   settings: AppSettings;
   counters: {
     rc: string | null;
     sp: string | null;
     cs: string | null;
     sv: string | null;
-    auc: string | null;
   };
 }

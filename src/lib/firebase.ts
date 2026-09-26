@@ -40,7 +40,6 @@ import {
   SevaBooking,
   SevaCatalogueItem,
   HundiCollection,
-  AuctionItem,
   AppSettings,
   AppState,
   UserProfile,
@@ -140,9 +139,8 @@ export interface FirestoreListeners {
   onSevas?: (sevas: SevaBooking[]) => void;
   onSevaCatalogue?: (catalogue: SevaCatalogueItem[]) => void;
   onHundi?: (hundi: HundiCollection[]) => void;
-  onAuctions?: (auctions: AuctionItem[]) => void;
   onSettings?: (settings: AppSettings) => void;
-  onCounters?: (counters: { rc?: string | null; sp?: string | null; cs?: string | null; sv?: string | null; auc?: string | null }) => void;
+  onCounters?: (counters: { rc?: string | null; sp?: string | null; cs?: string | null; sv?: string | null }) => void;
   onStatusChange?: (status: SyncStatus, error?: string) => void;
 }
 
@@ -286,9 +284,8 @@ export interface ServerDataResult {
   sevas: SevaBooking[];
   sevaCatalogue: SevaCatalogueItem[];
   hundi: HundiCollection[];
-  auctions: AuctionItem[];
   settings?: AppSettings;
-  counters?: { rc?: string | null; sp?: string | null; cs?: string | null; sv?: string | null; auc?: string | null };
+  counters?: { rc?: string | null; sp?: string | null; cs?: string | null; sv?: string | null };
 }
 
 export async function fetchFreshDataFromServer(): Promise<ServerDataResult> {
@@ -300,7 +297,6 @@ export async function fetchFreshDataFromServer(): Promise<ServerDataResult> {
     sevas,
     sevaCatalogue,
     hundi,
-    auctions,
     settings,
     counters
   ] = await Promise.all([
@@ -311,9 +307,8 @@ export async function fetchFreshDataFromServer(): Promise<ServerDataResult> {
     fetchCollectionSafely<SevaBooking>('sevas', INITIAL_STATE.sevas || []),
     fetchCollectionSafely<SevaCatalogueItem>('sevaCatalogue', DEFAULT_SEVAS),
     fetchCollectionSafely<HundiCollection>('hundi', []),
-    fetchCollectionSafely<AuctionItem>('auctions', []),
     fetchDocSafely<AppSettings>('settings', 'config', INITIAL_STATE.settings),
-    fetchDocSafely<{ rc?: string | null; sp?: string | null; cs?: string | null; sv?: string | null; auc?: string | null }>(
+    fetchDocSafely<{ rc?: string | null; sp?: string | null; cs?: string | null; sv?: string | null }>(
       'metadata',
       'counters',
       INITIAL_STATE.counters
@@ -328,7 +323,6 @@ export async function fetchFreshDataFromServer(): Promise<ServerDataResult> {
     sevas,
     sevaCatalogue: sevaCatalogue.length > 0 ? sevaCatalogue : DEFAULT_SEVAS,
     hundi,
-    auctions,
     settings: settings || INITIAL_STATE.settings,
     counters: counters || INITIAL_STATE.counters
   };
@@ -441,20 +435,6 @@ export function initFirestoreSync(listeners: FirestoreListeners, initialState?: 
     );
     unsubscribes.push(unsubHundi);
 
-    // 4c. Auctions Collection Listener
-    const unsubAuctions = onSnapshot(
-      collection(db, 'auctions'),
-      (snap) => {
-        const items: AuctionItem[] = [];
-        snap.forEach((d) => items.push({ id: d.id, ...d.data() } as AuctionItem));
-        listeners.onAuctions?.(items);
-        saveLocalSnapshotBackup({ auctions: items });
-        listeners.onStatusChange?.('synced');
-      },
-      (err) => handleSnapshotError('auctions', err)
-    );
-    unsubscribes.push(unsubAuctions);
-
     // 5. Seva Catalogue Collection Listener
     const unsubSc = onSnapshot(
       collection(db, 'sevaCatalogue'),
@@ -551,12 +531,6 @@ export async function seedInitialDataIfEmpty(initialState: AppState) {
         });
       }
 
-      if (initialState.auctions) {
-        initialState.auctions.forEach((a) => {
-          batch.set(doc(db, 'auctions', a.id), a);
-        });
-      }
-
       initialState.sevaCatalogue.forEach((sc) => {
         batch.set(doc(db, 'sevaCatalogue', sc.id), sc);
       });
@@ -566,8 +540,7 @@ export async function seedInitialDataIfEmpty(initialState: AppState) {
         rc: initialState.counters?.rc || '1',
         sp: initialState.counters?.sp || '0',
         cs: initialState.counters?.cs || '0',
-        sv: initialState.counters?.sv || '0',
-        auc: initialState.counters?.auc || '0',
+        sv: initialState.counters?.sv || '0'
       });
 
       await batch.commit();
@@ -675,24 +648,6 @@ export async function cloudDeleteHundi(id: string) {
   }
 }
 
-export async function cloudSaveAuction(auction: AuctionItem) {
-  try {
-    await setDoc(doc(db, 'auctions', auction.id), { ...auction, updatedAt: new Date().toISOString() });
-  } catch (err) {
-    console.error('Error saving auction record to Firestore:', err);
-    throw err;
-  }
-}
-
-export async function cloudDeleteAuction(id: string) {
-  try {
-    await deleteDoc(doc(db, 'auctions', id));
-  } catch (err) {
-    console.error('Error deleting auction record from Firestore:', err);
-    throw err;
-  }
-}
-
 export async function cloudSaveSeva(seva: SevaBooking) {
   try {
     await setDoc(doc(db, 'sevas', seva.id), { ...seva, updatedAt: new Date().toISOString() });
@@ -774,7 +729,6 @@ export async function cloudSyncAllData(state: AppState) {
       { name: 'commercialStalls', items: state.commercialStalls || [] },
       { name: 'sevas', items: state.sevas || [] },
       { name: 'hundi', items: state.hundi || [] },
-      { name: 'auctions', items: state.auctions || [] },
       { name: 'sevaCatalogue', items: state.sevaCatalogue || [] },
     ];
 
@@ -878,14 +832,14 @@ export async function cloudSyncAllData(state: AppState) {
 
 export async function cloudClearAllData() {
   try {
-    const collections = ['expenses', 'contributions', 'sponsors', 'commercialStalls', 'sevas', 'hundi', 'auctions'];
+    const collections = ['expenses', 'contributions', 'sponsors', 'commercialStalls', 'sevas', 'hundi'];
     for (const colName of collections) {
       const snap = await getDocs(collection(db, colName));
       const batch = writeBatch(db);
       snap.forEach((d) => batch.delete(d.ref));
       await batch.commit();
     }
-    await setDoc(doc(db, 'metadata', 'counters'), { rc: '0', sp: '0', cs: '0', sv: '0', auc: '0' });
+    await setDoc(doc(db, 'metadata', 'counters'), { rc: '0', sp: '0', cs: '0', sv: '0' });
   } catch (err) {
     console.error('Error clearing Firestore data:', err);
     throw err;

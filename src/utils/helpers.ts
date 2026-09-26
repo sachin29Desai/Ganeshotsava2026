@@ -102,7 +102,6 @@ export const INITIAL_STATE: AppState = {
   sevas: [],
   sevaCatalogue: DEFAULT_SEVAS,
   hundi: [],
-  auctions: [],
   settings: {
     org: 'Eldorado',
     location: 'Eldorado ganeshotsava 2026',
@@ -117,8 +116,7 @@ export const INITIAL_STATE: AppState = {
     rc: '1',
     sp: null,
     cs: '65247543',
-    sv: null,
-    auc: null
+    sv: null
   }
 };
 

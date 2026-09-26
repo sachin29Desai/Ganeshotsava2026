@@ -36,7 +36,6 @@ import {
   SevaBooking,
   SevaCatalogueItem,
   HundiCollection,
-  AuctionItem,
   AppSettings,
   AppState,
   UserRole,
@@ -75,8 +74,6 @@ import {
   cloudDeleteSevaCatalogueItem,
   cloudSaveHundi,
   cloudDeleteHundi,
-  cloudSaveAuction,
-  cloudDeleteAuction,
   cloudSaveSettings,
   cloudSaveCounters,
   cloudBulkImportContributions,
@@ -101,7 +98,6 @@ import { SponsorshipView } from './components/SponsorshipView';
 import { CommercialStallsView } from './components/CommercialStallsView';
 import { SevasView } from './components/SevasView';
 import { HundiView } from './components/HundiView';
-import { AuctionsView } from './components/AuctionsView';
 import { SettingsView } from './components/SettingsView';
 import { ReceiptInvoiceModal, PrintData } from './components/ReceiptInvoiceModal';
 import { PublicReceiptPortal } from './components/PublicReceiptPortal';
@@ -145,7 +141,6 @@ export function App() {
   const [sevas, setSevas] = useState<SevaBooking[]>(() => window.__E__?.sevas || initialLocalState?.sevas || INITIAL_STATE.sevas || []);
   const [sevaCatalogue, setSevaCatalogue] = useState<SevaCatalogueItem[]>(() => window.__E__?.sevaCatalogue || initialLocalState?.sevaCatalogue || DEFAULT_SEVAS);
   const [hundi, setHundi] = useState<HundiCollection[]>(() => window.__E__?.hundi || initialLocalState?.hundi || []);
-  const [auctions, setAuctions] = useState<AuctionItem[]>(() => window.__E__?.auctions || initialLocalState?.auctions || []);
   const [settings, setSettings] = useState<AppSettings>(() => window.__E__?.settings || initialLocalState?.settings || INITIAL_STATE.settings);
 
   // In-memory counters synced with Firestore metadata/counters
@@ -154,14 +149,12 @@ export function App() {
     sp?: string | null;
     cs?: string | null;
     sv?: string | null;
-    auc?: string | null;
   }>(() => window.__E__?.counters || initialLocalState?.counters || INITIAL_STATE.counters || {});
   const countersRef = useRef<{
     rc?: string | null;
     sp?: string | null;
     cs?: string | null;
     sv?: string | null;
-    auc?: string | null;
   }>({});
 
   useEffect(() => {
@@ -171,8 +164,8 @@ export function App() {
   // --- Active Tab Navigation ---
   // First Level: 'statement' | 'income' | 'expenditure' | 'settings'
   const [activeTab, setActiveTab] = useState<'statement' | 'income' | 'expenditure' | 'settings'>('statement');
-  // Sub-level under 'income': 'donations' | 'sponsorship' | 'stalls' | 'sevas' | 'hundi' | 'auctions'
-  const [activeIncomeSubTab, setActiveIncomeSubTab] = useState<'donations' | 'sponsorship' | 'stalls' | 'sevas' | 'hundi' | 'auctions'>('donations');
+  // Sub-level under 'income': 'donations' | 'sponsorship' | 'stalls' | 'sevas' | 'hundi'
+  const [activeIncomeSubTab, setActiveIncomeSubTab] = useState<'donations' | 'sponsorship' | 'stalls' | 'sevas' | 'hundi'>('donations');
 
   // --- Community Routing Architecture ---
   // 'ganeshotsava': Sri Ganeshotsava 2026 Festival Portal (Default Landing Page '/')
@@ -464,14 +457,12 @@ export function App() {
     sevas,
     sevaCatalogue,
     hundi,
-    auctions,
     settings,
     counters: {
       rc: countersRef.current.rc || null,
       sp: countersRef.current.sp || null,
       cs: countersRef.current.cs || null,
-      sv: countersRef.current.sv || null,
-      auc: countersRef.current.auc || null
+      sv: countersRef.current.sv || null
     }
   });
 
@@ -492,7 +483,6 @@ export function App() {
       setSevas(serverData.sevas);
       setSevaCatalogue(serverData.sevaCatalogue);
       setHundi(serverData.hundi);
-      setAuctions(serverData.auctions);
       if (serverData.settings) setSettings(prev => ({ ...prev, ...serverData.settings }));
       if (serverData.counters) {
         setCounters(serverData.counters);
@@ -556,9 +546,6 @@ export function App() {
         onHundi: data => {
           if (data && !hasUnsavedChangesRef.current) setHundi(data);
         },
-        onAuctions: data => {
-          if (data && !hasUnsavedChangesRef.current) setAuctions(data);
-        },
         onSettings: data => {
           if (data && !hasUnsavedChangesRef.current) setSettings(prev => ({ ...prev, ...data }));
         },
@@ -570,7 +557,6 @@ export function App() {
                 sp: data.sp !== undefined ? String(data.sp) : prev.sp,
                 cs: data.cs !== undefined ? String(data.cs) : prev.cs,
                 sv: data.sv !== undefined ? String(data.sv) : prev.sv,
-                auc: data.auc !== undefined ? String(data.auc) : prev.auc,
               };
               countersRef.current = updated;
               return updated;
@@ -608,7 +594,7 @@ export function App() {
         }
       }, 700);
     }
-  }, [expenses, contributions, sponsors, commercialStalls, sevas, sevaCatalogue, hundi, auctions, settings]);
+  }, [expenses, contributions, sponsors, commercialStalls, sevas, sevaCatalogue, hundi, settings]);
 
   // Handle Hash on load (Share Snapshot view)
   useEffect(() => {
@@ -627,7 +613,6 @@ export function App() {
             if (data.eg_sevas) setSevas(data.eg_sevas);
             if (data.eg_seva_catalogue) setSevaCatalogue(data.eg_seva_catalogue);
             if (data.eg_hundi) setHundi(data.eg_hundi);
-            if (data.eg_auctions) setAuctions(data.eg_auctions);
             if (data.org || data.location) {
               setSettings(prev => ({ ...prev, org: data.org || prev.org, location: data.location || prev.location }));
             }
@@ -646,8 +631,7 @@ export function App() {
   const csAct = commercialStalls.reduce((s, r) => s + Number(r.act || 0), 0);
   const svTot = sevas.reduce((s, r) => s + Number(r.amt || 0), 0);
   const hundiTot = hundi.reduce((s, r) => s + Number(r.act || 0), 0);
-  const aucTot = auctions.reduce((s, r) => s + Number(r.act || 0), 0);
-  const totalIncome = ctTot + spAct + csAct + svTot + hundiTot + aucTot;
+  const totalIncome = ctTot + spAct + csAct + svTot + hundiTot;
 
   const exAct = expenses.reduce((s, r) => s + getExpenseActual(r), 0);
   const netBalance = totalIncome - exAct;
@@ -865,35 +849,6 @@ export function App() {
 
   const handleDeleteHundi = (id: string) => {
     setHundi(prev => prev.filter(x => x.id !== id));
-    hasUnsavedChangesRef.current = true;
-    setHasUnsavedChanges(true);
-  };
-
-  const handleSaveAuction = (row: AuctionItem) => {
-    setAuctions(prev => {
-      const idx = prev.findIndex(x => x.id === row.id);
-      if (idx >= 0) {
-        const next = [...prev];
-        next[idx] = row;
-        return next;
-      }
-      return [...prev, row];
-    });
-    const match = row.invNo?.match(/(\d+)$/);
-    if (match) {
-      const n = parseInt(match[1], 10);
-      const cur = parseInt(countersRef.current.auc || '0', 10);
-      if (n > cur) {
-        countersRef.current = { ...countersRef.current, auc: String(n) };
-        setCounters(prev => ({ ...prev, auc: String(n) }));
-      }
-    }
-    hasUnsavedChangesRef.current = true;
-    setHasUnsavedChanges(true);
-  };
-
-  const handleDeleteAuction = (id: string) => {
-    setAuctions(prev => prev.filter(x => x.id !== id));
     hasUnsavedChangesRef.current = true;
     setHasUnsavedChanges(true);
   };
@@ -1309,7 +1264,7 @@ export function App() {
   };
 
   const shareWhatsAppSummary = () => {
-    const msg = `📊 *Ganeshotsava 2026 — Income & Expenditure Statement*\n*${cleanOrgName(settings.org, 'Eldorado')}*\n\n💰 *INCOME (RECEIPTS)*\n• Voluntary Contributions: ₹${fmt(ctTot)}\n• Sponsorship: ₹${fmt(spAct)}\n• Commercial Stalls: ₹${fmt(csAct)}\n• Seva Bookings: ₹${fmt(svTot)}\n• Hundi Collection: ₹${fmt(hundiTot)}\n• Auctions: ₹${fmt(aucTot)}\n▶ *Total Income: ₹${fmt(totalIncome)}*\n\n📤 *EXPENDITURE (PAYMENTS)*\n• Actual Incurred: ₹${fmt(exAct)}\n▶ *Total Expenditure: ₹${fmt(exAct)}*\n\n${netBalance >= 0 ? '✅' : '⚠️'} *Net Surplus/(Deficit): ₹${fmt(Math.abs(netBalance))}${netBalance < 0 ? ' (Deficit)' : ' (Surplus)'}*\n\n_Ganapati Bappa Morya!_ 🙏🌺`;
+    const msg = `📊 *Ganeshotsava 2026 — Income & Expenditure Statement*\n*${cleanOrgName(settings.org, 'Eldorado')}*\n\n💰 *INCOME (RECEIPTS)*\n• Voluntary Contributions: ₹${fmt(ctTot)}\n• Sponsorship: ₹${fmt(spAct)}\n• Commercial Stalls: ₹${fmt(csAct)}\n• Seva Bookings: ₹${fmt(svTot)}\n• Hundi Collection: ₹${fmt(hundiTot)}\n▶ *Total Income: ₹${fmt(totalIncome)}*\n\n📤 *EXPENDITURE (PAYMENTS)*\n• Actual Incurred: ₹${fmt(exAct)}\n▶ *Total Expenditure: ₹${fmt(exAct)}*\n\n${netBalance >= 0 ? '✅' : '⚠️'} *Net Surplus/(Deficit): ₹${fmt(Math.abs(netBalance))}${netBalance < 0 ? ' (Deficit)' : ' (Surplus)'}*\n\n_Ganapati Bappa Morya!_ 🙏🌺`;
     openWhatsApp(msg);
   };
 
@@ -1360,8 +1315,15 @@ export function App() {
       return;
     }
 
-    // Default window.print for Statement view or other views
+    // Default window.print for Statement view or other views with clean page hiding
+    document.body.classList.add('statement-print-active');
+    const originalTitle = document.title;
+    document.title = `Income_and_Expenditure_Statement_${(settings.org || 'Ganeshotsava_2026').replace(/[^a-zA-Z0-9]/g, '_')}`;
+    
     window.print();
+    
+    document.body.classList.remove('statement-print-active');
+    document.title = originalTitle;
   };
 
   // Excel Export
@@ -1384,7 +1346,6 @@ export function App() {
       ['Commercial Stalls (Actual)', csAct],
       ['Seva Bookings', svTot],
       ['Hundi Collections', hundiTot],
-      ['Auctions (Maha Laddu / Artifacts)', aucTot],
       ['TOTAL INCOME (A)', totalIncome],
       [],
       ['B. EXPENDITURE (PAYMENTS)', 'AMOUNT (₹)'],
@@ -1457,18 +1418,7 @@ export function App() {
     }));
     window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.json_to_sheet(hundiData), 'Hundi Collections');
 
-    // 7. Auctions
-    const aucData = auctions.map(a => ({
-      'Invoice No': a.invNo,
-      'Auction Details': a.det,
-      'Auctioned (By)': a.by,
-      'Winning Amount (₹)': a.act,
-      'Date': a.date,
-      'Notes': a.notes
-    }));
-    window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.json_to_sheet(aucData), 'Auctions');
-
-    // 8. Expenditure (Payments)
+    // 7. Expenditure (Payments)
     const exData = expenses.map(e => {
       const bills = (e.bills && e.bills.length > 0)
         ? e.bills
@@ -2396,23 +2346,6 @@ export function App() {
                   {hundi.length}
                 </span>
               </button>
-
-              {/* Sub-tab 6: Auctions */}
-              <button
-                onClick={() => setActiveIncomeSubTab('auctions')}
-                className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
-                  activeIncomeSubTab === 'auctions'
-                    ? 'bg-[#991B1B] text-white shadow-xs'
-                    : 'bg-white text-stone-700 hover:bg-stone-200 border border-stone-300'
-                }`}
-              >
-                <span>Auctions</span>
-                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
-                  activeIncomeSubTab === 'auctions' ? 'bg-white/25 text-white' : 'bg-stone-100 text-stone-600'
-                }`}>
-                  {auctions.length}
-                </span>
-              </button>
             </div>
           </div>
         )}
@@ -2473,7 +2406,6 @@ export function App() {
             commercialStalls={commercialStalls}
             sevas={sevas}
             hundi={hundi}
-            auctions={auctions}
             settings={settings}
             userRole={userRole || undefined}
             isAdmin={isAdmin}
@@ -2575,19 +2507,6 @@ export function App() {
                 onDelete={handleDeleteHundi}
               />
             )}
-
-            {activeIncomeSubTab === 'auctions' && (isAdmin || isReadOnly) && (
-              <AuctionsView
-                auctions={auctions}
-                isAdmin={isAdmin}
-                onSave={handleSaveAuction}
-                onDelete={handleDeleteAuction}
-                onPrintInvoice={a => {
-                  setPrintData({ type: 'invoice', subType: 'auction', item: a });
-                  setReceiptModalOpen(true);
-                }}
-              />
-            )}
           </div>
         )}
 
@@ -2622,7 +2541,6 @@ export function App() {
               setCommercialStalls([]);
               setSevas([]);
               setHundi([]);
-              setAuctions([]);
               setCounters({});
               countersRef.current = {};
               try {

@@ -15,9 +15,10 @@ import {
   Lightbulb,
   CreditCard,
   ArrowRight,
-  Info
+  Info,
+  FileText
 } from 'lucide-react';
-import { Expense, Contribution, Sponsor, CommercialStall, SevaBooking, HundiCollection, AuctionItem, AppSettings, UserRole } from '../types';
+import { Expense, Contribution, Sponsor, CommercialStall, SevaBooking, HundiCollection, AppSettings, UserRole } from '../types';
 import { fmt, getExpenseActual, getExpenseBalance, cleanOrgName, fmtDate, getLightingAndDecorationExpense } from '../utils/helpers';
 import { getStallFields } from './CommercialStallsView';
 
@@ -28,12 +29,11 @@ interface StatementViewProps {
   commercialStalls: CommercialStall[];
   sevas: SevaBooking[];
   hundi: HundiCollection[];
-  auctions: AuctionItem[];
   settings: AppSettings;
   userRole?: UserRole;
   isAdmin?: boolean;
   isMember?: boolean;
-  onNavigateToTab?: (tab: 'donations' | 'sponsorship' | 'stalls' | 'sevas' | 'hundi' | 'auctions' | 'expenditure') => void;
+  onNavigateToTab?: (tab: 'donations' | 'sponsorship' | 'stalls' | 'sevas' | 'hundi' | 'expenditure') => void;
   onNavigateToExpenditure?: () => void;
   onPrintInvoice?: (stall: CommercialStall) => void;
   onAddStall?: () => void;
@@ -49,7 +49,6 @@ export const StatementView: React.FC<StatementViewProps> = ({
   commercialStalls,
   sevas,
   hundi,
-  auctions,
   settings,
   userRole,
   isAdmin = false,
@@ -78,11 +77,10 @@ export const StatementView: React.FC<StatementViewProps> = ({
   const csAct = commercialStalls.reduce((s, r) => s + Number(r.act || 0), 0);
   const svTot = sevas.reduce((s, r) => s + Number(r.amt || 0), 0);
   const hundiTot = hundi.reduce((s, r) => s + Number(r.act || 0), 0);
-  const aucTot = auctions.reduce((s, r) => s + Number(r.act || 0), 0);
 
-  const totalIncome = ctTot + spAct + csAct + svTot + hundiTot + aucTot;
+  const totalIncome = ctTot + spAct + csAct + svTot + hundiTot;
   const totalIncomeTransactions =
-    contributions.length + sponsors.length + commercialStalls.length + sevas.length + hundi.length + auctions.length;
+    contributions.length + sponsors.length + commercialStalls.length + sevas.length + hundi.length;
 
   // Expenditure totals
   const exAct = expenses.reduce((s, r) => s + getExpenseActual(r), 0);
@@ -99,9 +97,17 @@ export const StatementView: React.FC<StatementViewProps> = ({
     { label: 'Sponsorship', value: spAct, color: '#3B82F6', borderClass: 'border-blue-500', bgClass: 'bg-blue-500', textClass: 'text-blue-700', percentage: getPercent(spAct) },
     { label: 'Education Fest', value: csAct, color: '#EF4444', borderClass: 'border-red-500', bgClass: 'bg-red-500', textClass: 'text-red-700', percentage: getPercent(csAct) },
     { label: 'Seva Bookings', value: svTot, color: '#F59E0B', borderClass: 'border-amber-500', bgClass: 'bg-amber-500', textClass: 'text-amber-700', percentage: getPercent(svTot) },
-    { label: 'Hundi Collections', value: hundiTot, color: '#8B5CF6', borderClass: 'border-violet-500', bgClass: 'bg-violet-500', textClass: 'text-violet-700', percentage: getPercent(hundiTot) },
-    { label: 'Auctions (Laddu)', value: aucTot, color: '#EC4899', borderClass: 'border-pink-500', bgClass: 'bg-pink-500', textClass: 'text-pink-700', percentage: getPercent(aucTot) }
+    { label: 'Hundi Collections', value: hundiTot, color: '#8B5CF6', borderClass: 'border-violet-500', bgClass: 'bg-violet-500', textClass: 'text-violet-700', percentage: getPercent(hundiTot) }
   ].filter(c => c.value > 0);
+
+  // Calculations for outstanding sponsor funds and pending payments
+  const totalSponsorshipOutstanding = sponsors.reduce((s, r) => s + Math.max(0, Number(r.est || 0) - Number(r.act || 0)), 0);
+  const pendingExpenses = expenses.map(e => ({
+    name: e.item || 'General Expense',
+    outstanding: Math.max(0, Number(e.est || 0) - Number(e.adv || 0)),
+    total: Number(e.est || 0),
+    advance: Number(e.adv || 0)
+  })).filter(e => e.outstanding > 0);
 
   // Donut values: Circle circumference is 2 * PI * R
   const donutRadius = 65;
@@ -125,6 +131,45 @@ export const StatementView: React.FC<StatementViewProps> = ({
     };
   });
 
+  // Prep expenditure categories and segments for Donut rendering
+  const expColors = [
+    '#EF4444', // Red
+    '#F59E0B', // Amber
+    '#3B82F6', // Blue
+    '#10B981', // Emerald
+    '#8B5CF6', // Violet
+    '#EC4899', // Pink
+    '#14B8A6', // Teal
+    '#6366F1'  // Indigo
+  ];
+
+  const expCategories = expenses.map((exp, idx) => {
+    const val = getExpenseActual(exp);
+    return {
+      label: exp.item || `Expense Head ${idx + 1}`,
+      value: val,
+      color: expColors[idx % expColors.length],
+      percentage: exAct > 0 ? ((val / exAct) * 100).toFixed(1) : '0.0'
+    };
+  }).filter(c => c.value > 0);
+
+  let expCumulativePercent = 0;
+  const expDonutSegments = expCategories.map((cat) => {
+    const fraction = exAct > 0 ? cat.value / exAct : 0;
+    const strokeDashOffset = donutCircumference - (fraction * donutCircumference);
+    const strokeDashArray = `${donutCircumference} ${donutCircumference}`;
+    const rotationAngle = (expCumulativePercent * 360) - 90;
+    expCumulativePercent += fraction;
+
+    return {
+      ...cat,
+      fraction,
+      strokeDashOffset,
+      strokeDashArray,
+      rotationAngle
+    };
+  });
+
   return (
     <div id="statement-print-target" className="space-y-6 relative">
       {/* 1. TOP HEADER & PRINT ACTION */}
@@ -138,15 +183,15 @@ export const StatementView: React.FC<StatementViewProps> = ({
           </p>
         </div>
 
-        {canViewDetails && (
+        {isAdmin && (
           <div className="flex items-center gap-2">
             <button
               onClick={onPrint}
               className="bg-stone-100 hover:bg-stone-200 text-stone-800 text-xs font-bold uppercase tracking-wider px-3.5 py-2 rounded inline-flex items-center gap-1.5 transition-colors cursor-pointer border border-stone-200"
-              title="Print Income & Expenditure Statement"
+              title="Print Income & Expenditure Statement (Admin Only)"
             >
               <Printer className="w-3.5 h-3.5 text-[#991B1B]" />
-              <span>Print</span>
+              <span>Print Statement</span>
             </button>
           </div>
         )}
@@ -190,14 +235,6 @@ export const StatementView: React.FC<StatementViewProps> = ({
             </span>
             <span>Total disbursed &amp; settled</span>
           </div>
-          {lightingData.totalBal > 0 && (
-            <div className="mt-2.5 pt-2 border-t border-red-100 flex items-center justify-between text-xs">
-              <span className="text-stone-600 font-medium">Lighting &amp; Deco to pay:</span>
-              <span className="font-mono font-bold text-[#991B1B] bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded text-[11px]">
-                ₹ {fmt(lightingData.totalBal)}
-              </span>
-            </div>
-          )}
         </div>
 
         {/* Net Surplus / Deficit */}
@@ -237,102 +274,115 @@ export const StatementView: React.FC<StatementViewProps> = ({
         </div>
       </div>
 
-      {/* 2.2. LIGHTING & DECORATION VENDOR PAYMENT INFO CALLOUT */}
-      <div className="bg-gradient-to-r from-amber-50/90 via-white to-amber-50/90 border-2 border-amber-300 rounded-xl p-4 sm:p-5 shadow-xs relative overflow-hidden">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div className="flex items-start gap-3.5 min-w-0">
-            <div className="w-10 h-10 rounded-xl bg-amber-400 text-stone-900 flex items-center justify-center shrink-0 shadow-xs border border-amber-300">
-              <Lightbulb className="w-5 h-5 text-[#991B1B]" />
-            </div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="bg-[#991B1B] text-white text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded">
-                  Expenditure Info
-                </span>
-                <span className="text-[11px] font-bold text-amber-950 uppercase tracking-wider">
-                  Lighting &amp; Decoration Vendor
-                </span>
-                {lightingData.totalBal > 0 ? (
-                  <span className="bg-amber-100 text-amber-900 border border-amber-300 text-[10px] font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-600 animate-pulse" />
-                    Amount to be Paid: ₹ {fmt(lightingData.totalBal)}
-                  </span>
-                ) : (
-                  <span className="bg-emerald-100 text-emerald-900 border border-emerald-300 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                    ✓ Vendor Fully Settled
-                  </span>
-                )}
-              </div>
-              <h3 className="text-base font-serif font-bold text-stone-900 mt-1">
-                {lightingData.item?.item || 'Lightings and Decorations and Event Management'}
-              </h3>
-              <p className="text-xs text-stone-600 mt-0.5">
-                Vendor contract for Sri Ganeshotsava 2026 illumination, pendal lightings, stage decoration &amp; event management.
-              </p>
-            </div>
+      {/* 2.2. KEY OUTSTANDING FINANCIAL SUMMARY & STRATEGIC POLICIES */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Left Card: Financial Obligations & Pledges */}
+        <div className="bg-white border border-stone-200 rounded-xl p-4 sm:p-5 shadow-xs space-y-3.5">
+          <div className="flex items-center gap-2 border-b border-stone-100 pb-2">
+            <span className="p-1 rounded bg-amber-50 text-[#991B1B] border border-amber-200">
+              <CreditCard className="w-4 h-4" />
+            </span>
+            <span className="text-xs font-bold uppercase tracking-wider text-stone-800">
+              Outstanding Obligations &amp; Pledges
+            </span>
           </div>
 
-          {/* Breakdown & Quick Action */}
-          <div className="flex flex-wrap items-center gap-3 lg:justify-end shrink-0 pt-2 lg:pt-0 border-t lg:border-t-0 border-amber-200">
-            <div className="bg-white border border-stone-200 rounded-lg px-3 py-2 text-center shadow-2xs">
-              <div className="text-[9px] font-bold uppercase tracking-wider text-stone-500">
-                Agreed Contract
-              </div>
-              <div className="text-sm font-mono font-bold text-stone-800">
-                ₹ {fmt(lightingData.totalEst)}
-              </div>
+          <div className="space-y-3">
+            {/* Sponsors amount to be received */}
+            <div className="bg-emerald-50/50 border border-emerald-100 rounded-lg p-3">
+              <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block">
+                Sponsorship Contributions Outstanding
+              </span>
+              <span className="text-sm font-medium text-stone-700 block mt-0.5 leading-relaxed">
+                Total outstanding sponsorship amount to be received (pledged commitments pending collection):
+              </span>
+              <span className="text-base font-mono font-black text-emerald-700 mt-1 block">
+                ₹ {fmt(totalSponsorshipOutstanding)}
+              </span>
+              <span className="text-[10px] text-stone-400 block mt-0.5 italic">
+                * Individual sponsor names and corporate details are withheld to protect donor privacy.
+              </span>
             </div>
 
-            <div className="bg-white border border-emerald-200 rounded-lg px-3 py-2 text-center shadow-2xs">
-              <div className="text-[9px] font-bold uppercase tracking-wider text-emerald-700">
-                Advance Paid
-              </div>
-              <div className="text-sm font-mono font-bold text-emerald-700">
-                ₹ {fmt(lightingData.totalAdv)}
-              </div>
+            {/* Expenditure to be paid bullet points */}
+            <div className="bg-stone-50/80 border border-stone-200/60 rounded-lg p-3">
+              <span className="text-[10px] font-bold text-stone-700 uppercase tracking-wider block mb-1.5">
+                Pending Expenditures to be Settled
+              </span>
+              {pendingExpenses.length === 0 ? (
+                <p className="text-xs text-stone-500 italic">
+                  ✓ All expenditure heads have been fully paid and settled!
+                </p>
+              ) : (
+                <ul className="space-y-1.5 list-disc pl-4 text-xs text-stone-600">
+                  {pendingExpenses.map((exp, idx) => (
+                    <li key={idx} className="leading-relaxed">
+                      <strong>{exp.name}</strong>: <span className="font-mono font-bold text-red-600">₹ {fmt(exp.outstanding)}</span> pending to be paid (Estimated: ₹{fmt(exp.total)}, Paid: ₹{fmt(exp.advance)})
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Right Card: Strategic Notes & Governance Policies */}
+        <div className="bg-white border border-stone-200 rounded-xl p-4 sm:p-5 shadow-xs space-y-3.5 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center gap-2 border-b border-stone-100 pb-2">
+              <span className="p-1 rounded bg-amber-50 text-[#991B1B] border border-amber-200">
+                <FileText className="w-4 h-4" />
+              </span>
+              <span className="text-xs font-bold uppercase tracking-wider text-stone-800">
+                Strategic Notifications &amp; Policies
+              </span>
             </div>
 
-            <div className="bg-amber-100/90 border-2 border-amber-400 rounded-lg px-3.5 py-2 text-center shadow-2xs">
-              <div className="text-[9px] font-bold uppercase tracking-wider text-amber-950">
-                Amount to be Paid to Vendor
+            <div className="space-y-3 mt-3.5">
+              {/* Audit Status Note */}
+              <div className="flex gap-2.5 items-start">
+                <span className="text-base shrink-0">📌</span>
+                <div>
+                  <span className="text-xs font-bold text-stone-800 block">
+                    Account Audit Under Process
+                  </span>
+                  <p className="text-xs text-stone-600 mt-0.5 leading-relaxed">
+                    Please note that Ganeshotsava 2026 financial accounts are currently undergoing a professional audit process. Once the audit is completed, the verified final statement details will be officially shared.
+                  </p>
+                </div>
               </div>
-              <div className="text-base sm:text-lg font-mono font-black text-[#991B1B]">
-                ₹ {fmt(lightingData.totalBal)}
+
+              {/* Reserve surplus Fixed Deposit Note */}
+              <div className="flex gap-2.5 items-start border-t border-stone-100 pt-3">
+                <span className="text-base shrink-0">💰</span>
+                <div>
+                  <span className="text-xs font-bold text-stone-800 block">
+                    Net Surplus Reserve Policy (FD)
+                  </span>
+                  <p className="text-xs text-stone-600 mt-0.5 leading-relaxed font-normal">
+                    The Ganeshotsava Committee has resolved that the final Net Surplus of <strong className="font-mono text-stone-900">₹ {fmt(netBalance)}</strong> will be deposited as a <strong>Fixed Deposit (FD)</strong> in the bank. This amount is securely reserved to serve as the initial fund for the next year's <strong>Sri Ganeshotsava 2027</strong> celebrations.
+                  </p>
+                </div>
               </div>
             </div>
-
-            {(onNavigateToTab || onNavigateToExpenditure) && (
-              <button
-                type="button"
-                onClick={() => {
-                  if (onNavigateToExpenditure) onNavigateToExpenditure();
-                  else if (onNavigateToTab) onNavigateToTab('expenditure');
-                }}
-                className="bg-[#991B1B] hover:bg-[#7F1D1D] text-white text-xs font-bold uppercase tracking-wider px-3.5 py-2.5 rounded-lg shadow-xs transition-all cursor-pointer inline-flex items-center gap-1.5 shrink-0 self-stretch sm:self-auto justify-center"
-                title="Go to Expenditure tab to view vendor bills and payment records"
-              >
-                <span>View in Expenditure</span>
-                <ExternalLink className="w-3.5 h-3.5" />
-              </button>
-            )}
           </div>
         </div>
       </div>
 
       {/* 2.5. GRAPHICAL FINANCIAL ANALYTICS PANEL */}
-      <div className="bg-white border border-stone-200 rounded-xl p-4 sm:p-5 shadow-sm space-y-4 no-print">
+      <div className="bg-white border border-stone-200 rounded-xl p-4 sm:p-5 shadow-sm space-y-4">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-stone-100 pb-3">
           <div>
             <h3 className="text-sm font-bold uppercase tracking-wider text-stone-800 flex items-center gap-1.5">
               <span>Visual Financial Analytics</span>
             </h3>
-            <p className="text-[11px] text-stone-500">
+            <p className="text-[11px] text-stone-500 font-medium">
               Interactive graphical charts of Ganeshotsava 2026 ledger
             </p>
           </div>
 
           {/* Toggle buttons to switch graph types */}
-          <div className="flex items-center gap-1 bg-stone-100 p-1 rounded-lg border border-stone-200 text-xs">
+          <div className="flex items-center gap-1 bg-stone-100 p-1 rounded-lg border border-stone-200 text-xs no-print">
             <button
               type="button"
               onClick={() => setChartType('donut')}
@@ -343,7 +393,7 @@ export const StatementView: React.FC<StatementViewProps> = ({
               }`}
             >
               <PieChart className="w-3.5 h-3.5" />
-              <span>Income Share</span>
+              <span>Income &amp; Expenditure Share</span>
             </button>
             <button
               type="button"
@@ -402,91 +452,184 @@ export const StatementView: React.FC<StatementViewProps> = ({
 
         {/* 1. DONUT/PIE CHART VIEW */}
         {chartType === 'donut' && (
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
-            {/* SVG Interactive Donut */}
-            <div className="md:col-span-5 flex justify-center py-2 relative">
-              <div className="relative w-44 h-44 sm:w-48 sm:h-44">
-                <svg className="w-full h-full transform -rotate-90" viewBox="0 0 160 160">
-                  <circle
-                    cx="80"
-                    cy="80"
-                    r={donutRadius}
-                    fill="transparent"
-                    stroke="#F5F5F4"
-                    strokeWidth="15"
-                  />
-                  {donutSegments.map((seg, idx) => (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-2">
+            {/* Left Column: Receipts Chart */}
+            <div className="border border-stone-200/70 rounded-2xl p-4 bg-stone-50/25 shadow-3xs space-y-4">
+              <div className="flex justify-center py-2 relative">
+                <div className="relative w-44 h-44 sm:w-48 sm:h-44">
+                  <svg className="w-full h-full transform -rotate-90" viewBox="0 0 160 160">
                     <circle
-                      key={seg.label}
                       cx="80"
                       cy="80"
                       r={donutRadius}
                       fill="transparent"
-                      stroke={seg.color}
-                      strokeWidth={hoveredIndex === idx ? '18' : '15'}
-                      strokeDasharray={seg.strokeDashArray}
-                      strokeDashoffset={seg.strokeDashOffset}
-                      strokeLinecap="round"
-                      className="transition-all duration-300 origin-center cursor-pointer"
-                      style={{
-                        transform: `rotate(${seg.rotationAngle}deg)`
-                      }}
-                      onMouseEnter={() => setHoveredIndex(idx)}
-                      onMouseLeave={() => setHoveredIndex(null)}
+                      stroke="#F5F5F4"
+                      strokeWidth="15"
                     />
-                  ))}
-                </svg>
+                    {donutSegments.map((seg, idx) => (
+                      <circle
+                        key={seg.label}
+                        cx="80"
+                        cy="80"
+                        r={donutRadius}
+                        fill="transparent"
+                        stroke={seg.color}
+                        strokeWidth={hoveredIndex === idx ? '18' : '15'}
+                        strokeDasharray={seg.strokeDashArray}
+                        strokeDashoffset={seg.strokeDashOffset}
+                        strokeLinecap="round"
+                        className="transition-all duration-300 origin-center cursor-pointer"
+                        style={{
+                          transform: `rotate(${seg.rotationAngle}deg)`
+                        }}
+                        onMouseEnter={() => setHoveredIndex(idx)}
+                        onMouseLeave={() => setHoveredIndex(null)}
+                      />
+                    ))}
+                  </svg>
 
-                {/* Centered Total Overlay */}
-                <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none p-4">
-                  <span className="text-[10px] uppercase font-bold text-stone-400 tracking-wider">
-                    Total Income
-                  </span>
-                  <span className="text-sm sm:text-base font-mono font-black text-stone-900">
-                    ₹{fmt(totalIncome)}
-                  </span>
+                  {/* Centered Total Overlay with Ganesha image */}
+                  <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none p-4">
+                    <img src="/lord_ganesha.svg" alt="Lord Ganesha" className="w-10 h-10 opacity-35 object-contain mb-0.5" />
+                    <span className="text-[8px] uppercase font-bold text-stone-500 tracking-wider leading-none">
+                      Total Receipts
+                    </span>
+                    <span className="text-xs font-mono font-black text-stone-900 mt-0.5">
+                      ₹{fmt(totalIncome)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Categorized legend and values */}
+              <div className="space-y-2">
+                <h4 className="text-[10px] font-bold uppercase tracking-wider text-stone-500 mb-1 text-center">
+                  Income Streams
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {donutSegments.map((cat, idx) => {
+                    const isHovered = hoveredIndex === idx;
+                    return (
+                      <div
+                        key={cat.label}
+                        onMouseEnter={() => setHoveredIndex(idx)}
+                        onMouseLeave={() => setHoveredIndex(null)}
+                        className={`p-2.5 rounded-xl border transition-all flex items-center justify-between ${
+                          isHovered
+                            ? 'border-stone-300 bg-stone-50/70 shadow-3xs translate-x-0.5'
+                            : 'border-stone-100 bg-white'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: cat.color }} />
+                          <div className="min-w-0">
+                            <span className="font-bold text-stone-800 text-[11px] block truncate">
+                              {cat.label}
+                            </span>
+                            <span className="text-[9px] text-stone-400 block font-mono">
+                              {cat.percentage}% share
+                            </span>
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <span className="font-mono font-bold text-[11px] text-stone-900 block">
+                            ₹{fmt(cat.value)}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>
 
-            {/* Categorized legend and values */}
-            <div className="md:col-span-7 space-y-2">
-              <h4 className="text-[10px] font-bold uppercase tracking-wider text-stone-500 mb-1">
-                Income Stream Distribution
-              </h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {donutSegments.map((cat, idx) => {
-                  const isHovered = hoveredIndex === idx;
-                  return (
-                    <div
-                      key={cat.label}
-                      onMouseEnter={() => setHoveredIndex(idx)}
-                      onMouseLeave={() => setHoveredIndex(null)}
-                      className={`p-2.5 rounded-xl border transition-all flex items-center justify-between ${
-                        isHovered
-                          ? 'border-stone-300 bg-stone-50/70 shadow-3xs translate-x-0.5'
-                          : 'border-stone-100 bg-white'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <span className={`w-3 h-3 rounded-full shrink-0 ${cat.bgClass}`} />
-                        <div className="min-w-0">
-                          <span className="font-bold text-stone-800 text-xs block truncate">
-                            {cat.label}
-                          </span>
-                          <span className="text-[10px] text-stone-400 block font-mono">
-                            {cat.percentage}% share
+            {/* Right Column: Payments Chart */}
+            <div className="border border-stone-200/70 rounded-2xl p-4 bg-stone-50/25 shadow-3xs space-y-4">
+              <div className="flex justify-center py-2 relative">
+                <div className="relative w-44 h-44 sm:w-48 sm:h-44">
+                  <svg className="w-full h-full transform -rotate-90" viewBox="0 0 160 160">
+                    <circle
+                      cx="80"
+                      cy="80"
+                      r={donutRadius}
+                      fill="transparent"
+                      stroke="#F5F5F4"
+                      strokeWidth="15"
+                    />
+                    {expDonutSegments.map((seg, idx) => (
+                      <circle
+                        key={seg.label}
+                        cx="80"
+                        cy="80"
+                        r={donutRadius}
+                        fill="transparent"
+                        stroke={seg.color}
+                        strokeWidth={hoveredIndex === idx + 100 ? '18' : '15'}
+                        strokeDasharray={seg.strokeDashArray}
+                        strokeDashoffset={seg.strokeDashOffset}
+                        strokeLinecap="round"
+                        className="transition-all duration-300 origin-center cursor-pointer"
+                        style={{
+                          transform: `rotate(${seg.rotationAngle}deg)`
+                        }}
+                        onMouseEnter={() => setHoveredIndex(idx + 100)}
+                        onMouseLeave={() => setHoveredIndex(null)}
+                      />
+                    ))}
+                  </svg>
+
+                  {/* Centered Total Overlay with Ganesha image */}
+                  <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none p-4">
+                    <img src="/lord_ganesha.svg" alt="Lord Ganesha" className="w-10 h-10 opacity-35 object-contain mb-0.5" />
+                    <span className="text-[8px] uppercase font-bold text-stone-500 tracking-wider leading-none">
+                      Total Payments
+                    </span>
+                    <span className="text-xs font-mono font-black text-stone-900 mt-0.5">
+                      ₹{fmt(exAct)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Categorized legend and values */}
+              <div className="space-y-2">
+                <h4 className="text-[10px] font-bold uppercase tracking-wider text-stone-500 mb-1 text-center">
+                  Expenditure Heads
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {expDonutSegments.map((cat, idx) => {
+                    const isHovered = hoveredIndex === idx + 100;
+                    return (
+                      <div
+                        key={cat.label}
+                        onMouseEnter={() => setHoveredIndex(idx + 100)}
+                        onMouseLeave={() => setHoveredIndex(null)}
+                        className={`p-2.5 rounded-xl border transition-all flex items-center justify-between ${
+                          isHovered
+                            ? 'border-stone-300 bg-stone-50/70 shadow-3xs translate-x-0.5'
+                            : 'border-stone-100 bg-white'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: cat.color }} />
+                          <div className="min-w-0">
+                            <span className="font-bold text-stone-800 text-[11px] block truncate">
+                              {cat.label}
+                            </span>
+                            <span className="text-[9px] text-stone-400 block font-mono">
+                              {cat.percentage}% share
+                            </span>
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <span className="font-mono font-bold text-[11px] text-stone-900 block">
+                            ₹{fmt(cat.value)}
                           </span>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <span className="font-mono font-bold text-xs text-stone-900 block">
-                          ₹{fmt(cat.value)}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
             </div>
           </div>
@@ -704,22 +847,6 @@ export const StatementView: React.FC<StatementViewProps> = ({
           <div className="text-base font-mono font-bold text-emerald-700">₹ {fmt(hundiTot)}</div>
           <div className="text-[10px] text-stone-400 mt-0.5">
             {hundi.length} count(s) • {getPercent(hundiTot)}%
-          </div>
-        </div>
-
-        {/* Auctions */}
-        <div
-          onClick={() => onNavigateToTab?.('auctions')}
-          className={`bg-white border border-stone-200 rounded p-3 text-center shadow-2xs hover:border-emerald-300 transition-colors ${
-            onNavigateToTab ? 'cursor-pointer hover:bg-emerald-50/20' : ''
-          }`}
-        >
-          <div className="text-[9px] font-bold text-stone-500 uppercase tracking-wider mb-0.5">
-            Auctions (Maha Laddu)
-          </div>
-          <div className="text-base font-mono font-bold text-emerald-700">₹ {fmt(aucTot)}</div>
-          <div className="text-[10px] text-stone-400 mt-0.5">
-            {auctions.length} item(s) • {getPercent(aucTot)}%
           </div>
         </div>
       </div>

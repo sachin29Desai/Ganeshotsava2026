@@ -47,7 +47,7 @@ export const AdminAccessGate: React.FC<AdminAccessGateProps> = ({
       const saved = localStorage.getItem('ekb_allowed_emails');
       if (saved) return JSON.parse(saved);
     } catch {}
-    return ['desaisachin95@gmail.com', 'kannadigara.balaga.eldorado@gmail.com'];
+    return ['desaisachin95@gmail.com'];
   };
 
   const handlePasscodeSubmit = async (e: React.FormEvent) => {
@@ -88,10 +88,10 @@ export const AdminAccessGate: React.FC<AdminAccessGateProps> = ({
       const email = res.user.email?.toLowerCase();
       const allowed = getAllowedEmails().map(e => e.toLowerCase());
 
-      if (email && (allowed.includes(email) || email === 'desaisachin95@gmail.com')) {
+      if (email === 'desaisachin95@gmail.com') {
         onSuccess();
       } else {
-        setError(`Access Denied: ${email || 'This account'} is not an authorized committee admin email.`);
+        setError(`Access Denied: ${email || 'This account'} is not the designated administrator (desaisachin95@gmail.com).`);
       }
     } catch (err: any) {
       console.warn('Google sign in popup error:', err);

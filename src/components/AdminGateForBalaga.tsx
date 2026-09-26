@@ -25,7 +25,7 @@ export const AdminGateForBalaga: React.FC<AdminGateForBalagaProps> = ({
       const saved = localStorage.getItem('ekb_allowed_emails');
       if (saved) return JSON.parse(saved);
     } catch {}
-    return ['desaisachin95@gmail.com', 'kannadigara.balaga.eldorado@gmail.com'];
+    return ['desaisachin95@gmail.com'];
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -45,11 +45,11 @@ export const AdminGateForBalaga: React.FC<AdminGateForBalagaProps> = ({
         const res = await signInWithPopup(auth, googleProvider);
         const email = res.user.email?.toLowerCase();
         const allowed = getAllowedEmails().map((e) => e.toLowerCase());
-        if (email && (allowed.includes(email) || email === 'desaisachin95@gmail.com')) {
+        if (email === 'desaisachin95@gmail.com') {
           onSuccess();
         } else {
           setError(
-            `Access Denied: ${email} is not in the Admin approved list. Contact the Balaga President.`
+            `Access Denied: ${email} is not the designated Administrator (desaisachin95@gmail.com).`
           );
         }
       } else {

@@ -13,7 +13,9 @@ import {
   LogIn,
   HeartHandshake,
   Check,
-  RefreshCw
+  RefreshCw,
+  Copy,
+  ExternalLink
 } from 'lucide-react';
 import { AppSettings, UserRole, UserProfile } from '../types';
 import { cleanOrgName } from '../utils/helpers';
@@ -23,7 +25,6 @@ import {
   signInWithPopup,
   cloudGetUserProfile,
   cloudGetUserProfileByPhone,
-  sendSignInLinkToEmail,
   sendOtpEmailApi,
   cloudSaveOtp,
   cloudGetOtp,
@@ -73,8 +74,7 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
 
   const getAdminEmails = (): string[] => {
     const list = new Set<string>([
-      'desaisachin95@gmail.com',
-      'kannadigara.balaga.eldorado@gmail.com'
+      'desaisachin95@gmail.com'
     ]);
     if (settings.adminEmails && Array.isArray(settings.adminEmails)) {
       settings.adminEmails.forEach(e => list.add(e.toLowerCase().trim()));
@@ -91,11 +91,10 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
     return Array.from(list);
   };
 
-  // Resolve user role
+  // Resolve user role: ONLY desaisachin95@gmail.com is admin. All others default to viewer.
   const resolveRole = (email: string, userRole?: UserRole): UserRole => {
     const cleanEmail = email.toLowerCase().trim();
-    const adminList = getAdminEmails().map(e => e.toLowerCase());
-    if (cleanEmail === 'desaisachin95@gmail.com' || adminList.includes(cleanEmail) || userRole === 'admin') {
+    if (cleanEmail === 'desaisachin95@gmail.com') {
       return 'admin';
     }
     if (userRole === 'member' || userRole === 'read_only' || userRole === 'sponsor') {
@@ -115,27 +114,11 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
     const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
     const continueUrl = `${window.location.origin}${window.location.pathname}?email=${encodeURIComponent(targetEmail)}`;
 
-    console.log("%c👉 DEV MODE VERIFICATION DETAILS:", "color: #991B1B; font-weight: bold; font-size: 14px;");
-    console.log("%cOTP Code: " + otp, "color: #059669; font-weight: bold; font-size: 13px;");
-    console.log("%cMagic Link: " + continueUrl, "color: #2563EB; font-weight: bold; text-decoration: underline;");
-
     try {
       // 1. Save OTP to Firestore
       await cloudSaveOtp(targetEmail, otp, expiresAt);
 
-      // 2. Try sending through Firebase (Magic Link)
-      if (auth) {
-        try {
-          await sendSignInLinkToEmail(auth, targetEmail, {
-            url: continueUrl,
-            handleCodeInApp: true
-          });
-        } catch (authErr) {
-          console.warn('Firebase Auth sendSignInLinkToEmail failed (expected if provider disabled):', authErr);
-        }
-      }
-
-      // 3. Try sending through our highly-deliverable SMTP/Brevo/Resend proxy
+      // 2. Dispatch single verification email with code via server email dispatcher
       const proxyResult = await sendOtpEmailApi(targetEmail, otp, continueUrl, settings.org);
       if (!proxyResult || !proxyResult.success) {
         console.warn('Backend proxy OTP mail failed:', proxyResult?.error);
@@ -199,14 +182,17 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
 
       const profile = await cloudGetUserProfile(otpSentState);
       if (profile) {
+        const isSuperAdmin = otpSentState.toLowerCase().trim() === 'desaisachin95@gmail.com';
+        const assignedRole: UserRole = isSuperAdmin ? 'admin' : (profile.role === 'member' ? 'member' : 'viewer');
         const verifiedProfile: UserProfile = {
           ...profile,
+          role: assignedRole,
           status: 'verified',
           updatedAt: new Date().toISOString()
         };
         await cloudSaveUserProfile(verifiedProfile);
         
-        const role = resolveRole(otpSentState, verifiedProfile.role);
+        const role = resolveRole(otpSentState, assignedRole);
         sessionStorage.setItem('eg_committee_auth', 'true');
         sessionStorage.setItem('eg_user_role', role);
         sessionStorage.setItem('eg_user_email', otpSentState);
@@ -249,45 +235,10 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
 
     setIsSubmitting(true);
     try {
-      const adminList = getAdminEmails().map(e => e.toLowerCase());
-      const isSuperAdmin = cleanEmail === 'desaisachin95@gmail.com' || cleanEmail === 'kannadigara.balaga.eldorado@gmail.com' || adminList.includes(cleanEmail);
-
-      // Check if user is already registered in database
-      const existingProfile = await cloudGetUserProfile(cleanEmail);
-
-      const isAdminUser = isSuperAdmin || (existingProfile && existingProfile.role === 'admin');
-      const isMemberUser = existingProfile && (existingProfile.role === 'member' || existingProfile.role === 'read_only' || existingProfile.role === 'sponsor');
-
-      // 1. FOR ADMIN AND MEMBERS: Log in directly by verifying email is already registered!
-      if (isAdminUser || isMemberUser) {
-        const role: UserRole = isAdminUser ? 'admin' : 'member';
-        const profile: UserProfile = existingProfile || {
-          email: cleanEmail,
-          name: isSuperAdmin ? 'Sachin Desai (Admin)' : (role === 'admin' ? 'Admin' : 'Member'),
-          flat: role === 'admin' ? 'Admin Desk' : 'Member',
-          mobile: '',
-          role: role,
-          status: 'verified' as const
-        };
-
-        if (profile.status !== 'verified') {
-          profile.status = 'verified';
-          cloudSaveUserProfile(profile).catch(() => {});
-        }
-
-        sessionStorage.setItem('eg_committee_auth', 'true');
-        sessionStorage.setItem('eg_user_role', role);
-        sessionStorage.setItem('eg_user_email', cleanEmail);
-        sessionStorage.setItem('eg_user_profile', JSON.stringify({ ...profile, role }));
-
-        onSuccess(role, profile);
-        return;
-      }
-
-      // 2. FOR OTHERS (devotees / residents / unassigned users):
-      // The login should happen by clicking verification link!
+      // FOR EVERYONE (devotees, members, and admin alike):
+      // No email is preserved or pre-seeded; everyone requires email verification!
       await triggerOtpSendFlow(cleanEmail);
-      setInfoMessage(`Verification link sent! A sign-in verification link has been dispatched to ${cleanEmail}. Please check your inbox and click the verification link to log in.`);
+      setInfoMessage(`Verification code sent! A verification email with a 6-digit code has been dispatched to ${cleanEmail}. Please enter the code below to log in.`);
     } catch (err: any) {
       console.error('Error during login:', err);
       setError('An error occurred while logging in. Please verify your internet connection.');
@@ -320,6 +271,13 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
         return;
       }
 
+      if (existingProfile.status !== 'verified') {
+        setError('Your email verification is pending. A verification code has been dispatched to your email. Please enter the code below to complete verification.');
+        triggerOtpSendFlow(email).catch(() => {});
+        setLoadingGoogle(false);
+        return;
+      }
+
       const role = resolveRole(email, existingProfile.role);
       sessionStorage.setItem('eg_committee_auth', 'true');
       sessionStorage.setItem('eg_user_role', role);
@@ -340,25 +298,22 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
     setShowOnboarding(false);
     setMailDeliveryFailed(false);
     
-    // Automatically trigger OTP & magic link generation in background for the new user
-    if (newProfile.email && newProfile.status === 'unverified') {
-      triggerOtpSendFlow(newProfile.email).catch(() => {});
-    }
+    const cleanEmail = (newProfile.email || '').toLowerCase().trim();
+    // Strictly assign default viewer right. Only desaisachin95@gmail.com can ever have admin right
+    const isGlobalAdmin = cleanEmail === 'desaisachin95@gmail.com';
+    newProfile.role = isGlobalAdmin ? 'admin' : 'viewer';
+    newProfile.status = 'unverified';
 
-    // Cache session storage values ONLY if verified!
-    if (newProfile.status === 'verified') {
-      const role = resolveRole(newProfile.email, newProfile.role);
-      sessionStorage.setItem('eg_committee_auth', 'true');
-      sessionStorage.setItem('eg_user_role', role);
-      sessionStorage.setItem('eg_user_email', newProfile.email);
-      sessionStorage.setItem('eg_user_profile', JSON.stringify({ ...newProfile, role }));
-    } else {
-      // Clear any session cache to prevent unverified bypass
-      sessionStorage.removeItem('eg_committee_auth');
-      sessionStorage.removeItem('eg_user_role');
-      sessionStorage.removeItem('eg_user_email');
-      sessionStorage.removeItem('eg_user_profile');
-    }
+    await cloudSaveUserProfile(newProfile).catch(() => {});
+
+    // Clear session storage so user CANNOT access portal while verification is pending
+    sessionStorage.removeItem('eg_committee_auth');
+    sessionStorage.removeItem('eg_user_role');
+    sessionStorage.removeItem('eg_user_email');
+    sessionStorage.removeItem('eg_user_profile');
+
+    // Automatically dispatch verification code & link to user's email
+    triggerOtpSendFlow(newProfile.email).catch(() => {});
 
     // Open Thank You Dialog
     setShowThankYou(newProfile);
@@ -366,15 +321,9 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
 
   const handleThankYouConfirm = () => {
     if (showThankYou) {
-      const role = resolveRole(showThankYou.email, showThankYou.role);
-      if (showThankYou.status === 'unverified') {
-        setError(null);
-        setInfoMessage(`Registration successful! Please enter the 6-digit verification code sent to ${showThankYou.email} below to verify your email and access the portal.`);
-        setOtpSentState(showThankYou.email);
-        setShowThankYou(null);
-        return;
-      }
-      onSuccess(role, showThankYou);
+      setError(null);
+      setInfoMessage(`Registration completed! A verification email with a 6-digit code has been dispatched to ${showThankYou.email}. Please enter the code below to complete verification and sign in.`);
+      setOtpSentState(showThankYou.email);
       setShowThankYou(null);
     }
   };
@@ -471,7 +420,7 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
                   Sign In by Email
                 </h2>
                 <p className="text-xs text-amber-200/90 font-medium mt-0.5">
-                  Admins &amp; Members log in directly. Others log in via verification link.
+                  Verification link required for all accounts (Devotees, Members &amp; Admins)
                 </p>
               </div>
 
@@ -495,28 +444,39 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
                 {/* LOGIN / OTP CONDITIONAL FORM */}
                 {otpSentState ? (
                   <form onSubmit={handleVerifyOtp} className="space-y-4 text-left animate-in fade-in duration-200">
-                    <div className="p-3.5 bg-amber-50/80 border border-amber-300 rounded-xl space-y-1.5">
-                      <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-full bg-amber-400 text-stone-900 flex items-center justify-center shrink-0">
-                          <Mail className="w-3.5 h-3.5 text-[#991B1B]" />
+                    <div className="p-4 bg-gradient-to-br from-amber-50 to-orange-50/60 border-2 border-amber-300 rounded-xl space-y-3">
+                      <div className="flex items-start gap-2.5">
+                        <div className="w-8 h-8 rounded-full bg-amber-400 text-stone-900 flex items-center justify-center shrink-0 shadow-xs mt-0.5">
+                          <Mail className="w-4 h-4 text-[#991B1B]" />
                         </div>
-                        <div>
+                        <div className="flex-1 min-w-0">
                           <span className="font-bold text-xs text-amber-950 uppercase tracking-wider block">
                             Verification Link Sent!
                           </span>
-                          <span className="text-[11px] text-stone-600 block">
+                          <span className="text-xs text-stone-700 block truncate">
                             Sent to <strong className="font-semibold text-stone-900">{otpSentState}</strong>
                           </span>
                         </div>
                       </div>
-                      <p className="text-[11px] text-stone-700 leading-relaxed pt-1.5 border-t border-amber-200">
-                        Please check your email and <strong>click the verification link</strong> to log in directly to the portal.
+
+                      <p className="text-xs text-stone-700 leading-relaxed pt-2 border-t border-amber-200/80">
+                        A verification email with your <strong>6-digit verification code</strong> and <strong>sign-in link</strong> has been sent to your inbox.
                       </p>
+
+                      <div className="bg-amber-100/80 border border-amber-300 rounded-xl p-3 text-[11px] text-amber-950 flex items-start gap-2.5">
+                        <AlertCircle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                        <div>
+                          <strong className="font-bold text-amber-900 block">Check your Inbox &amp; Spam/Junk folder:</strong>
+                          <p className="text-stone-700 mt-0.5 leading-relaxed">
+                            Open the email received at <strong>{otpSentState}</strong> and enter the 6-digit code below, or click the verification link inside your email.
+                          </p>
+                        </div>
+                      </div>
                     </div>
 
                     <div className="space-y-1.5">
                       <label className="block text-xs font-bold uppercase tracking-wider text-stone-700">
-                        Or Enter 6-Digit Code from Email
+                        Enter 6-Digit Code Received on Mail <span className="text-red-500">*</span>
                       </label>
                       <input
                         type="text"
@@ -531,17 +491,14 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
                         autoFocus
                         className="w-full bg-stone-50 border border-stone-300 rounded-xl px-4 py-3 text-center text-xl font-mono font-black tracking-[8px] text-[#991B1B] outline-none focus:bg-white focus:border-[#991B1B] focus:ring-2 focus:ring-[#991B1B]/20 transition-all"
                       />
-                      <p className="text-[10px] text-stone-500">
-                        You can also enter the 6-digit code received in your email above.
-                      </p>
                     </div>
 
                     <button
                       type="submit"
                       disabled={verifyingOtp || otpInput.trim().length !== 6}
-                      className="w-full bg-[#991B1B] hover:bg-[#7F1D1D] active:scale-[0.99] text-white font-bold text-xs sm:text-sm uppercase tracking-wider py-3.5 px-4 rounded-xl shadow-md inline-flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
+                      className="w-full bg-stone-800 hover:bg-stone-900 active:scale-[0.99] text-white font-bold text-xs uppercase tracking-wider py-2.5 px-4 rounded-xl shadow-xs inline-flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
                     >
-                      <ShieldCheck className="w-4 h-4 text-amber-300" />
+                      <ShieldCheck className="w-4 h-4 text-emerald-400" />
                       <span>{verifyingOtp ? 'Verifying Code...' : 'Verify Code & Sign In'}</span>
                     </button>
 
@@ -592,7 +549,7 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
                         />
                       </div>
                       <p className="text-[11px] text-stone-500">
-                        Admins &amp; Members login directly. Others will receive a verification link by email.
+                        A secure sign-in verification link will be sent to your email.
                       </p>
                     </div>
 
@@ -603,7 +560,7 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
                       className="w-full bg-[#991B1B] hover:bg-[#7F1D1D] active:scale-[0.99] text-white font-bold text-xs sm:text-sm uppercase tracking-wider py-3.5 px-4 rounded-xl shadow-md inline-flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
                     >
                       <LogIn className="w-4 h-4 text-amber-300" />
-                      <span>{isSubmitting ? 'Verifying Email...' : 'Login with Email'}</span>
+                      <span>{isSubmitting ? 'Sending Verification Link...' : 'Send Verification Link & Sign In'}</span>
                     </button>
 
                     {/* Dedicated Register Button: Register */}
@@ -694,33 +651,29 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
             </h3>
             
             <p className="text-xs text-stone-600 leading-relaxed">
-              Welcome, <strong className="text-stone-900">{showThankYou.name}</strong>! Your profile (Flat {showThankYou.flat}) has been registered securely in our devotee database.
+              Welcome, <strong className="text-stone-900">{showThankYou.name}</strong>! Your profile (Flat {showThankYou.flat}) has been registered as a <strong>Devotee (Viewer)</strong>.
             </p>
 
-            {mailDeliveryFailed ? (
-              <div className="p-3.5 bg-amber-50 border border-amber-300 rounded-xl text-left text-xs text-amber-950">
-                <p className="leading-relaxed font-semibold">
-                  Your profile is registered but pending email verification.
-                </p>
-              </div>
-            ) : (
-              <div className="p-3 bg-amber-50/70 border border-amber-300/80 rounded-xl text-left text-[11px] text-amber-950 space-y-1">
-                <span className="font-bold flex items-center gap-1 text-amber-900">
-                  <Mail className="w-3.5 h-3.5 text-[#991B1B]" />
-                  <span>Verification Link Sent</span>
-                </span>
-                <p className="leading-relaxed">
-                  We have sent a secure sign-in / verification link to <strong className="font-semibold text-stone-900">{showThankYou.email}</strong>. Please check your inbox (and spam folder) and click the link to verify your email.
-                </p>
-              </div>
-            )}
+            <div className="p-3 bg-amber-50/70 border border-amber-300/80 rounded-xl text-left text-[11px] text-amber-950 space-y-1">
+              <span className="font-bold flex items-center gap-1 text-amber-900">
+                <Mail className="w-3.5 h-3.5 text-[#991B1B]" />
+                <span>Verification Code &amp; Link Sent</span>
+              </span>
+              <p className="leading-relaxed">
+                We dispatched your 6-digit verification code and link to <strong className="font-semibold text-stone-900">{showThankYou.email}</strong>.
+              </p>
+              <p className="text-stone-600 font-medium pt-1 border-t border-amber-200/60">
+                Email verification is required before access is granted. Please check your Inbox and Spam/Junk folder and enter the 6-digit code.
+              </p>
+            </div>
 
             <button
               type="button"
               onClick={handleThankYouConfirm}
-              className="w-full py-3 bg-[#991B1B] hover:bg-[#7F1D1D] text-white font-bold text-xs sm:text-sm uppercase tracking-wider rounded-xl shadow-md cursor-pointer transition-colors"
+              className="w-full py-3 bg-[#991B1B] hover:bg-[#7F1D1D] text-white font-bold text-xs sm:text-sm uppercase tracking-wider rounded-xl shadow-md cursor-pointer transition-colors flex items-center justify-center gap-2"
             >
-              Proceed to Devotee Portal
+              <ShieldCheck className="w-4 h-4 text-amber-300" />
+              <span>Enter Email Verification Code</span>
             </button>
           </div>
         </div>

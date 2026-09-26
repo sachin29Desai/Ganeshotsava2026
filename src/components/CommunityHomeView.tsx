@@ -162,7 +162,7 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
       const saved = localStorage.getItem('ekb_allowed_emails');
       if (saved) return JSON.parse(saved);
     } catch {}
-    return ['desaisachin95@gmail.com', 'kannadigara.balaga.eldorado@gmail.com'];
+    return ['desaisachin95@gmail.com'];
   });
 
   const handleUpdateAllowedEmails = (emails: string[]) => {

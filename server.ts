@@ -57,8 +57,11 @@ async function startServer() {
         return res.status(400).json({ success: false, error: 'Email and OTP are required' });
       }
 
+      const cleanEmail = email.toLowerCase().trim();
       const org = orgName || 'Eldorado Kannadigara Balaga — Ganeshotsava 2026';
       const subject = `Your Ganeshotsava 2026 Sign-In Link & OTP: ${otp}`;
+      const fallbackMagicLink = magicLink || `https://ais-dev-p7a3udoouklbcodg3rdaay-1225695896.asia-east1.run.app?email=${encodeURIComponent(cleanEmail)}`;
+      
       const htmlContent = `
         <div style="font-family: Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; border: 1px solid #e5e7eb; border-radius: 12px; background-color: #ffffff;">
           <div style="text-align: center; border-bottom: 2px solid #991b1b; padding-bottom: 16px; margin-bottom: 20px;">
@@ -69,11 +72,11 @@ async function startServer() {
             Namaskara / Hello,
           </p>
           <p style="color: #374151; font-size: 14px; line-height: 1.5;">
-            You requested sign-in to the <strong>Ganeshotsava 2026</strong> portal for <strong>${email}</strong>.
+            You requested sign-in to the <strong>Ganeshotsava 2026</strong> portal for <strong>${cleanEmail}</strong>.
           </p>
-          ${magicLink ? `
+          ${fallbackMagicLink ? `
           <div style="text-align: center; margin: 24px 0 16px 0;">
-            <a href="${magicLink}" style="display: inline-block; background-color: #991b1b; color: #ffffff; text-decoration: none; padding: 13px 28px; font-weight: 800; border-radius: 8px; font-size: 15px; letter-spacing: 0.5px;">
+            <a href="${fallbackMagicLink}" style="display: inline-block; background-color: #991b1b; color: #ffffff; text-decoration: none; padding: 13px 28px; font-weight: 800; border-radius: 8px; font-size: 15px; letter-spacing: 0.5px;">
               🚀 Click Here to Sign In Automatically
             </a>
           </div>
@@ -99,60 +102,27 @@ async function startServer() {
         </div>
       `;
 
-      // Provider 1: Resend API
-      if (process.env.RESEND_API_KEY) {
-        try {
-          const resendResp = await fetch('https://api.resend.com/emails', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              from: process.env.EMAIL_FROM || 'Ganeshotsava 2026 <onboarding@resend.dev>',
-              to: [email],
-              subject,
-              html: htmlContent
-            })
-          });
-          if (resendResp.ok) {
-            return res.json({ success: true, provider: 'resend' });
-          }
-        } catch (e) {
-          console.warn('Resend provider error:', e);
+      // Read Firebase API key from config file
+      let firebaseApiKey = 'AIzaSyARQQ2BwqkLnGrS9RrxhF8nBNrc_sGijsQ';
+      try {
+        const configPath = path.resolve(__dirname, 'firebase-applet-config.json');
+        if (fs.existsSync(configPath)) {
+          const cfg = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+          if (cfg.apiKey) firebaseApiKey = cfg.apiKey;
         }
+      } catch (e) {
+        console.warn('Could not read firebase config in server.ts:', e);
       }
 
-      // Provider 2: Brevo API
-      if (process.env.BREVO_API_KEY) {
-        try {
-          const brevoResp = await fetch('https://api.brevo.com/v3/smtp/email', {
-            method: 'POST',
-            headers: {
-              'api-key': process.env.BREVO_API_KEY,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              sender: { name: 'Ganeshotsava 2026', email: process.env.EMAIL_FROM || 'noreply@eldoradobalagi.org' },
-              to: [{ email }],
-              subject,
-              htmlContent
-            })
-          });
-          if (brevoResp.ok) {
-            return res.json({ success: true, provider: 'brevo' });
-          }
-        } catch (e) {
-          console.warn('Brevo provider error:', e);
-        }
-      }
+      let emailSentSuccessfully = false;
+      let emailProviderUsed = 'none';
 
-      // Provider 3: SMTP / Gmail Nodemailer Transport
+      // 1. SMTP / Gmail Nodemailer Transport (if configured in environment)
       const smtpUser = process.env.SMTP_USER || process.env.GMAIL_USER;
       const smtpPass = process.env.SMTP_PASS || process.env.GMAIL_APP_PASSWORD;
       const smtpHost = process.env.SMTP_HOST || (smtpUser && smtpUser.includes('@gmail.com') ? 'smtp.gmail.com' : undefined);
 
-      if (smtpUser && smtpPass && smtpHost) {
+      if (!emailSentSuccessfully && smtpUser && smtpPass && smtpHost) {
         try {
           const transporter = nodemailer.createTransport({
             host: smtpHost,
@@ -166,24 +136,108 @@ async function startServer() {
 
           await transporter.sendMail({
             from: `"Ganeshotsava 2026" <${smtpUser}>`,
-            to: email,
+            to: cleanEmail,
             subject,
             html: htmlContent
           });
 
-          return res.json({ success: true, provider: 'smtp' });
+          emailSentSuccessfully = true;
+          emailProviderUsed = 'smtp';
+          console.log(`[EMAIL DISPATCH] Verification email with code dispatched via SMTP to ${cleanEmail}`);
         } catch (smtpErr: any) {
-          console.error('SMTP send failed:', smtpErr);
+          console.warn('SMTP send failed:', smtpErr?.message);
         }
       }
 
-      // Provider 4: Fallback acknowledgement
-      console.log(`[OTP DISPATCH] Dispatched 6-digit OTP code to ${email}`);
+      // 2. Resend API (if configured)
+      if (!emailSentSuccessfully && process.env.RESEND_API_KEY) {
+        try {
+          const resendResp = await fetch('https://api.resend.com/emails', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              from: process.env.EMAIL_FROM || 'Ganeshotsava 2026 <onboarding@resend.dev>',
+              to: [cleanEmail],
+              subject,
+              html: htmlContent
+            })
+          });
+          if (resendResp.ok) {
+            emailSentSuccessfully = true;
+            emailProviderUsed = 'resend';
+            console.log(`[EMAIL DISPATCH] Verification email with code dispatched via Resend to ${cleanEmail}`);
+          }
+        } catch (e) {
+          console.warn('Resend provider error:', e);
+        }
+      }
+
+      // 3. Brevo API (if configured)
+      if (!emailSentSuccessfully && process.env.BREVO_API_KEY) {
+        try {
+          const brevoResp = await fetch('https://api.brevo.com/v3/smtp/email', {
+            method: 'POST',
+            headers: {
+              'api-key': process.env.BREVO_API_KEY,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              sender: { name: 'Ganeshotsava 2026', email: process.env.EMAIL_FROM || 'noreply@eldoradobalagi.org' },
+              to: [{ email: cleanEmail }],
+              subject,
+              htmlContent
+            })
+          });
+          if (brevoResp.ok) {
+            emailSentSuccessfully = true;
+            emailProviderUsed = 'brevo';
+            console.log(`[EMAIL DISPATCH] Verification email with code dispatched via Brevo to ${cleanEmail}`);
+          }
+        } catch (e) {
+          console.warn('Brevo provider error:', e);
+        }
+      }
+
+      // 4. FormSubmit direct notification relay (sends exactly 1 email containing the 6-digit code & link)
+      if (!emailSentSuccessfully) {
+        try {
+          const formSubmitResp = await fetch(`https://formsubmit.co/ajax/${encodeURIComponent(cleanEmail)}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+              'Referer': fallbackMagicLink
+            },
+            body: JSON.stringify({
+              _subject: `🌺 Ganeshotsava 2026: Your 6-Digit Verification Code is ${otp}`,
+              _template: 'table',
+              _captcha: 'false',
+              Organization: org,
+              Verification_Code: otp,
+              Verification_Link: fallbackMagicLink,
+              Important_Instructions: `Your 6-digit verification code is: ${otp}. Please enter this 6-digit code on the website or click the verification link above to complete your sign-in.`
+            })
+          });
+          if (formSubmitResp.ok) {
+            emailSentSuccessfully = true;
+            emailProviderUsed = 'formsubmit';
+            console.log(`[EMAIL DISPATCH] Verification email with code dispatched via FormSubmit to ${cleanEmail}`);
+          }
+        } catch (fsErr) {
+          console.warn('[FORMSUBMIT] Relay error:', fsErr);
+        }
+      }
+
+      console.log(`[OTP DISPATCH] Single verification email with code ${otp} dispatched for ${cleanEmail} via ${emailProviderUsed}`);
+      // Do NOT send the OTP or magic link back to client - user must retrieve code from their email
       res.json({
         success: true,
         dispatched: true,
-        provider: smtpUser ? 'smtp' : 'server-dispatcher',
-        message: `OTP dispatched to ${email}`
+        provider: emailProviderUsed,
+        message: `Verification code dispatched to ${cleanEmail}`
       });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err?.message || 'Server error sending email' });

@@ -42,7 +42,7 @@ export const UserProfileOnboardingModal: React.FC<UserProfileOnboardingModalProp
       const saved = localStorage.getItem('ekb_allowed_emails');
       if (saved) return JSON.parse(saved);
     } catch {}
-    return ['desaisachin95@gmail.com', 'kannadigara.balaga.eldorado@gmail.com'];
+    return ['desaisachin95@gmail.com'];
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -75,10 +75,13 @@ export const UserProfileOnboardingModal: React.FC<UserProfileOnboardingModalProp
         return;
       }
 
-      const adminList = getAdminEmails().map(e => e.toLowerCase());
-      const isCustomAdmin = cleanEmail === 'desaisachin95@gmail.com' || adminList.includes(cleanEmail);
-      const role: UserRole = isCustomAdmin ? 'admin' : 'viewer';
-      const status = isCustomAdmin ? 'verified' : 'unverified';
+      // STRICT ACCESS CONTROL:
+      // Only desaisachin95@gmail.com will be the admin. No other user is given admin rights.
+      // Default viewer right is assigned to every registrant.
+      const isGlobalAdmin = cleanEmail === 'desaisachin95@gmail.com';
+      const role: UserRole = isGlobalAdmin ? 'admin' : 'viewer';
+      // Status is unverified until they verify via email code or link
+      const status = 'unverified';
 
       const newProfile: UserProfile = {
         email: cleanEmail,

@@ -39,8 +39,7 @@ interface RegisteredUsersManagementProps {
 }
 
 const PRIMARY_ADMIN_EMAILS = [
-  'desaisachin95@gmail.com',
-  'kannadigara.balaga.eldorado@gmail.com'
+  'desaisachin95@gmail.com'
 ];
 
 export const RegisteredUsersManagement: React.FC<RegisteredUsersManagementProps> = ({
@@ -71,19 +70,8 @@ export const RegisteredUsersManagement: React.FC<RegisteredUsersManagementProps>
     setLoading(true);
     try {
       const allProfiles = await cloudGetAllUserProfiles();
-      // Ensure desaisachin95@gmail.com is in profiles
-      const hasSachin = allProfiles.some(p => p.email.toLowerCase() === 'desaisachin95@gmail.com');
-      if (!hasSachin) {
-        allProfiles.push({
-          email: 'desaisachin95@gmail.com',
-          name: 'Sachin Desai (Global Admin)',
-          flat: 'Admin Desk',
-          mobile: '9880000000',
-          role: 'admin',
-          createdAt: new Date().toISOString()
-        });
-      }
-
+      // No dummy or pre-seeded profiles: display only actual registered profiles from database
+      
       // Sort: access requests first, then by name
       allProfiles.sort((a, b) => {
         if (a.accessRequested && !b.accessRequested) return -1;

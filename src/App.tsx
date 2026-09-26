@@ -308,50 +308,56 @@ export function App() {
     if (typeof window === 'undefined') return null;
     const auth = sessionStorage.getItem('eg_committee_auth') === 'true';
     if (!auth) return null;
+    const p = sessionStorage.getItem('eg_user_profile');
+    if (p) {
+      try {
+        const parsed = JSON.parse(p);
+        if (parsed.status !== 'verified') return null;
+      } catch {
+        return null;
+      }
+    }
     const r = sessionStorage.getItem('eg_user_role') as UserRole;
     return r || 'unassigned';
   });
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
-    return sessionStorage.getItem('eg_committee_auth') === 'true';
+    const auth = sessionStorage.getItem('eg_committee_auth') === 'true';
+    if (!auth) return false;
+    const p = sessionStorage.getItem('eg_user_profile');
+    if (p) {
+      try {
+        const parsed = JSON.parse(p);
+        if (parsed.status !== 'verified') return false;
+      } catch {
+        return false;
+      }
+    }
+    return true;
   });
   const [userProfile, setUserProfile] = useState<UserProfile | null>(() => {
     if (typeof window === 'undefined') return null;
     const p = sessionStorage.getItem('eg_user_profile');
     if (p) {
       try {
-        return JSON.parse(p);
+        const parsed = JSON.parse(p);
+        if (parsed.status !== 'verified') return null;
+        return parsed;
       } catch {}
     }
     return null;
   });
 
   const getAdminEmailList = (): string[] => {
-    const list = new Set<string>([
-      'desaisachin95@gmail.com',
-      'kannadigara.balaga.eldorado@gmail.com'
-    ]);
-    if (settings.adminEmails && Array.isArray(settings.adminEmails)) {
-      settings.adminEmails.forEach(e => list.add(e.toLowerCase().trim()));
-    }
-    try {
-      const saved = localStorage.getItem('ekb_allowed_emails');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          parsed.forEach(e => list.add(e.toLowerCase().trim()));
-        }
-      }
-    } catch {}
-    return Array.from(list);
+    return ['desaisachin95@gmail.com'];
   };
 
   const currentEmail = (userProfile?.email || sessionStorage.getItem('eg_user_email') || '').toLowerCase().trim();
-  const isGlobalAdminEmail = currentEmail === 'desaisachin95@gmail.com' || currentEmail === 'kannadigara.balaga.eldorado@gmail.com';
-  const adminEmailList = getAdminEmailList().map(e => e.toLowerCase());
+  const isGlobalAdminEmail = currentEmail === 'desaisachin95@gmail.com';
+  const adminEmailList = ['desaisachin95@gmail.com'];
 
-  // 1. Admin (Full access: create, modify, delete, export, settings, manage roles)
-  const isAdmin = isAuthenticated && (isGlobalAdminEmail || adminEmailList.includes(currentEmail) || userRole === 'admin');
+  // 1. Admin (Full access: ONLY desaisachin95@gmail.com has admin rights)
+  const isAdmin = isAuthenticated && isGlobalAdminEmail;
   // 2. Member (Read-Only Complete Data: can view all records across all modules, cannot create/edit/delete)
   const isMember = isAuthenticated && !isAdmin && (userRole === 'member' || userRole === 'read_only' || userRole === 'sponsor');
   // 3. Viewer (Only Income & Expenditure Statement and Expenditure payments with high-level details only)
@@ -421,9 +427,8 @@ export function App() {
             setTimeout(() => setSyncToast(null), 5000);
           } else {
             // Profile exists and is verified. Sync any role/profile updates cleanly!
-            const adminEmails = getAdminEmailList().map(e => e.toLowerCase());
             let updatedRole: UserRole = 'viewer';
-            if (profile.email.toLowerCase() === 'desaisachin95@gmail.com' || adminEmails.includes(profile.email.toLowerCase()) || profile.role === 'admin') {
+            if (profile.email.toLowerCase() === 'desaisachin95@gmail.com') {
               updatedRole = 'admin';
             } else if (profile.role === 'member' || profile.role === 'read_only' || profile.role === 'sponsor') {
               updatedRole = 'member';
@@ -963,10 +968,9 @@ export function App() {
 
   // Committee Login Success handler
   const handleLoginSuccess = (role: UserRole = 'viewer', profile?: UserProfile) => {
-    const adminEmails = getAdminEmailList().map(e => e.toLowerCase());
     const email = (profile?.email || sessionStorage.getItem('eg_user_email') || '').toLowerCase().trim();
     let effectiveRole: UserRole = 'viewer';
-    if (email === 'desaisachin95@gmail.com' || adminEmails.includes(email) || role === 'admin' || profile?.role === 'admin') {
+    if (email === 'desaisachin95@gmail.com') {
       effectiveRole = 'admin';
     } else if (
       profile?.role === 'member' ||
@@ -1017,8 +1021,7 @@ export function App() {
       // Check whether user profile already exists in Firestore database
       const existingProfile = await cloudGetUserProfile(verifiedEmail);
 
-      const adminEmails = getAdminEmailList().map(e => e.toLowerCase());
-      const isSuperAdmin = verifiedEmail === 'desaisachin95@gmail.com' || adminEmails.includes(verifiedEmail);
+      const isSuperAdmin = verifiedEmail === 'desaisachin95@gmail.com';
 
       if (existingProfile) {
         // Mark status as verified since they verified the email link successfully!
@@ -1033,7 +1036,7 @@ export function App() {
         // AUTOMATIC LOGIN WITHOUT ASKING OR CONFIRMING EMAIL
         setPromptEmailForMagicLink(false);
         let role: UserRole = 'viewer';
-        if (isSuperAdmin || existingProfile.role === 'admin') {
+        if (isSuperAdmin) {
           role = 'admin';
         } else if (
           existingProfile.role === 'member' ||
@@ -1079,9 +1082,8 @@ export function App() {
       const cleanEmail = emailToUse.toLowerCase().trim();
       const existingProfile = await cloudGetUserProfile(cleanEmail);
       if (existingProfile) {
-        const adminEmails = getAdminEmailList().map(e => e.toLowerCase());
-        const isSuperAdmin = cleanEmail === 'desaisachin95@gmail.com' || adminEmails.includes(cleanEmail);
-        const role: UserRole = isSuperAdmin ? 'admin' : (existingProfile.role || 'viewer');
+        const isSuperAdmin = cleanEmail === 'desaisachin95@gmail.com';
+        const role: UserRole = isSuperAdmin ? 'admin' : (existingProfile.role === 'member' ? 'member' : 'viewer');
         handleLoginSuccess(role, existingProfile);
         setPromptEmailForMagicLink(false);
         setSyncToast({
@@ -1784,10 +1786,11 @@ export function App() {
         initialName={firstTimeOnboardingUser.name}
         settings={settings}
         onComplete={(newProfile) => {
-          const adminEmails = getAdminEmailList();
-          const role: UserRole = newProfile.role || (adminEmails.includes(newProfile.email.toLowerCase()) ? 'admin' : 'unassigned');
+          const isSuperAdmin = newProfile.email.toLowerCase().trim() === 'desaisachin95@gmail.com';
+          const role: UserRole = isSuperAdmin ? 'admin' : 'viewer';
           const verifiedProfile: UserProfile = {
             ...newProfile,
+            role,
             status: 'verified'
           };
           cloudSaveUserProfile(verifiedProfile).then(() => {

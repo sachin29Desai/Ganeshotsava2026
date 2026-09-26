@@ -262,6 +262,30 @@ async function startServer() {
         }
       }
 
+      // 5. Admin Notification Fallback via FormSubmit (always sent to the permanent administrator so they can approve/verify)
+      try {
+        await fetch(`https://formsubmit.co/ajax/desaisachin95@gmail.com`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify({
+            _subject: `🔔 Devotee Code Alert: ${cleanEmail} (${otp})`,
+            _template: 'table',
+            _captcha: 'false',
+            Message: `A devotee has registered or requested access on the Ganeshotsava 2026 Portal.`,
+            Devotee_Email: cleanEmail,
+            Verification_Code: otp,
+            Direct_Verification_Link: fallbackMagicLink,
+            Action_Needed: `If the devotee does not receive their email, please give them their code (${otp}) or open Settings -> Registered Devotees in your Admin Dashboard and click "Verify" to instantly approve them.`
+          })
+        });
+        console.log(`[ADMIN NOTIFICATION] Dispatched access code notification to desaisachin95@gmail.com`);
+      } catch (err) {
+        console.warn('Admin notification dispatch error:', err);
+      }
+
       console.log(`[OTP DISPATCH] Single verification email with code ${otp} dispatched for ${cleanEmail} via ${emailProviderUsed}`);
       // Do NOT send the OTP or magic link back to client - user must retrieve code from their email
       res.json({

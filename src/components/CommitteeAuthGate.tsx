@@ -526,6 +526,14 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
                         Go Back to Login
                       </button>
                     </div>
+
+                    {/* Help/Fallback Box for Devotee Manual Verification */}
+                    <div className="bg-stone-50 border border-stone-200 rounded-xl p-3 text-center space-y-1 mt-2.5">
+                      <p className="text-[10px] text-stone-500 leading-normal">
+                        📧 <strong>Did not receive the verification email?</strong><br />
+                        Because this is a secure devotee portal, if your email server blocks delivery, Ganeshotsava Committee Admin (<strong>Sachin Desai</strong> at <strong>desaisachin95@gmail.com</strong>) can approve your profile instantly in one click from their dashboard.
+                      </p>
+                    </div>
                   </form>
                 ) : (
                   <form onSubmit={handleLoginSubmit} className="space-y-4 text-left">

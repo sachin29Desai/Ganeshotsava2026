@@ -231,7 +231,7 @@ export const StatementView: React.FC<StatementViewProps> = ({
                 ಶ್ರೀ ಗಣೇಶೋತ್ಸವ ೨೦೨೬
               </h2>
               <p className="text-xs sm:text-sm font-semibold text-[#991B1B]">
-                Income &amp; Expenditure Statement and Financial position statement(Balance sheet)
+                Income &amp; Expenditure Statement and Financial Position Statement(Balance Sheet)
               </p>
               <div className="flex flex-wrap items-center gap-2 mt-0.5 text-xs text-stone-500 font-medium">
                 <span>Eldorado</span>
@@ -247,7 +247,7 @@ export const StatementView: React.FC<StatementViewProps> = ({
               Financial Year 2026-27
             </span>
             <span className="text-[11px] font-mono font-bold text-[#991B1B]">
-              Income &amp; Expenditure Statement and Financial position statement(Balance sheet)
+              Income &amp; Expenditure Statement and Financial Position Statement(Balance Sheet)
             </span>
             <span className="text-[10px] text-stone-500 font-medium">
               Unaudited Financial Statements 2026 • Eldorado
@@ -1285,10 +1285,10 @@ export const StatementView: React.FC<StatementViewProps> = ({
           Financial Document • Sri Ganeshotsava 2026 • Eldorado
         </p>
         <p className="leading-relaxed text-stone-700 text-xs">
-          ಈ ಲೆಕ್ಕಪತ್ರವು ೨೦೨೬ರ ಲೆಕ್ಕಪರಿಶೋಧನೆಗೊಳಪಡದ ಹಣಕಾಸು ಹೇಳಿಕೆಯನ್ನು (Unaudited Financial Statements 2026) ಒಳಗೊಂಡಿದೆ. ಸಂಪೂರ್ಣ ಪಾರದರ್ಶಕತೆಗಾಗಿ, ಎಲ್ಲಾ ಭೌತಿಕ ಬಿಲ್‌ಗಳು, ಪಾವತಿ ರಶೀದಿಗಳು ಮತ್ತು ಬ್ಯಾಂಕ್ ವಹಿವಾಟಿನ ದಾಖಲೆಗಳನ್ನು ಸಮಿತಿಯ ವಶದಲ್ಲಿ ಸಂರಕ್ಷಿಸಲಾಗಿದ್ದು ಭಕ್ತರ ಪರಿಶೀಲನೆಗೆ ಲಭ್ಯವಿರುತ್ತದೆ.
+          ಈ ಲೆಕ್ಕಪತ್ರವು ೨೦೨೬ರ ಲೆಕ್ಕಪರಿಶೋಧನೆಗೊಳಪಡದ ಹಣಕಾಸು ಹೇಳಿಕೆಯನ್ನು (Unaudited Financial Statements 2026) ಒಳಗೊಂಡಿದೆ. ಸಂಪೂರ್ಣ ಪಾರದರ್ಶಕತೆಗಾಗಿ, ಎಲ್ಲಾ ಭೌತಿಕ|ಡಿಜಿಟಲ್ ಬಿಲ್‌ಗಳು, ಪಾವತಿ ರಶೀದಿಗಳು ಮತ್ತು ಬ್ಯಾಂಕ್ ವಹಿವಾಟಿನ ದಾಖಲೆಗಳನ್ನು ಸಮಿತಿಯ ವಶದಲ್ಲಿ ಸಂರಕ್ಷಿಸಲಾಗಿದ್ದು ಭಕ್ತರ ಪರಿಶೀಲನೆಗೆ ಲಭ್ಯವಿರುತ್ತದೆ.
         </p>
         <p className="leading-tight text-[10px] text-stone-500 italic">
-          This statement reflects accounted records as recorded in the Unaudited Financial Statements 2026. For complete transparency, all physical bills, payment receipts, and bank transaction proofs are preserved under committee custody and available upon request.
+          This statement reflects accounted records as recorded in the Unaudited Financial Statements 2026. For complete transparency, all physical|digital bills, payment receipts, and bank transaction proofs are preserved under committee custody and available upon request.
         </p>
       </div>
 

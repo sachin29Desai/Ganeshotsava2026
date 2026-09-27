@@ -1008,18 +1008,67 @@ export async function cloudIncrementOtpAttempts(email: string, currentAttempts: 
 }
 
 export async function sendOtpEmailApi(email: string, otp: string, magicLink: string, orgName: string) {
+  const cleanEmail = email.toLowerCase().trim();
+  const payload = { email: cleanEmail, otp, magicLink, orgName };
+
+  // Detect whether running on a custom domain (e.g. www.eldoradokannadigarabalaga.in) vs Cloud Run
+  const isCustomDomain = typeof window !== 'undefined' && 
+    !window.location.origin.includes('localhost') && 
+    !window.location.origin.includes('127.0.0.1') && 
+    !window.location.origin.includes('.run.app');
+
+  const backendCloudRunUrl = 'https://ais-dev-p7a3udoouklbcodg3rdaay-1225695896.asia-east1.run.app/api/send-otp-email';
+
+  // If on custom domain, try direct Cloud Run backend first so static hosting 405 is bypassed
+  const endpointsToTry = isCustomDomain 
+    ? [backendCloudRunUrl, '/api/send-otp-email']
+    : ['/api/send-otp-email', backendCloudRunUrl];
+
+  for (const endpoint of endpointsToTry) {
+    try {
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.success) {
+          return data;
+        }
+      }
+    } catch (err) {
+      console.warn(`Failed to dispatch email via ${endpoint}:`, err);
+    }
+  }
+
+  // Resilient direct fallback: FormSubmit relay from client-side
   try {
-    const res = await fetch('/api/send-otp-email', {
+    const fsRes = await fetch(`https://formsubmit.co/ajax/${encodeURIComponent(cleanEmail)}`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
       },
-      body: JSON.stringify({ email, otp, magicLink, orgName })
+      body: JSON.stringify({
+        _subject: `🌺 Ganeshotsava 2026: Your 6-Digit Verification Code is ${otp}`,
+        _template: 'table',
+        _captcha: 'false',
+        Organization: orgName || 'Eldorado Kannadigara Balaga',
+        Verification_Code: otp,
+        Verification_Link: magicLink,
+        Important_Instructions: `Your 6-digit verification code is: ${otp}. Please enter this 6-digit code on the website or click the verification link above to complete your sign-in.`
+      })
     });
-    return await res.json();
-  } catch (err) {
-    console.warn('Failed to call send-otp-email proxy API:', err);
-    return { success: false, error: String(err) };
+    if (fsRes.ok) {
+      return { success: true, dispatched: true, provider: 'client-formsubmit' };
+    }
+  } catch (fsErr) {
+    console.warn('Client FormSubmit fallback failed:', fsErr);
   }
+
+  return { success: false, error: 'Could not dispatch verification email. Please check network connectivity.' };
 }
 

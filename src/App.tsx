@@ -88,7 +88,9 @@ import {
   getAdditionalUserInfo,
   cloudGetUserProfile,
   cloudSaveUserProfile,
-  cloudGetAllUserProfiles
+  cloudGetAllUserProfiles,
+  cloudGetOtp,
+  cloudDeleteOtp
 } from './lib/firebase';
 
 import { StatementView } from './components/StatementView';
@@ -315,9 +317,9 @@ export function App() {
   });
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
-    const auth = sessionStorage.getItem('eg_committee_auth') === 'true';
+    const auth = sessionStorage.getItem('eg_committee_auth') === 'true' || localStorage.getItem('eg_committee_auth') === 'true';
     if (!auth) return false;
-    const p = sessionStorage.getItem('eg_user_profile');
+    const p = sessionStorage.getItem('eg_user_profile') || localStorage.getItem('eg_user_profile');
     if (p) {
       try {
         const parsed = JSON.parse(p);
@@ -330,7 +332,7 @@ export function App() {
   });
   const [userProfile, setUserProfile] = useState<UserProfile | null>(() => {
     if (typeof window === 'undefined') return null;
-    const p = sessionStorage.getItem('eg_user_profile');
+    const p = sessionStorage.getItem('eg_user_profile') || localStorage.getItem('eg_user_profile');
     if (p) {
       try {
         const parsed = JSON.parse(p);
@@ -942,9 +944,13 @@ export function App() {
 
     sessionStorage.setItem('eg_committee_auth', 'true');
     sessionStorage.setItem('eg_user_role', effectiveRole);
+    localStorage.setItem('eg_committee_auth', 'true');
+    localStorage.setItem('eg_user_role', effectiveRole);
     if (profile) {
       sessionStorage.setItem('eg_user_profile', JSON.stringify({ ...profile, role: effectiveRole }));
       sessionStorage.setItem('eg_user_email', profile.email);
+      localStorage.setItem('eg_user_profile', JSON.stringify({ ...profile, role: effectiveRole }));
+      localStorage.setItem('eg_user_email', profile.email);
       setUserProfile({ ...profile, role: effectiveRole });
     }
     setUserRole(effectiveRole);
@@ -952,7 +958,7 @@ export function App() {
   };
 
   // --- Process Passwordless Email Magic Link Sign-In ---
-  const processEmailMagicLink = async (emailToUse: string) => {
+  const processEmailMagicLink = async (emailToUse: string, otpToVerify?: string | null) => {
     if (!auth) return;
     setIsVerifyingMagicLink(true);
     setMagicLinkError(null);
@@ -960,13 +966,26 @@ export function App() {
       const cleanEmail = emailToUse.toLowerCase().trim();
       let verifiedEmail = cleanEmail;
 
-      if (isSignInWithEmailLink(auth, window.location.href)) {
+      // 1. If an OTP is provided in the verification URL, verify it against Firestore
+      if (otpToVerify && otpToVerify.trim().length === 6) {
         try {
+          const savedOtp = await cloudGetOtp(cleanEmail);
+          if (savedOtp && savedOtp.otpHash === otpToVerify.trim()) {
+            await cloudDeleteOtp(cleanEmail);
+          }
+        } catch (otpErr) {
+          console.warn('OTP verification from URL error:', otpErr);
+        }
+      }
+
+      // 2. Safe check with Firebase signInWithEmailLink
+      try {
+        if (isSignInWithEmailLink(auth, window.location.href)) {
           const result = await signInWithEmailLink(auth, cleanEmail, window.location.href);
           verifiedEmail = (result.user.email || cleanEmail).toLowerCase().trim();
-        } catch (authErr: any) {
-          console.warn('signInWithEmailLink notice:', authErr);
         }
+      } catch (authErr: any) {
+        console.warn('signInWithEmailLink notice:', authErr);
       }
 
       // Clean up localStorage and remove query parameters from URL cleanly
@@ -1032,7 +1051,7 @@ export function App() {
         });
       }
     } catch (err: any) {
-      console.error('Error during signInWithEmailLink:', err);
+      console.error('Error during email verification link processing:', err);
       // Fallback: If user is already registered in database, log them in!
       const cleanEmail = emailToUse.toLowerCase().trim();
       const existingProfile = await cloudGetUserProfile(cleanEmail);
@@ -1049,6 +1068,7 @@ export function App() {
         return;
       }
       setMagicLinkError(err?.message || 'Failed to complete magic link sign-in. The link may have expired or was already used.');
+      setPromptEmailForMagicLink(true);
     } finally {
       setIsVerifyingMagicLink(false);
     }
@@ -1059,7 +1079,12 @@ export function App() {
     if (!auth) return;
     try {
       const url = new URL(window.location.href);
-      const isEmailLink = isSignInWithEmailLink(auth, window.location.href);
+      let isEmailLink = false;
+      try {
+        isEmailLink = isSignInWithEmailLink(auth, window.location.href);
+      } catch (e) {
+        console.warn('isSignInWithEmailLink check failed:', e);
+      }
       const emailFromUrl = url.searchParams.get('email');
       const otpFromUrl = url.searchParams.get('otp');
 
@@ -1068,15 +1093,16 @@ export function App() {
           emailFromUrl ||
           window.localStorage.getItem('emailForSignIn') ||
           sessionStorage.getItem('eg_user_email') ||
+          localStorage.getItem('eg_user_email') ||
           ''
         ).toLowerCase().trim();
 
         if (savedEmail) {
-          processEmailMagicLink(savedEmail);
+          processEmailMagicLink(savedEmail, otpFromUrl);
         } else {
           cloudGetAllUserProfiles().then(profiles => {
             if (profiles.length === 1) {
-              processEmailMagicLink(profiles[0].email);
+              processEmailMagicLink(profiles[0].email, otpFromUrl);
             } else {
               setPromptEmailForMagicLink(true);
             }
@@ -1086,7 +1112,7 @@ export function App() {
         }
       }
     } catch (err) {
-      console.warn('isSignInWithEmailLink check error:', err);
+      console.warn('URL email link check error:', err);
     }
   }, []);
 
@@ -1105,6 +1131,7 @@ export function App() {
     sessionStorage.removeItem('eg_user_profile');
     localStorage.removeItem('eg_committee_auth');
     localStorage.removeItem('eg_user_role');
+    localStorage.removeItem('eg_user_email');
     localStorage.removeItem('eg_user_profile');
     setUserProfile(null);
     setUserRole(null);

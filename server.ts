@@ -20,6 +20,19 @@ async function startServer() {
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
 
+  // CORS middleware allowing cross-origin requests from custom domain
+  app.use((req, res, next) => {
+    const origin = (req.headers.origin as string) || '*';
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    if (req.method === 'OPTIONS') {
+      return res.sendStatus(200);
+    }
+    next();
+  });
+
   // --- API ROUTE: SHORT LINK CREATION ---
   app.get('/api/create-short-link', async (req, res) => {
     try {
@@ -91,7 +104,10 @@ async function startServer() {
         }
       }
 
-      const fallbackMagicLink = resolvedMagicLink || `${requestOrigin}?email=${encodeURIComponent(cleanEmail)}`;
+      let fallbackMagicLink = resolvedMagicLink || `${requestOrigin}?email=${encodeURIComponent(cleanEmail)}`;
+      if (fallbackMagicLink && !fallbackMagicLink.includes('otp=')) {
+        fallbackMagicLink += `${fallbackMagicLink.includes('?') ? '&' : '?'}otp=${encodeURIComponent(otp)}`;
+      }
       
       const htmlContent = `
         <div style="font-family: Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; border: 1px solid #e5e7eb; border-radius: 12px; background-color: #ffffff;">

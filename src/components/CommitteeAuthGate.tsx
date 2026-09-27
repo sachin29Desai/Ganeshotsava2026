@@ -112,7 +112,7 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
     
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
-    const continueUrl = `${window.location.origin}${window.location.pathname}?email=${encodeURIComponent(targetEmail)}`;
+    const continueUrl = `${window.location.origin}${window.location.pathname}?email=${encodeURIComponent(targetEmail)}&otp=${otp}`;
 
     try {
       // 1. Save OTP to Firestore
@@ -197,6 +197,10 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
         sessionStorage.setItem('eg_user_role', role);
         sessionStorage.setItem('eg_user_email', otpSentState);
         sessionStorage.setItem('eg_user_profile', JSON.stringify({ ...verifiedProfile, role }));
+        localStorage.setItem('eg_committee_auth', 'true');
+        localStorage.setItem('eg_user_role', role);
+        localStorage.setItem('eg_user_email', otpSentState);
+        localStorage.setItem('eg_user_profile', JSON.stringify({ ...verifiedProfile, role }));
 
         onSuccess(role, verifiedProfile);
         setOtpSentState(null);
@@ -283,6 +287,10 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
       sessionStorage.setItem('eg_user_role', role);
       sessionStorage.setItem('eg_user_email', email);
       sessionStorage.setItem('eg_user_profile', JSON.stringify({ ...existingProfile, role }));
+      localStorage.setItem('eg_committee_auth', 'true');
+      localStorage.setItem('eg_user_role', role);
+      localStorage.setItem('eg_user_email', email);
+      localStorage.setItem('eg_user_profile', JSON.stringify({ ...existingProfile, role }));
 
       onSuccess(role, existingProfile);
     } catch (err: any) {
@@ -311,6 +319,10 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
     sessionStorage.removeItem('eg_user_role');
     sessionStorage.removeItem('eg_user_email');
     sessionStorage.removeItem('eg_user_profile');
+    localStorage.removeItem('eg_committee_auth');
+    localStorage.removeItem('eg_user_role');
+    localStorage.removeItem('eg_user_email');
+    localStorage.removeItem('eg_user_profile');
 
     // Automatically dispatch verification code & link to user's email
     triggerOtpSendFlow(newProfile.email).catch(() => {});

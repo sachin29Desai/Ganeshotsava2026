@@ -315,7 +315,7 @@ export function triggerReceiptDirectPrint(
  */
 export async function downloadStatementPdf(
   elementId = 'statement-print-target',
-  filename = 'Ganeshotsava_Samithi_2026_Income_and_Expenditure_Statement.pdf'
+  filename = 'Ganeshotsava_Samithi_Unaudited_Financial_Statements_2026.pdf'
 ): Promise<boolean> {
   const element = document.getElementById(elementId);
   if (!element) return false;
@@ -502,7 +502,7 @@ export async function downloadStatementPdf(
  */
 export function triggerStatementDirectPrint(
   _element?: HTMLElement | null,
-  title = 'Ganeshotsava_Samithi_2026_Income_and_Expenditure_Statement'
+  title = 'Ganeshotsava_Samithi_Unaudited_Financial_Statements_2026'
 ): void {
   document.body.classList.add('statement-print-active');
   const prevTitle = document.title;

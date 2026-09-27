@@ -205,10 +205,10 @@ export const StatementView: React.FC<StatementViewProps> = ({
         {/* Festive Top Bar with Sacred Inscription */}
         <div className="bg-gradient-to-r from-amber-700 via-[#991B1B] to-amber-700 text-amber-100 px-4 py-2 rounded-xl text-center shadow-xs">
           <p className="text-xs sm:text-sm font-serif font-black tracking-widest uppercase">
-            ॥ श्री गणेशाय नमः ॥
+            ॥ ಶ್ರೀ ಗಣೇಶಾಯ ನಮಃ ॥
           </p>
           <p className="text-[10px] sm:text-xs text-amber-200/90 font-serif italic mt-0.5">
-            ॥ वक्रतुण्ड महाकाय सूर्यकोटि समप्रभ । निर्विघ्नं कुरु मे देव सर्वकार्येषु सर्वदा ॥
+            ॥ ವಕ್ರತುಂಡ ಮಹಾಕಾಯ ಸೂರ್ಯಕೋಟಿ ಸಮಪ್ರಭ । ನಿರ್ವಿಘ್ನಂ ಕುರು ಮೇ ದೇವ ಸರ್ವಕಾರ್ಯೇಷು ಸರ್ವದಾ ॥
           </p>
         </div>
 
@@ -225,17 +225,19 @@ export const StatementView: React.FC<StatementViewProps> = ({
             <div>
               <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-100 text-[#991B1B] text-[10px] font-bold uppercase tracking-wider mb-1 border border-amber-200">
                 <Sparkles className="w-3 h-3 text-amber-600" />
-                <span>Ganeshotsava Samithi 2026</span>
+                <span>ಶ್ರೀ ಗಣೇಶೋತ್ಸವ ಸಮಿತಿ 2026</span>
               </div>
               <h2 className="text-xl sm:text-2xl font-serif font-black text-stone-900 tracking-tight">
-                Sri Ganeshotsava 2026
+                ಶ್ರೀ ಗಣೇಶೋತ್ಸವ ೨೦೨೬
               </h2>
               <p className="text-xs sm:text-sm font-semibold text-[#991B1B]">
-                Income &amp; Expenditure Statement &amp; Financial Ledger
+                Income &amp; Expenditure Statement and Financial position statement(Balance sheet)
               </p>
-              <p className="text-xs text-stone-500 mt-0.5 font-medium">
-                Eldorado
-              </p>
+              <div className="flex flex-wrap items-center gap-2 mt-0.5 text-xs text-stone-500 font-medium">
+                <span>Eldorado</span>
+                <span>•</span>
+                <span className="text-amber-800 font-semibold">Unaudited Financial Statements 2026</span>
+              </div>
             </div>
           </div>
 
@@ -245,10 +247,10 @@ export const StatementView: React.FC<StatementViewProps> = ({
               Financial Year 2026-27
             </span>
             <span className="text-[11px] font-mono font-bold text-[#991B1B]">
-              Reconciled &amp; Audited Ledger
+              Income &amp; Expenditure Statement and Financial position statement(Balance sheet)
             </span>
             <span className="text-[10px] text-stone-500 font-medium">
-              Eldorado
+              Unaudited Financial Statements 2026 • Eldorado
             </span>
           </div>
 
@@ -479,7 +481,7 @@ export const StatementView: React.FC<StatementViewProps> = ({
                     Net Surplus Reserve &amp; Fixed Deposit (FD) Policy
                   </span>
                   <p className="text-xs text-stone-600 mt-0.5 leading-relaxed font-normal">
-                    The Ganeshotsava Committee has resolved that the current Net Surplus of <strong className="font-mono text-stone-900">₹ {fmt(Math.abs(netBalance))}</strong> along with all pending pledged sponsorship amounts to be collected (<strong className="font-mono text-emerald-700">₹ {fmt(totalSponsorshipOutstanding)}</strong>) will be transferred as the opening fund for next year's <strong>Sri Ganeshotsava 2027</strong>. Any upcoming compliance or professional account auditing fees will be disbursed directly from this account Net Surplus, and the entire remaining net balance will be deposited into a bank <strong>Fixed Deposit (FD)</strong>.
+                    The Ganeshotsava Committee has accounted that the current Net Surplus of <strong className="font-mono text-stone-900">₹ {fmt(Math.abs(netBalance))}</strong> along with all pending pledged sponsorship amounts to be collected (<strong className="font-mono text-emerald-700">₹ {fmt(totalSponsorshipOutstanding)}</strong>) will be transferred as the opening fund for next year's <strong>Sri Ganeshotsava 2027</strong>. Any upcoming compliance or professional account auditing fees will be disbursed directly from this account Net Surplus, and the entire remaining net balance will be deposited into a bank <strong>Fixed Deposit (FD)</strong>.
                   </p>
                 </div>
               </div>
@@ -979,7 +981,7 @@ export const StatementView: React.FC<StatementViewProps> = ({
             </span>
             <div>
               <h3 className="text-sm sm:text-base font-serif font-black text-amber-950 uppercase tracking-wide">
-                Governance Resolution — Surplus &amp; Fund Deployment Policy
+                Governance Policy — Surplus &amp; Fund Deployment Policy
               </h3>
               <p className="text-[11px] text-amber-800 font-medium">
                 Framework for Net Surplus, pending sponsorship collections, audit fees &amp; 2027 Fixed Deposit
@@ -987,7 +989,7 @@ export const StatementView: React.FC<StatementViewProps> = ({
             </div>
           </div>
           <div className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-300 text-[10px] font-bold uppercase tracking-wider shrink-0">
-            ✓ Resolved by Ganeshotsava Samithi 2026
+            ✓ Accounted by Ganeshotsava Samithi 2026
           </div>
         </div>
 
@@ -1169,7 +1171,7 @@ export const StatementView: React.FC<StatementViewProps> = ({
 
             <div className="space-y-2 leading-relaxed">
               <p className="text-stone-600">
-                <strong>Resident &amp; Devotee Notice:</strong> Every voluntary donation, seva offering, and vendor disbursement is maintained with meticulous accounting records. Any resident who desires to inspect <strong>itemized vendor receipts, quotation comparisons, bank statements, or audit files</strong> is warmly encouraged to reach out to Ganeshotsava Samithi 2026 via the WhatsApp group.
+                <strong>Resident &amp; Devotee Notice:</strong> Every voluntary donation, seva offering, and vendor disbursement is maintained with meticulous accounting records. Any resident who desires to inspect <strong>itemized vendor receipts, quotations, bank statements and audit files</strong> is warmly encouraged to reach out to Ganeshotsava Samithi 2026 via the WhatsApp group.
               </p>
 
               <div className="pt-1 font-medium text-[11px]">
@@ -1193,7 +1195,7 @@ export const StatementView: React.FC<StatementViewProps> = ({
         {/* Decorative Top Heading */}
         <div className="text-center space-y-1 border-b-2 border-amber-200 pb-3">
           <span className="text-xs font-serif font-black tracking-widest text-[#991B1B] uppercase block">
-            ॥ ॐ गं गणपतये नमः ॥
+            ॥ ಓಂ ಗಂ ಗಣಪತಯೇ ನಮಃ ॥
           </span>
           <h3 className="text-lg sm:text-2xl font-serif font-black text-stone-900 tracking-tight">
             A Humble Note of Gratitude &amp; Devotional Acknowledgment
@@ -1229,7 +1231,7 @@ export const StatementView: React.FC<StatementViewProps> = ({
           {/* Right Column: Heartfelt Humble Letter */}
           <div className="md:col-span-8 space-y-3 text-xs sm:text-[13px] text-stone-800 leading-relaxed font-normal">
             <p className="font-serif italic text-amber-950 font-semibold text-sm">
-              Namaskara and Warm Festive Greetings to All Respected Residents, Devotees, and Families,
+              ಎಲ್ಲಾ ಗೌರವಾನ್ವಿತ ನಿವಾಸಿಗಳು, ಭಕ್ತರು ಮತ್ತು ಕುಟುಂಬಗಳಿಗೆ ನಮಸ್ಕಾರಗಳು (Namaskara &amp; Festive Greetings to All Residents, Devotees &amp; Families),
             </p>
 
             <p>
@@ -1250,24 +1252,24 @@ export const StatementView: React.FC<StatementViewProps> = ({
 
             <div className="p-3.5 rounded-xl bg-amber-100/70 border border-amber-300 text-amber-950 space-y-1 font-serif">
               <p className="font-bold text-center text-xs sm:text-sm text-[#991B1B]">
-                ॥ गणपती बाप्पा मोरया, पुढच्या वर्षी लवकर या ॥
+                ॥ ಗಣಪತಿ ಬಪ್ಪ ಮೋರಿಯಾ, ಮುಂದಿನ ವರ್ಷ ಬೇಗ ಬನ್ನಿ ॥
               </p>
               <p className="text-center text-[11px] sm:text-xs text-stone-700 italic">
-                “May Lord Sri Ganesha bestow good health, boundless happiness, prosperity, and peace upon all our families. We look forward to celebrating Sri Ganeshotsava 2027 together with even greater devotion and unity!”
+                “ಶ್ರೀ ಗಣೇಶನು ನಮ್ಮೆಲ್ಲರ ಕುಟುಂಬಗಳಿಗೆ ಆಯುರಾರೋಗ್ಯ, ಸುಖ, ಸಮೃದ್ಧಿ ಮತ್ತು ಶಾಂತಿಯನ್ನು ಕರುಣಿಸಲಿ. May Lord Sri Ganesha bestow good health, boundless happiness, prosperity, and peace upon all our families. We look forward to celebrating Sri Ganeshotsava 2027 together!”
               </p>
             </div>
 
             <div className="pt-2 flex flex-col sm:flex-row items-start sm:items-center justify-between border-t border-amber-200/80 gap-2 text-stone-600">
               <div>
                 <span className="block font-bold text-stone-900 text-xs">
-                  Ganeshotsava Samithi 2026
+                  ಶ್ರೀ ಗಣೇಶೋತ್ಸವ ಸಮಿತಿ 2026 (Ganeshotsava Samithi 2026)
                 </span>
                 <span className="block text-[11px] text-stone-500">
-                  Eldorado
+                  ಎಲ್ಡೊರಾಡೊ • Eldorado
                 </span>
               </div>
               <div className="text-left sm:text-right font-serif text-[11px] text-[#991B1B] font-bold">
-                Ganapati Bappa Morya! 🙏
+                ಗಣಪತಿ ಬಪ್ಪ ಮೋರಿಯಾ! (Ganapati Bappa Morya!) 🙏
               </div>
             </div>
           </div>
@@ -1275,12 +1277,18 @@ export const StatementView: React.FC<StatementViewProps> = ({
       </div>
 
       {/* 7. PRINT ATTESTATION FOOTER */}
-      <div className="p-3.5 rounded-xl bg-stone-50 border border-stone-200 text-center text-[10px] text-stone-500 space-y-1 print-avoid-break">
-        <p className="font-semibold text-stone-700">
+      <div className="p-3.5 rounded-xl bg-stone-50 border border-stone-200 text-center text-[10px] text-stone-500 space-y-1.5 print-avoid-break">
+        <p className="font-semibold text-stone-800 text-xs">
+          ಹಣಕಾಸು ದಾಖಲೆ • ಶ್ರೀ ಗಣೇಶೋತ್ಸವ ೨೦೨೬ • ಎಲ್ಡೊರಾಡೊ
+        </p>
+        <p className="text-[11px] font-medium text-stone-600">
           Financial Document • Sri Ganeshotsava 2026 • Eldorado
         </p>
-        <p className="leading-tight">
-          This statement reflects reconciled accounts as recorded in the festival ledger. For complete transparency, all physical bills, payment receipts, and bank transaction proofs are preserved under committee custody and available upon request.
+        <p className="leading-relaxed text-stone-700 text-xs">
+          ಈ ಲೆಕ್ಕಪತ್ರವು ೨೦೨೬ರ ಲೆಕ್ಕಪರಿಶೋಧನೆಗೊಳಪಡದ ಹಣಕಾಸು ಹೇಳಿಕೆಯನ್ನು (Unaudited Financial Statements 2026) ಒಳಗೊಂಡಿದೆ. ಸಂಪೂರ್ಣ ಪಾರದರ್ಶಕತೆಗಾಗಿ, ಎಲ್ಲಾ ಭೌತಿಕ ಬಿಲ್‌ಗಳು, ಪಾವತಿ ರಶೀದಿಗಳು ಮತ್ತು ಬ್ಯಾಂಕ್ ವಹಿವಾಟಿನ ದಾಖಲೆಗಳನ್ನು ಸಮಿತಿಯ ವಶದಲ್ಲಿ ಸಂರಕ್ಷಿಸಲಾಗಿದ್ದು ಭಕ್ತರ ಪರಿಶೀಲನೆಗೆ ಲಭ್ಯವಿರುತ್ತದೆ.
+        </p>
+        <p className="leading-tight text-[10px] text-stone-500 italic">
+          This statement reflects accounted records as recorded in the Unaudited Financial Statements 2026. For complete transparency, all physical bills, payment receipts, and bank transaction proofs are preserved under committee custody and available upon request.
         </p>
       </div>
 

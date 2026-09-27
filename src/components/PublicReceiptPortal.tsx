@@ -320,7 +320,7 @@ export const PublicReceiptPortal: React.FC<PublicReceiptPortalProps> = ({
     if (isSeva) {
       text = `🙏 *Sri Ganeshotsava 2026 - Seva Token / Receipt*\n*${cleanOrgName(settings.org, 'Eldorado Residents Association')}*\n\n📜 *Token No:* ${item.rcptNo || '—'}\n🌺 *Seva Offering:* ${item.seva || 'Devotional Seva'}\n👤 *Devotee:* ${item.name}\n🏠 *Flat / Unit:* ${item.flat || '—'}\n${item.qty ? `📦 *Quantity:* ${item.qty} ${item.unit || ''}\n` : ''}${item.amt > 0 ? `💰 *Amount:* ₹${fmt(item.amt)} (${numWords(item.amt)} Rupees)\n` : '🌸 *Offering:* In-Kind Material Offering\n'}📅 *Date:* ${fmtDate(item.date)}\n✨ *Status:* ${item.status === 'Confirmed' ? '✓ Confirmed by Committee' : '⏳ Booked (To be confirmed)'}\n\n👉 *Download Official PDF Receipt Online:*\n${portalUrl}\n\n*May Lord Sri Ganesha Bless You & Your Family!* 🌺`;
     } else {
-      text = `🙏 *Sri Ganeshotsava 2026 - Voluntary Contribution Receipt*\n*${cleanOrgName(settings.org, 'Eldorado Residents Association')}*\n\n📜 *Receipt No:* ${item.rcptNo || '—'}\n👤 *Devotee:* ${item.name}\n🏠 *Flat / Unit:* ${item.flat || '—'}\n💰 *Amount:* ₹${fmt(item.amt)} (${numWords(item.amt)} Rupees)\n📅 *Date:* ${fmtDate(item.date)}\n\n👉 *Download Official PDF Receipt Online:*\n${portalUrl}\n\n*Ganapati Bappa Morya!* 🌺`;
+      text = `🙏 *Sri Ganeshotsava 2026 - Voluntary Contribution Receipt*\n*${cleanOrgName(settings.org, 'Eldorado Residents Association')}*\n\n📜 *Receipt No:* ${item.rcptNo || '—'}\n👤 *Devotee:* ${item.name}\n🏠 *Flat / Unit:* ${item.flat || '—'}\n💰 *Amount:* ₹${fmt(item.amt)} (${numWords(item.amt)} Rupees)\n📅 *Date:* ${fmtDate(item.date)}\n\n👉 *Download Official PDF Receipt Online:*\n${portalUrl}\n\n*ಗಣಪತಿ ಬಪ್ಪ ಮೋರಿಯಾ! (Ganapati Bappa Morya!)* 🌺`;
     }
 
     window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
@@ -895,7 +895,7 @@ export const PublicReceiptPortal: React.FC<PublicReceiptPortalProps> = ({
                     <div className="flex-1 text-center">
                       <div className="text-[10px] font-bold uppercase tracking-widest text-[#991B1B] mb-0.5 inline-flex items-center justify-center gap-1.5">
                         <img src="/lord_ganesha.svg" alt="" className="w-3.5 h-3.5 object-contain inline" referrerPolicy="no-referrer" />
-                        <span>GANAPATI BAPPA MORYA</span>
+                        <span>ಗಣಪತಿ ಬಪ್ಪ ಮೋರಿಯಾ • GANAPATI BAPPA MORYA</span>
                         <img src="/lord_ganesha.svg" alt="" className="w-3.5 h-3.5 object-contain inline" referrerPolicy="no-referrer" />
                       </div>
                       <h2 className="text-xl sm:text-2xl font-serif font-black text-[#991B1B] leading-tight">
@@ -1071,7 +1071,7 @@ export const PublicReceiptPortal: React.FC<PublicReceiptPortalProps> = ({
                 <div className="flex-1 text-center">
                   <div className="text-[10px] font-bold uppercase tracking-widest text-[#991B1B] mb-0.5 inline-flex items-center justify-center gap-1.5">
                     <img src="/lord_ganesha.svg" alt="" className="w-3.5 h-3.5 object-contain inline" referrerPolicy="no-referrer" />
-                    <span>GANAPATI BAPPA MORYA</span>
+                    <span>ಗಣಪತಿ ಬಪ್ಪ ಮೋರಿಯಾ • GANAPATI BAPPA MORYA</span>
                     <img src="/lord_ganesha.svg" alt="" className="w-3.5 h-3.5 object-contain inline" referrerPolicy="no-referrer" />
                   </div>
                   <h2 className="text-2xl font-serif font-black text-[#991B1B] leading-tight">

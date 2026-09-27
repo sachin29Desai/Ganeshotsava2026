@@ -292,7 +292,7 @@ export const ReceiptInvoiceModal: React.FC<ReceiptInvoiceModalProps> = ({
                 <div className="flex-1 text-center">
                   <div className="text-[10px] font-bold uppercase tracking-widest text-[#991B1B] mb-0.5 inline-flex items-center justify-center gap-1.5">
                     <img src="/lord_ganesha.svg" alt="" className="w-3.5 h-3.5 object-contain inline" referrerPolicy="no-referrer" />
-                    <span>GANAPATI BAPPA MORYA</span>
+                    <span>ಗಣಪತಿ ಬಪ್ಪ ಮೋರಿಯಾ • GANAPATI BAPPA MORYA</span>
                     <img src="/lord_ganesha.svg" alt="" className="w-3.5 h-3.5 object-contain inline" referrerPolicy="no-referrer" />
                   </div>
                   <h2 className="text-xl sm:text-2xl font-serif font-black text-[#991B1B] leading-tight">
@@ -493,7 +493,7 @@ export const ReceiptInvoiceModal: React.FC<ReceiptInvoiceModalProps> = ({
                   <div className="bg-amber-50 border border-amber-200 rounded p-3 text-xs text-stone-700 mb-4">
                     <strong>Thank you for your generous partnership &amp; devotional support! 🙏</strong>
                     <br />
-                    <em>Ganapati Bappa Morya!</em>
+                    <em>ಗಣಪತಿ ಬಪ್ಪ ಮೋರಿಯಾ! (Ganapati Bappa Morya!)</em>
                   </div>
 
                   <DigitalSignatureBlock refCode={`GNS2026-${subType.toUpperCase()}-INVOICE-${item.invNo || 'VAL'}`} />
@@ -502,7 +502,7 @@ export const ReceiptInvoiceModal: React.FC<ReceiptInvoiceModalProps> = ({
 
               <div className="text-center text-xs text-stone-600 border-t border-stone-200 pt-3 mt-4">
                 Thank you for your generous support 🙏<br />
-                <strong>Ganapati Bappa Morya!</strong>
+                <strong>ಗಣಪತಿ ಬಪ್ಪ ಮೋರಿಯಾ! (Ganapati Bappa Morya!)</strong>
               </div>
             </div>
           </div>

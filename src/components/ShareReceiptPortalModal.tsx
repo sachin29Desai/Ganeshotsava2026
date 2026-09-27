@@ -171,7 +171,7 @@ export const ShareReceiptPortalModal: React.FC<ShareReceiptPortalModalProps> = (
   };
 
   const handleShareWhatsApp = () => {
-    const text = `🙏 *Ganeshotsava 2026 — Official Devotee Receipt Portal*\n*${cleanOrgName(settings.org, 'Eldorado Residents Association')}*\n\nDear Devotees & Residents,\nYou can now search and download your official Ganesh Festival voluntary contribution receipt directly on your phone or computer:\n\n👉 *Click here to download your receipt:*\n${primaryShareUrl}\n\nSimply enter your *Flat Number* (e.g. A-101) or *Name* to get your signed official PDF receipt.\n\n*Ganapati Bappa Morya!* 🌺🙏`;
+    const text = `🙏 *Ganeshotsava 2026 — Official Devotee Receipt Portal*\n*${cleanOrgName(settings.org, 'Eldorado Residents Association')}*\n\nDear Devotees & Residents,\nYou can now search and download your official Ganesh Festival voluntary contribution receipt directly on your phone or computer:\n\n👉 *Click here to download your receipt:*\n${primaryShareUrl}\n\nSimply enter your *Flat Number* (e.g. A-101) or *Name* to get your signed official PDF receipt.\n\n*ಗಣಪತಿ ಬಪ್ಪ ಮೋರಿಯಾ! (Ganapati Bappa Morya!)* 🌺🙏`;
     window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
   };
 

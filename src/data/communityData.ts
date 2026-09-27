@@ -344,7 +344,7 @@ export const GALLERY_PHOTOS: GalleryPhoto[] = [
     tag: 'Ganesha Chaturthi',
     performanceType: 'Procession & Dhol',
     imageUrl: 'https://images.unsplash.com/photo-1576097449798-7c7f90e1248a?auto=format&fit=crop&w=800&q=80',
-    caption: 'Joyful immersion procession accompanied by festive music and chants of "Ganapati Bappa Morya".'
+    caption: 'Joyful immersion procession accompanied by festive music and chants of "ಗಣಪತಿ ಬಪ್ಪ ಮೋರಿಯಾ (Ganapati Bappa Morya)".'
   },
   {
     id: 'g6',

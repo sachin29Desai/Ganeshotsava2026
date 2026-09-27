@@ -2297,7 +2297,7 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
           }`}
         >
           <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px]">
-            <span>© 2024-2026 Eldorado Kannadigara Balaga. All rights reserved.</span>
+            <span>© 2024-2026 ಎಲ್ಡೊರಾಡೊ ಕನ್ನಡಿಗರ ಬಳಗ. ಎಲ್ಲ ಹಕ್ಕುಗಳನ್ನು ಕಾಯ್ದಿರಿಸಲಾಗಿದೆ (Eldorado Kannadigara Balaga. All rights reserved).</span>
             <div className="flex items-center gap-4">
               <button
                 onClick={() => setPolicyModal('cookies')}

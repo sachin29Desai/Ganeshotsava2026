@@ -304,16 +304,12 @@ export const StatementView: React.FC<StatementViewProps> = ({
               </span>
             </div>
 
-            {/* Expenditure to be paid bullet points */}
-            <div className="bg-stone-50/80 border border-stone-200/60 rounded-lg p-3">
-              <span className="text-[10px] font-bold text-stone-700 uppercase tracking-wider block mb-1.5">
-                Pending Expenditures to be Settled
-              </span>
-              {pendingExpenses.length === 0 ? (
-                <p className="text-xs text-stone-500 italic">
-                  ✓ All expenditure heads have been fully paid and settled!
-                </p>
-              ) : (
+            {/* Expenditure to be paid bullet points - Only shown if there are pending expenditures to be settled */}
+            {pendingExpenses.length > 0 && (
+              <div className="bg-stone-50/80 border border-stone-200/60 rounded-lg p-3">
+                <span className="text-[10px] font-bold text-stone-700 uppercase tracking-wider block mb-1.5">
+                  Pending Expenditures to be Settled
+                </span>
                 <ul className="space-y-1.5 list-disc pl-4 text-xs text-stone-600">
                   {pendingExpenses.map((exp, idx) => (
                     <li key={idx} className="leading-relaxed">
@@ -321,8 +317,8 @@ export const StatementView: React.FC<StatementViewProps> = ({
                     </li>
                   ))}
                 </ul>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </div>
 

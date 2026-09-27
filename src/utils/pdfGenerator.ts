@@ -308,6 +308,214 @@ export function triggerReceiptDirectPrint(
   }, 350);
 }
 
+/**
+ * Direct Multi-Page PDF Exporter using html2canvas-pro + jsPDF
+ * Renders every page of the statement into a pristine multi-page A4 PDF file
+ * with pixel-perfect alignment, no clipped elements, and standard A4 margins.
+ */
+export async function downloadStatementPdf(
+  elementId = 'statement-print-target',
+  filename = 'Ganeshotsava_Samithi_2026_Income_and_Expenditure_Statement.pdf'
+): Promise<boolean> {
+  const element = document.getElementById(elementId);
+  if (!element) return false;
+
+  // Wait for all fonts & images inside the document
+  if ('fonts' in document) {
+    try {
+      await document.fonts.ready;
+    } catch {
+      // ignore
+    }
+  }
+
+  const images = Array.from(element.querySelectorAll('img'));
+  await Promise.all(
+    images.map(img => {
+      if (img.complete && img.naturalWidth !== 0) return Promise.resolve();
+      return new Promise<void>(resolve => {
+        img.onload = () => resolve();
+        img.onerror = () => resolve();
+        setTimeout(resolve, 800);
+      });
+    })
+  );
+
+  // Dedicated off-screen fixed wrapper at (0, 0)
+  // Ensures exact layout at 1000px without negative coordinate shifting
+  const wrapper = document.createElement('div');
+  wrapper.id = 'statement-pdf-render-wrapper';
+  wrapper.style.position = 'fixed';
+  wrapper.style.top = '0';
+  wrapper.style.left = '0';
+  wrapper.style.width = '1000px';
+  wrapper.style.minWidth = '1000px';
+  wrapper.style.maxWidth = '1000px';
+  wrapper.style.height = 'auto';
+  wrapper.style.zIndex = '-9999';
+  wrapper.style.overflow = 'visible';
+  wrapper.style.backgroundColor = '#ffffff';
+  wrapper.style.pointerEvents = 'none';
+
+  // Create clean clone formatted specifically for standard A4 document rendering
+  const clone = element.cloneNode(true) as HTMLElement;
+  clone.id = 'statement-pdf-clone';
+  clone.style.width = '1000px';
+  clone.style.minWidth = '1000px';
+  clone.style.maxWidth = '1000px';
+  clone.style.margin = '0 auto';
+  clone.style.padding = '0';
+  clone.style.background = '#ffffff';
+  clone.style.color = '#1a1a1a';
+  clone.style.boxSizing = 'border-box';
+  clone.style.position = 'relative';
+
+  // Strip screen-only action buttons from the PDF clone
+  clone.querySelectorAll('.no-print, button').forEach(el => el.remove());
+
+  // Show any print-only headers
+  clone.querySelectorAll('.print-only-header').forEach((el: any) => {
+    el.style.display = 'flex';
+  });
+
+  // Ensure all containers are visible without clipping
+  clone.querySelectorAll('*').forEach((el: any) => {
+    if (el.style) {
+      el.style.overflow = 'visible';
+    }
+  });
+
+  wrapper.appendChild(clone);
+  document.body.appendChild(wrapper);
+
+  try {
+    // Measure bounding boxes of direct sections while mounted in DOM
+    const cloneRect = clone.getBoundingClientRect();
+    const sections = Array.from(clone.children) as HTMLElement[];
+
+    const canvas = await html2canvas(clone, {
+      scale: 2,
+      useCORS: true,
+      allowTaint: false,
+      backgroundColor: '#ffffff',
+      logging: false,
+      width: 1000,
+      windowWidth: 1000,
+      x: 0,
+      y: 0,
+      scrollX: 0,
+      scrollY: 0,
+      imageTimeout: 10000
+    });
+
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    const pdfPageWidth = 210;
+    const pdfPageHeight = 297;
+    const marginX = 10; // 10mm left and right margin
+    const marginY = 10; // 10mm top and bottom margin
+    const contentWidth = pdfPageWidth - marginX * 2; // 190mm
+    const contentHeight = pdfPageHeight - marginY * 2; // 277mm
+
+    const canvasWidth = canvas.width;
+    const canvasHeight = canvas.height;
+
+    // Height in canvas pixels that corresponds to one PDF page contentHeight
+    const pageCanvasHeight = (contentHeight * canvasWidth) / contentWidth;
+
+    // Calculate exact canvas vertical bounds for each top-level section
+    const scaleFactor = canvasHeight / (cloneRect.height || 1);
+    const sectionBounds = sections.map(s => {
+      const sRect = s.getBoundingClientRect();
+      const top = Math.max(0, (sRect.top - cloneRect.top) * scaleFactor);
+      const bottom = Math.min(canvasHeight, (sRect.bottom - cloneRect.top) * scaleFactor);
+      return { top, bottom, height: bottom - top };
+    }).filter(s => s.height > 10).sort((a, b) => a.top - b.top);
+
+    let currentY = 0;
+    let pageCount = 0;
+
+    while (currentY < canvasHeight) {
+      if (pageCount > 0) {
+        pdf.addPage('a4', 'p');
+      }
+
+      const maxSliceY = currentY + pageCanvasHeight;
+      let sliceEnd = Math.min(maxSliceY, canvasHeight);
+
+      // If not at the end of the document, search for card boundaries to avoid breaking inside a card
+      if (sliceEnd < canvasHeight) {
+        const cutSection = sectionBounds.find(b => b.top < maxSliceY && b.bottom > maxSliceY);
+        // Break cleanly right before the card if we've rendered at least 30% of a page
+        if (cutSection && cutSection.top > currentY + (pageCanvasHeight * 0.30)) {
+          sliceEnd = cutSection.top;
+        }
+      }
+
+      const sliceHeight = sliceEnd - currentY;
+
+      const pageCanvas = document.createElement('canvas');
+      pageCanvas.width = canvasWidth;
+      pageCanvas.height = sliceHeight;
+      const pageCtx = pageCanvas.getContext('2d');
+
+      if (pageCtx) {
+        pageCtx.fillStyle = '#ffffff';
+        pageCtx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
+        pageCtx.drawImage(
+          canvas,
+          0,
+          currentY,
+          canvasWidth,
+          sliceHeight,
+          0,
+          0,
+          canvasWidth,
+          sliceHeight
+        );
+
+        const pageImgData = pageCanvas.toDataURL('image/jpeg', 0.98);
+        const sliceHeightMm = (sliceHeight * contentWidth) / canvasWidth;
+
+        // Perfectly centered horizontally at marginX = 10mm (10 + 190 + 10 = 210mm)
+        // Aligned vertically at marginY = 10mm
+        pdf.addImage(pageImgData, 'JPEG', marginX, marginY, contentWidth, sliceHeightMm);
+      }
+
+      currentY = sliceEnd;
+      pageCount++;
+    }
+
+    pdf.save(filename);
+    return true;
+  } catch (err) {
+    console.error('PDF export error:', err);
+    triggerStatementDirectPrint(element, filename.replace('.pdf', ''));
+    return false;
+  } finally {
+    wrapper.remove();
+  }
+}
+
+/**
+ * Triggers direct browser printing of the multi-page Income & Expenditure Statement.
+ * Applies statement-print-active class to force full document flow across all pages.
+ */
+export function triggerStatementDirectPrint(
+  _element?: HTMLElement | null,
+  title = 'Ganeshotsava_Samithi_2026_Income_and_Expenditure_Statement'
+): void {
+  document.body.classList.add('statement-print-active');
+  const prevTitle = document.title;
+  document.title = title;
+
+  window.print();
+
+  setTimeout(() => {
+    document.body.classList.remove('statement-print-active');
+    document.title = prevTitle;
+  }, 1000);
+}
+
 export interface BulkPdfProgress {
   current: number;
   total: number;

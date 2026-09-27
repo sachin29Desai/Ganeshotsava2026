@@ -117,7 +117,9 @@ import {
   getReceiptPdfFilename,
   downloadBlobAsFile,
   generateReceiptPdfBlob,
-  triggerReceiptDirectPrint
+  triggerReceiptDirectPrint,
+  triggerStatementDirectPrint,
+  downloadStatementPdf
 } from './utils/pdfGenerator';
 
 declare global {
@@ -1330,27 +1332,36 @@ export function App() {
     }
   }, [receiptModalOpen, printData, settings.upi]);
 
-  // Isolated print trigger - ensures ONLY the receipt is printed without background records
+  // Isolated print trigger - ensures ONLY the receipt or statement is printed across ALL pages
   const triggerDirectPrint = () => {
-    const element = document.getElementById('receipt-print-target');
-    if (element && receiptModalOpen) {
+    const receiptEl = document.getElementById('receipt-print-target');
+    if (receiptEl && receiptModalOpen) {
       const isRcpt = printData?.type === 'receipt';
       const num = isRcpt ? (printData?.item?.rcptNo || printData?.item?.tokNo || '') : (printData?.item?.invNo || '');
       const flat = printData?.item?.flat || '';
       const docTitle = getReceiptDocumentTitle(isRcpt, num, flat);
-      triggerReceiptDirectPrint(element, docTitle);
+      triggerReceiptDirectPrint(receiptEl, docTitle);
       return;
     }
 
-    // Default window.print for Statement view or other views with clean page hiding
+    const statementEl = document.getElementById('statement-print-target');
+    if (statementEl) {
+      const docTitle = 'Ganeshotsava_Samithi_2026_Income_and_Expenditure_Statement';
+      triggerStatementDirectPrint(statementEl, docTitle);
+      return;
+    }
+
+    // Default window.print for other views with clean page hiding
     document.body.classList.add('statement-print-active');
     const originalTitle = document.title;
-    document.title = `Income_and_Expenditure_Statement_${(settings.org || 'Ganeshotsava_2026').replace(/[^a-zA-Z0-9]/g, '_')}`;
+    document.title = 'Ganeshotsava_Samithi_2026_Income_and_Expenditure_Statement';
     
     window.print();
     
-    document.body.classList.remove('statement-print-active');
-    document.title = originalTitle;
+    setTimeout(() => {
+      document.body.classList.remove('statement-print-active');
+      document.title = originalTitle;
+    }, 1000);
   };
 
   // Excel Export
@@ -2457,6 +2468,7 @@ export function App() {
             onShareWhatsApp={shareWhatsAppSummary}
             onExportExcel={handleExportExcel}
             onPrint={triggerDirectPrint}
+            onDownloadPdf={() => downloadStatementPdf()}
           />
         )}
 

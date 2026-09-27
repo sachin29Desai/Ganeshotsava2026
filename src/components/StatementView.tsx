@@ -16,7 +16,15 @@ import {
   CreditCard,
   ArrowRight,
   Info,
-  FileText
+  FileText,
+  QrCode,
+  HeartHandshake,
+  ShieldCheck,
+  MessageCircle,
+  Copy,
+  Check,
+  Share2,
+  Download
 } from 'lucide-react';
 import { Expense, Contribution, Sponsor, CommercialStall, SevaBooking, HundiCollection, AppSettings, UserRole } from '../types';
 import { fmt, getExpenseActual, getExpenseBalance, cleanOrgName, fmtDate, getLightingAndDecorationExpense } from '../utils/helpers';
@@ -40,6 +48,7 @@ interface StatementViewProps {
   onShareWhatsApp: () => void;
   onExportExcel: () => void;
   onPrint: () => void;
+  onDownloadPdf?: () => void | Promise<any>;
 }
 
 export const StatementView: React.FC<StatementViewProps> = ({
@@ -57,11 +66,30 @@ export const StatementView: React.FC<StatementViewProps> = ({
   onNavigateToExpenditure,
   onPrintInvoice,
   onAddStall,
-  onPrint
+  onShareWhatsApp,
+  onExportExcel,
+  onPrint,
+  onDownloadPdf
 }) => {
   // Graph visual representation states
   const [chartType, setChartType] = useState<'donut' | 'bars' | 'vs'>('donut');
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const [copiedLink, setCopiedLink] = useState(false);
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
+
+  const whatsappGroupUrl = 'https://chat.whatsapp.com/EAkzlpnwF0G9Xc8nenA8JY?mode=gi_t';
+  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(whatsappGroupUrl)}`;
+
+  const handleCopyWhatsAppLink = () => {
+    navigator.clipboard.writeText(whatsappGroupUrl);
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 3000);
+  };
+
+  // Ganesha photo from festive video / showcase first photo
+  const ganeshaPhotoUrl = (settings?.adminPhotos && settings.adminPhotos.length > 0 && settings.adminPhotos[0])
+    ? settings.adminPhotos[0]
+    : '/Gemini_Generated_Image_jforcsjforcsjfor.png';
 
   // Lighting & Decoration Vendor Payable Calculation
   const lightingData = getLightingAndDecorationExpense(expenses);
@@ -172,29 +200,124 @@ export const StatementView: React.FC<StatementViewProps> = ({
 
   return (
     <div id="statement-print-target" className="space-y-6 relative">
-      {/* 1. TOP HEADER & PRINT ACTION */}
-      <div className="bg-white border border-stone-200 rounded-lg p-4 shadow-sm flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h2 className="text-xl font-serif font-bold text-[#1A1A1A]">
-            Income &amp; Expenditure Statement
-          </h2>
-          <p className="text-xs text-stone-500 mt-0.5">
-            {cleanOrgName(settings.org, 'Eldorado Residents Association')} • {settings.location || 'Bengaluru'}
+      {/* 1. AUSPICIOUS INVOCATION & GRAND FESTIVE HEADER */}
+      <div className="bg-white border-2 border-amber-300 rounded-2xl p-4 sm:p-5 shadow-sm space-y-3 relative overflow-hidden print-avoid-break">
+        {/* Festive Top Bar with Sacred Inscription */}
+        <div className="bg-gradient-to-r from-amber-700 via-[#991B1B] to-amber-700 text-amber-100 px-4 py-2 rounded-xl text-center shadow-xs">
+          <p className="text-xs sm:text-sm font-serif font-black tracking-widest uppercase">
+            ॥ श्री गणेशाय नमः ॥
+          </p>
+          <p className="text-[10px] sm:text-xs text-amber-200/90 font-serif italic mt-0.5">
+            ॥ वक्रतुण्ड महाकाय सूर्यकोटि समप्रभ । निर्विघ्नं कुरु मे देव सर्वकार्येषु सर्वदा ॥
           </p>
         </div>
 
-        {isAdmin && (
-          <div className="flex items-center gap-2">
+        <div className="flex flex-col md:flex-row items-center justify-between gap-4 pt-1">
+          {/* Left: Divine Lord Ganesha Full Picture / Medallion */}
+          <div className="flex items-center gap-4 text-center sm:text-left">
+            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gradient-to-tr from-amber-400 via-amber-200 to-amber-400 p-0.5 shadow-md shrink-0 border-2 border-amber-500 overflow-hidden">
+              <img
+                src={ganeshaPhotoUrl}
+                alt="Lord Sri Ganesha"
+                className="w-full h-full object-cover rounded-full filter drop-shadow-sm"
+              />
+            </div>
+            <div>
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-100 text-[#991B1B] text-[10px] font-bold uppercase tracking-wider mb-1 border border-amber-200">
+                <Sparkles className="w-3 h-3 text-amber-600" />
+                <span>Ganeshotsava Samithi 2026</span>
+              </div>
+              <h2 className="text-xl sm:text-2xl font-serif font-black text-stone-900 tracking-tight">
+                Sri Ganeshotsava 2026
+              </h2>
+              <p className="text-xs sm:text-sm font-semibold text-[#991B1B]">
+                Income &amp; Expenditure Statement &amp; Financial Ledger
+              </p>
+              <p className="text-xs text-stone-500 mt-0.5 font-medium">
+                Eldorado
+              </p>
+            </div>
+          </div>
+
+          {/* Print/PDF Header Right Side Block */}
+          <div className="hidden print:flex flex-col items-end text-right shrink-0 print-only-header py-1">
+            <span className="text-xs font-serif font-black text-amber-950 uppercase tracking-wider">
+              Financial Year 2026-27
+            </span>
+            <span className="text-[11px] font-mono font-bold text-[#991B1B]">
+              Reconciled &amp; Audited Ledger
+            </span>
+            <span className="text-[10px] text-stone-500 font-medium">
+              Eldorado
+            </span>
+          </div>
+
+          {/* Right: Quick Action Controls (Print, Excel, WhatsApp) */}
+          <div className="flex flex-wrap items-center justify-center sm:justify-end gap-2 no-print shrink-0">
             <button
-              onClick={onPrint}
-              className="bg-stone-100 hover:bg-stone-200 text-stone-800 text-xs font-bold uppercase tracking-wider px-3.5 py-2 rounded inline-flex items-center gap-1.5 transition-colors cursor-pointer border border-stone-200"
-              title="Print Income & Expenditure Statement (Admin Only)"
+              type="button"
+              onClick={async () => {
+                if (onDownloadPdf) {
+                  setIsDownloadingPdf(true);
+                  try {
+                    await onDownloadPdf();
+                  } catch (e) {
+                    console.error(e);
+                  } finally {
+                    setIsDownloadingPdf(false);
+                  }
+                } else {
+                  onPrint();
+                }
+              }}
+              disabled={isDownloadingPdf}
+              className="bg-[#991B1B] hover:bg-[#7F1D1D] text-white text-xs font-bold uppercase tracking-wider px-4 py-2.5 rounded-xl shadow-md inline-flex items-center gap-2 transition-all cursor-pointer hover:shadow-lg active:scale-95 disabled:opacity-75"
+              title="Download Full Multi-Page PDF With All Pages Included"
             >
-              <Printer className="w-3.5 h-3.5 text-[#991B1B]" />
-              <span>Print Statement</span>
+              {isDownloadingPdf ? (
+                <>
+                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <span>Saving PDF...</span>
+                </>
+              ) : (
+                <>
+                  <Download className="w-4 h-4 text-amber-300" />
+                  <span>Save PDF (All Pages)</span>
+                </>
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={onPrint}
+              className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold uppercase tracking-wider px-3.5 py-2.5 rounded-xl shadow-xs inline-flex items-center gap-1.5 transition-all cursor-pointer hover:shadow-md active:scale-95"
+              title="Print via System Print Dialog"
+            >
+              <Printer className="w-3.5 h-3.5 text-amber-100" />
+              <span>Print</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={onShareWhatsApp}
+              className="bg-[#25D366] hover:bg-[#20BA5A] text-white text-xs font-bold uppercase tracking-wider px-3.5 py-2.5 rounded-xl shadow-xs inline-flex items-center gap-1.5 transition-all cursor-pointer"
+              title="Share Summary on WhatsApp"
+            >
+              <Share2 className="w-3.5 h-3.5" />
+              <span>Share</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={onExportExcel}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold uppercase tracking-wider px-3.5 py-2.5 rounded-xl shadow-xs inline-flex items-center gap-1.5 transition-all cursor-pointer"
+              title="Download Full Excel Ledger"
+            >
+              <FileText className="w-3.5 h-3.5" />
+              <span>Excel</span>
             </button>
           </div>
-        )}
+        </div>
       </div>
 
       {/* 2. EXECUTIVE FINANCIAL KPI CARDS */}
@@ -353,10 +476,10 @@ export const StatementView: React.FC<StatementViewProps> = ({
                 <span className="text-base shrink-0">💰</span>
                 <div>
                   <span className="text-xs font-bold text-stone-800 block">
-                    Net Surplus Reserve Policy (FD)
+                    Net Surplus Reserve &amp; Fixed Deposit (FD) Policy
                   </span>
                   <p className="text-xs text-stone-600 mt-0.5 leading-relaxed font-normal">
-                    The Ganeshotsava Committee has resolved that the final Net Surplus of <strong className="font-mono text-stone-900">₹ {fmt(netBalance)}</strong> will be deposited as a <strong>Fixed Deposit (FD)</strong> in the bank. This amount is securely reserved to serve as the initial fund for the next year's <strong>Sri Ganeshotsava 2027</strong> celebrations.
+                    The Ganeshotsava Committee has resolved that the current Net Surplus of <strong className="font-mono text-stone-900">₹ {fmt(Math.abs(netBalance))}</strong> along with all pending pledged sponsorship amounts to be collected (<strong className="font-mono text-emerald-700">₹ {fmt(totalSponsorshipOutstanding)}</strong>) will be transferred as the opening fund for next year's <strong>Sri Ganeshotsava 2027</strong>. Any upcoming compliance or professional account auditing fees will be disbursed directly from this account Net Surplus, and the entire remaining net balance will be deposited into a bank <strong>Fixed Deposit (FD)</strong>.
                   </p>
                 </div>
               </div>
@@ -845,6 +968,320 @@ export const StatementView: React.FC<StatementViewProps> = ({
             {hundi.length} count(s) • {getPercent(hundiTot)}%
           </div>
         </div>
+      </div>
+
+      {/* 4. GOVERNANCE RESOLUTION — SURPLUS & FUND DEPLOYMENT POLICY */}
+      <div className="bg-gradient-to-br from-amber-50/70 via-white to-amber-50/50 border-2 border-amber-300/90 rounded-2xl p-5 sm:p-6 shadow-sm space-y-4 print-avoid-break">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-amber-200/80 pb-3">
+          <div className="flex items-center gap-2.5">
+            <span className="p-2 rounded-xl bg-amber-500 text-white shadow-xs">
+              <ShieldCheck className="w-5 h-5 text-white" />
+            </span>
+            <div>
+              <h3 className="text-sm sm:text-base font-serif font-black text-amber-950 uppercase tracking-wide">
+                Governance Resolution — Surplus &amp; Fund Deployment Policy
+              </h3>
+              <p className="text-[11px] text-amber-800 font-medium">
+                Framework for Net Surplus, pending sponsorship collections, audit fees &amp; 2027 Fixed Deposit
+              </p>
+            </div>
+          </div>
+          <div className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-300 text-[10px] font-bold uppercase tracking-wider shrink-0">
+            ✓ Resolved by Ganeshotsava Samithi 2026
+          </div>
+        </div>
+
+        {/* Financial Policy Metric Highlights */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+          <div className="bg-white/90 border border-amber-200 rounded-xl p-3 shadow-2xs">
+            <span className="text-[10px] font-bold text-stone-500 uppercase tracking-wider block">
+              1. Current Net Surplus
+            </span>
+            <span className="text-xl font-mono font-black text-[#991B1B] mt-0.5 block">
+              ₹ {fmt(Math.abs(netBalance))}
+            </span>
+            <span className="text-[10px] text-stone-500 block mt-0.5">
+              Available liquid funds in festival ledger
+            </span>
+          </div>
+
+          <div className="bg-white/90 border border-amber-200 rounded-xl p-3 shadow-2xs">
+            <span className="text-[10px] font-bold text-stone-500 uppercase tracking-wider block">
+              2. Pledged Sponsorship Outstanding
+            </span>
+            <span className="text-xl font-mono font-black text-emerald-700 mt-0.5 block">
+              ₹ {fmt(totalSponsorshipOutstanding)}
+            </span>
+            <span className="text-[10px] text-stone-500 block mt-0.5">
+              Pledged partner dues pending collection
+            </span>
+          </div>
+
+          <div className="bg-gradient-to-tr from-amber-100 to-amber-50 border border-amber-300 rounded-xl p-3 shadow-2xs">
+            <span className="text-[10px] font-bold text-amber-900 uppercase tracking-wider block">
+              3. Total Projected Reserve Corpus
+            </span>
+            <span className="text-xl font-mono font-black text-stone-900 mt-0.5 block">
+              ₹ {fmt(Math.abs(netBalance) + totalSponsorshipOutstanding)}
+            </span>
+            <span className="text-[10px] text-amber-800 font-semibold block mt-0.5">
+              Earmarked as Seed Fund for Ganeshotsava 2027
+            </span>
+          </div>
+        </div>
+
+        {/* Detailed 3-Pillar Governance Stipulations */}
+        <div className="space-y-3 pt-1 text-xs text-stone-700">
+          <div className="flex items-start gap-3 p-3 rounded-xl bg-white border border-stone-200/80">
+            <span className="w-6 h-6 rounded-full bg-amber-400 text-[#991B1B] font-bold flex items-center justify-center shrink-0 text-xs shadow-xs mt-0.5">
+              1
+            </span>
+            <div className="space-y-0.5">
+              <strong className="text-stone-900 text-xs block">
+                Transfer of Surplus &amp; Sponsorships to Next Year (Sri Ganeshotsava 2027):
+              </strong>
+              <p className="leading-relaxed text-stone-600">
+                The entire current Net Surplus of <strong className="font-mono text-stone-900">₹ {fmt(Math.abs(netBalance))}</strong> along with all outstanding pledged sponsorship contributions upon realization (<strong className="font-mono text-stone-900">₹ {fmt(totalSponsorshipOutstanding)}</strong>) is officially protected and reserved to serve as the initial seed foundation fund for the upcoming <strong>Sri Ganeshotsava 2027</strong> celebrations.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-start gap-3 p-3 rounded-xl bg-white border border-stone-200/80">
+            <span className="w-6 h-6 rounded-full bg-amber-400 text-[#991B1B] font-bold flex items-center justify-center shrink-0 text-xs shadow-xs mt-0.5">
+              2
+            </span>
+            <div className="space-y-0.5">
+              <strong className="text-stone-900 text-xs block">
+                Disbursement of Professional Auditing Fees &amp; Statutory Charges:
+              </strong>
+              <p className="leading-relaxed text-stone-600">
+                To guarantee complete institutional transparency and regulatory compliance, any mandatory professional accounting charges — including <strong>official Chartered Accountant (CA) auditing fees, regulatory filing charges, and incidental banking service charges</strong> — will be disbursed directly from this account Net Surplus prior to final fund locking.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-start gap-3 p-3 rounded-xl bg-white border border-stone-200/80">
+            <span className="w-6 h-6 rounded-full bg-amber-400 text-[#991B1B] font-bold flex items-center justify-center shrink-0 text-xs shadow-xs mt-0.5">
+              3
+            </span>
+            <div className="space-y-0.5">
+              <strong className="text-stone-900 text-xs block">
+                Security via Bank Fixed Deposit (FD):
+              </strong>
+              <p className="leading-relaxed text-stone-600">
+                Upon final settlement of all accounts and the formal signing of the audit report, the entire remaining net balance will be securely converted into a <strong>Bank Fixed Deposit (FD)</strong> under the association’s official bank account. This deposit will earn risk-free interest and remain strictly untouched until deployed for <strong>Sri Ganeshotsava 2027</strong>.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 5. COMMUNITY INQUIRIES & WHATSAPP GROUP */}
+      <div className="bg-white border-2 border-emerald-400/80 rounded-2xl p-5 sm:p-6 shadow-sm space-y-4 print-avoid-break">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-emerald-100 pb-3">
+          <div className="flex items-center gap-2.5">
+            <span className="p-2 rounded-xl bg-[#25D366] text-white shadow-xs">
+              <QrCode className="w-5 h-5 text-white" />
+            </span>
+            <div>
+              <h3 className="text-sm sm:text-base font-serif font-black text-stone-900 uppercase tracking-wide">
+                Community Inquiries, Bill Inspection &amp; WhatsApp Group
+              </h3>
+              <p className="text-[11px] text-stone-500 font-medium">
+                Scan QR code or click the WhatsApp link to connect with Ganeshotsava Samithi 2026
+              </p>
+            </div>
+          </div>
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-bold uppercase tracking-wider shrink-0">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Community Ledger</span>
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-5 items-center pt-1">
+          {/* Left Column: WhatsApp QR Code Card */}
+          <div className="md:col-span-4 flex flex-col items-center justify-center p-4 bg-emerald-50/40 border-2 border-dashed border-emerald-300 rounded-2xl text-center space-y-2.5">
+            <span className="text-[10px] font-bold text-emerald-900 uppercase tracking-widest flex items-center gap-1">
+              <span>Scan via Mobile Camera</span>
+            </span>
+
+            <a
+              href={whatsappGroupUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="block p-2 bg-white rounded-xl shadow-xs border border-emerald-200 hover:scale-105 transition-transform cursor-pointer"
+              title="Click or Scan to Join WhatsApp Devotee Group"
+            >
+              <img
+                src={qrCodeUrl}
+                alt="WhatsApp Group QR Code"
+                className="w-36 h-36 sm:w-40 sm:h-40 object-contain mx-auto"
+                loading="eager"
+              />
+            </a>
+
+            <div className="space-y-0.5">
+              <span className="text-[11px] font-bold text-stone-800 block">
+                Devotee WhatsApp Group
+              </span>
+              <span className="text-[9px] text-stone-500 block">
+                Instant updates, bill verifications &amp; announcements
+              </span>
+            </div>
+          </div>
+
+          {/* Right Column: Direct Link & Transparent Verification Guidelines */}
+          <div className="md:col-span-8 space-y-3.5 text-xs text-stone-700">
+            <div className="p-3.5 rounded-xl bg-stone-50 border border-stone-200 space-y-2">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-stone-600 block">
+                WhatsApp Group Link (Click to Open / Copy):
+              </span>
+              <div className="flex flex-wrap items-center gap-2">
+                <a
+                  href={whatsappGroupUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-mono text-[11px] sm:text-xs font-bold text-emerald-700 hover:text-emerald-800 underline break-all flex items-center gap-1"
+                >
+                  <span>{whatsappGroupUrl}</span>
+                  <ExternalLink className="w-3.5 h-3.5 shrink-0" />
+                </a>
+
+                <button
+                  type="button"
+                  onClick={handleCopyWhatsAppLink}
+                  className="no-print px-2.5 py-1 rounded-lg border border-emerald-300 bg-white hover:bg-emerald-50 text-emerald-800 font-bold text-[10px] uppercase tracking-wider inline-flex items-center gap-1 cursor-pointer transition-colors shadow-3xs"
+                >
+                  {copiedLink ? (
+                    <>
+                      <Check className="w-3 h-3 text-emerald-600" />
+                      <span>Copied</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3 h-3 text-emerald-700" />
+                      <span>Copy Link</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-2 leading-relaxed">
+              <p className="text-stone-600">
+                <strong>Resident &amp; Devotee Notice:</strong> Every voluntary donation, seva offering, and vendor disbursement is maintained with meticulous accounting records. Any resident who desires to inspect <strong>itemized vendor receipts, quotation comparisons, bank statements, or audit files</strong> is warmly encouraged to reach out to Ganeshotsava Samithi 2026 via the WhatsApp group.
+              </p>
+
+              <div className="pt-1 font-medium text-[11px]">
+                <div className="p-2.5 rounded-lg bg-emerald-50/50 border border-emerald-200/60 flex items-center justify-between">
+                  <div>
+                    <span className="text-stone-500 block text-[9px] uppercase font-bold">Coordination &amp; Accounts Body</span>
+                    <span className="font-semibold text-stone-900">Ganeshotsava Samithi 2026 • Eldorado</span>
+                  </div>
+                  <span className="text-[10px] text-emerald-800 font-bold bg-emerald-100/80 px-2.5 py-1 rounded-full border border-emerald-200">
+                    Ganeshotsava Samithi 2026
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 6. A HUMBLE NOTE OF GRATITUDE & DEVOTIONAL ACKNOWLEDGMENT FROM THE GANESHOTSAVA TEAM (WITH FULL PICTURE OF LORD SRI GANESHA) */}
+      <div className="bg-gradient-to-br from-[#FFFDF9] via-amber-50/30 to-[#FFFDF9] border-2 border-amber-400 rounded-2xl p-5 sm:p-7 shadow-sm space-y-5 print-avoid-break relative overflow-hidden">
+        {/* Decorative Top Heading */}
+        <div className="text-center space-y-1 border-b-2 border-amber-200 pb-3">
+          <span className="text-xs font-serif font-black tracking-widest text-[#991B1B] uppercase block">
+            ॥ ॐ गं गणपतये नमः ॥
+          </span>
+          <h3 className="text-lg sm:text-2xl font-serif font-black text-stone-900 tracking-tight">
+            A Humble Note of Gratitude &amp; Devotional Acknowledgment
+          </h3>
+          <p className="text-xs text-amber-800 font-serif italic">
+            Celebrating the Divine Success, Community Unity &amp; Splendour of Sri Ganeshotsava 2026
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
+          {/* Left Column: Full Picture of Lord Sri Ganesha */}
+          <div className="md:col-span-4 flex flex-col items-center justify-center text-center p-4 bg-gradient-to-b from-amber-100/60 via-white to-amber-100/40 rounded-2xl border-2 border-amber-300 shadow-2xs">
+            <div className="w-48 h-56 sm:w-52 sm:h-60 rounded-2xl overflow-hidden p-1 bg-gradient-to-tr from-amber-400 via-yellow-200 to-amber-500 shadow-md border-2 border-amber-400 mb-3 flex items-center justify-center">
+              <img
+                src={ganeshaPhotoUrl}
+                alt="Lord Sri Vighnaharta Ganesha"
+                className="w-full h-full object-cover rounded-xl filter drop-shadow-md"
+              />
+            </div>
+            <div className="space-y-0.5">
+              <h4 className="font-serif font-black text-xs text-[#991B1B] uppercase tracking-wider">
+                Lord Sri Vighnaharta Ganesha
+              </h4>
+              <p className="text-[10px] text-amber-900 font-serif italic leading-tight">
+                Sri Ganeshotsava 2026 • Festival Darshan
+              </p>
+              <p className="text-[9px] text-stone-500 font-medium pt-1">
+                Eldorado
+              </p>
+            </div>
+          </div>
+
+          {/* Right Column: Heartfelt Humble Letter */}
+          <div className="md:col-span-8 space-y-3 text-xs sm:text-[13px] text-stone-800 leading-relaxed font-normal">
+            <p className="font-serif italic text-amber-950 font-semibold text-sm">
+              Namaskara and Warm Festive Greetings to All Respected Residents, Devotees, and Families,
+            </p>
+
+            <p>
+              With the supreme blessings of <strong>Lord Sri Vighnaharta Ganesha</strong>, the <strong>Sri Ganeshotsava 2026</strong> celebrations at Eldorado were concluded with boundless spiritual devotion, grand cultural splendour, and profound community harmony. We bow our heads in humble adoration and gratitude to the Lord for filling our homes with divine energy, joy, and peace.
+            </p>
+
+            <p>
+              On behalf of the entire Ganeshotsava organizing team, we offer our deepest, heartfelt gratitude to <strong>each and every resident, family, and devotee</strong> who contributed voluntary donations, booked sacred seva offerings, and actively participated throughout all days of pooja, aartis, cultural performances, and mahaprasada distribution. Your unstinted support and enthusiastic presence formed the very heartbeat of this grand celebration.
+            </p>
+
+            <p>
+              Our most sincere and humble salutations go out to our <strong>extraordinary resident volunteers, youth teams, decoration committee, puja &amp; stage coordinators, prasadam seva volunteers, and security &amp; housekeeping staff</strong>. Working day and night behind the scenes with untiring zeal and pure selfless dedication, you ensured every devotee experienced a safe, divine, and seamless festival.
+            </p>
+
+            <p>
+              We also express our sincere appreciation to our esteemed <strong>corporate sponsors and commercial stall partners</strong> for their valued collaboration in enriching our festival grounds.
+            </p>
+
+            <div className="p-3.5 rounded-xl bg-amber-100/70 border border-amber-300 text-amber-950 space-y-1 font-serif">
+              <p className="font-bold text-center text-xs sm:text-sm text-[#991B1B]">
+                ॥ गणपती बाप्पा मोरया, पुढच्या वर्षी लवकर या ॥
+              </p>
+              <p className="text-center text-[11px] sm:text-xs text-stone-700 italic">
+                “May Lord Sri Ganesha bestow good health, boundless happiness, prosperity, and peace upon all our families. We look forward to celebrating Sri Ganeshotsava 2027 together with even greater devotion and unity!”
+              </p>
+            </div>
+
+            <div className="pt-2 flex flex-col sm:flex-row items-start sm:items-center justify-between border-t border-amber-200/80 gap-2 text-stone-600">
+              <div>
+                <span className="block font-bold text-stone-900 text-xs">
+                  Ganeshotsava Samithi 2026
+                </span>
+                <span className="block text-[11px] text-stone-500">
+                  Eldorado
+                </span>
+              </div>
+              <div className="text-left sm:text-right font-serif text-[11px] text-[#991B1B] font-bold">
+                Ganapati Bappa Morya! 🙏
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 7. PRINT ATTESTATION FOOTER */}
+      <div className="p-3.5 rounded-xl bg-stone-50 border border-stone-200 text-center text-[10px] text-stone-500 space-y-1 print-avoid-break">
+        <p className="font-semibold text-stone-700">
+          Financial Document • Sri Ganeshotsava 2026 • Eldorado
+        </p>
+        <p className="leading-tight">
+          This statement reflects reconciled accounts as recorded in the festival ledger. For complete transparency, all physical bills, payment receipts, and bank transaction proofs are preserved under committee custody and available upon request.
+        </p>
       </div>
 
     </div>

@@ -129,6 +129,8 @@ export interface AppSettings {
   customReceiptPortalUrl?: string;
   customSevaPortalUrl?: string;
   adminEmails?: string[];
+  adminVideos?: string[];
+  adminPhotos?: string[];
 }
 
 export interface AppState {

@@ -37,13 +37,36 @@
     display: none !important;
   }
   
+  html,
   body {
     background: #ffffff !important;
     color: #000000 !important;
     margin: 0 !important;
     padding: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+  }
+
+  /* Reset flex and viewport containers so they don't trap pagination to 1 page */
+  #root,
+  #mainAppView,
+  #mainAppContent {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-height: 0 !important;
+    height: auto !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    float: none !important;
   }
 
   /* When printing from receipt/invoice modal, hide all main app contents */
@@ -137,25 +160,61 @@
     display: none !important;
   }
 
-  #statement-print-target {
+  body.statement-print-active,
+  body.statement-print-active #root,
+  body.statement-print-active #mainAppView,
+  body.statement-print-active #mainAppContent {
     display: block !important;
-    visibility: visible !important;
+    position: static !important;
     width: 100% !important;
-    margin: 0 auto !important;
-    background: #ffffff !important;
+    max-width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
   }
 
-  /* Force SVG donut chart segments to print in full color on all browsers */
+  #statement-print-target {
+    display: block !important;
+    position: static !important;
+    visibility: visible !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    background: #ffffff !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Force background colors, borders, and SVGs to print in full color on all browsers */
+  #statement-print-target,
+  #statement-print-target *,
   #statement-print-target svg circle,
-  #statement-print-target svg {
+  #statement-print-target svg,
+  #statement-print-target div,
+  #statement-print-target section {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
     color-adjust: exact !important;
+    overflow: visible !important;
+  }
+
+  .print-avoid-break {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    overflow: visible !important;
   }
 
   @page {
     size: A4 portrait;
-    margin: 10mm 12mm;
+    margin: 10mm 10mm;
   }
 }
 

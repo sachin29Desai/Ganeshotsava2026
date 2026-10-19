@@ -85,10 +85,17 @@ async function startServer() {
       if (!requestOrigin && req.headers.origin) {
         requestOrigin = req.headers.origin as string;
       }
+      if (!requestOrigin && req.headers['x-forwarded-host']) {
+        const proto = (req.headers['x-forwarded-proto'] as string) || 'https';
+        requestOrigin = `${proto}://${req.headers['x-forwarded-host']}`;
+      } else if (!requestOrigin && req.headers.host) {
+        const proto = (req.headers['x-forwarded-proto'] as string) || 'https';
+        requestOrigin = `${proto}://${req.headers.host}`;
+      }
       
       // Default fallback to the public Shared App URL so other users can always access it
       if (!requestOrigin || requestOrigin.includes('localhost') || requestOrigin.includes('127.0.0.1')) {
-        requestOrigin = 'https://ais-pre-p7a3udoouklbcodg3rdaay-1225695896.asia-east1.run.app';
+        requestOrigin = process.env.SHARED_APP_URL || 'https://ais-pre-g52qlb745qhljbygjytqsi-1225695896.asia-east1.run.app';
       }
 
       // If the incoming magicLink points to localhost or private dev URL, translate it to the correct public preview host
@@ -352,8 +359,9 @@ async function startServer() {
     });
   }
 
-  app.listen(port, () => {
-    console.log(`Server is running at http://localhost:${port}`);
+  const host = '0.0.0.0';
+  app.listen(Number(port), host, () => {
+    console.log(`Server is running at http://${host}:${port}`);
   });
 }
 

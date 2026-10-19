@@ -3,6 +3,30 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <script>
+      // Suppress Vite HMR WebSocket connection errors in AI Studio iframe/preview environment
+      window.addEventListener('unhandledrejection', function(event) {
+        var reason = event.reason;
+        var msg = (reason && (reason.message || reason.stack || String(reason))) || '';
+        if (
+          msg.includes('WebSocket') ||
+          msg.includes('ws:') ||
+          msg.includes('wss:') ||
+          msg.includes('@vite/client')
+        ) {
+          event.preventDefault();
+        }
+      });
+      window.addEventListener('error', function(event) {
+        var msg = (event.message || '') + ' ' + (event.filename || '');
+        if (
+          msg.includes('WebSocket') ||
+          msg.includes('@vite/client')
+        ) {
+          event.preventDefault();
+        }
+      });
+    </script>
     <title>Ganeshotsava 2026</title>
     <link rel="icon" type="image/svg+xml" href="/lord_ganesha.svg" />
     <meta name="description" content="Eldorado Ganeshotsava 2026 Event Planner & Financial Ledger with offline snapshot sharing and self-updating storage." />

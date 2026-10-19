@@ -14,7 +14,7 @@ const __dirname = path.dirname(__filename);
 async function startServer() {
   const app = express();
   const port = process.env.PORT || 3000;
-  const isProd = process.env.NODE_ENV === 'production' || fs.existsSync(path.resolve(__dirname, 'dist'));
+  const isProd = process.env.NODE_ENV === 'production';
 
   // Body parsing middlewares
   app.use(express.json());
@@ -321,7 +321,10 @@ async function startServer() {
     console.log('Starting full-stack server in DEVELOPMENT mode...');
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        hmr: false
+      },
       appType: 'custom'
     });
     

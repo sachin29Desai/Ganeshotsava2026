@@ -228,44 +228,27 @@ export function App() {
       return 'sevas';
     }
 
-    // 3. Eldorado Kannadigara Balaga Page (In Development Route: '/homepageindevelop' and community routes)
+    // 3. Sri Ganeshotsava 2026 Financial Ledger Check (/ganeshotsava, /statement, /ledger)
     if (
-      path === '/homepageindevelop' ||
-      path.startsWith('/homepageindevelop') ||
-      path === '/balaga' ||
-      path === '/events' ||
-      path.startsWith('/events') ||
-      path === '/gallery' ||
-      path === '/announcements' ||
-      path === '/archive' ||
-      path === '/about' ||
-      path === '/contact' ||
-      path === '/login' ||
-      path.includes('homepageindevelop') ||
-      params.get('view') === 'homepageindevelop' ||
-      params.get('page') === 'homepageindevelop' ||
-      params.get('route') === 'homepageindevelop' ||
-      params.has('homepageindevelop') ||
-      hash === '#homepageindevelop' ||
-      hash.startsWith('#/events') ||
-      hash.startsWith('#/gallery') ||
-      hash.startsWith('#/announcements') ||
-      hash.startsWith('#/archive') ||
-      hash.startsWith('#/about') ||
-      hash.startsWith('#/contact') ||
-      hash.startsWith('#/login')
+      path === '/ganeshotsava' ||
+      path === '/ganeshotsava2026' ||
+      path === '/statement' ||
+      path === '/ledger' ||
+      params.get('view') === 'statement' ||
+      params.get('view') === 'ledger' ||
+      hash === '#statement'
     ) {
-      return 'homepageindevelop';
+      return 'ganeshotsava';
     }
 
-    // 4. Default Landing Page: Sri Ganeshotsava 2026 ('/' or any other route)
-    return 'ganeshotsava';
+    // 4. Default Landing Page: Eldorado Kannadigara Balaga Society Home Page ('/')
+    return 'homepageindevelop';
   };
 
   const [currentRoute, setCurrentRoute] = useState<AppRoute>(getInitialRoute);
 
   const navigateToGaneshotsava = () => {
-    window.history.pushState({}, '', '/');
+    window.history.pushState({}, '', '/statement');
     setCurrentRoute('ganeshotsava');
   };
 
@@ -1648,24 +1631,8 @@ export function App() {
     );
   }
 
-  // 3. ELDORADO KANNADIGARA BALAGA PAGE (IN DEVELOPMENT: '/homepageindevelop')
-  // Requirement: "the balaga page should only be visible to admin"
+  // 3. ELDORADO KANNADIGARA BALAGA SOCIETY HOME PAGE ('/')
   if (currentRoute === 'homepageindevelop') {
-    if (!isAuthenticated || !isAdmin) {
-      return (
-        <AdminGateForBalaga
-          settings={settings}
-          onSuccess={() => {
-            setIsAuthenticated(true);
-            setUserRole('admin');
-            sessionStorage.setItem('eg_committee_auth', 'true');
-            sessionStorage.setItem('eg_user_role', 'admin');
-          }}
-          onBackToGaneshotsava={navigateToGaneshotsava}
-        />
-      );
-    }
-
     return (
       <CommunityHomeView
         settings={settings}
@@ -1887,6 +1854,16 @@ export function App() {
                 >
                   <Video className="w-3.5 h-3.5 text-[#991B1B]" />
                   <span>Festival Video</span>
+                </button>
+
+                {/* Return to Balaga Society Home Page */}
+                <button
+                  onClick={navigateToBalagaInDev}
+                  className="px-3 py-1 rounded-full font-bold uppercase tracking-wider inline-flex items-center gap-1.5 transition-all cursor-pointer text-[11px] bg-amber-400 text-stone-950 hover:bg-amber-300 shadow-xs"
+                  title="Return to Balaga Society Home Page"
+                >
+                  <Home className="w-3.5 h-3.5 text-[#991B1B]" />
+                  <span>Balaga Home</span>
                 </button>
 
                 {/* Button to request details on detailed data */}

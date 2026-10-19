@@ -73,46 +73,46 @@ export interface FAQItem {
 
 export const COMMUNITY_EVENTS: CommunityEvent[] = [
   {
-    id: 'ganesh-chaturthi-2026',
-    slug: 'ganesha-chaturthi-2026',
-    title: 'Ganesha Chaturthi 2026',
-    kannadaTitle: 'ಶ್ರೀ ವಿನಾಯಕ ಚತುರ್ಥಿ ಮಹೋತ್ಸವ ೨೦೨೬',
-    festival: 'Ganesha Chaturthi',
-    theme: 'ಭಕ್ತಿ, ಸಮೃದ್ಧಿ ಮತ್ತು ಕನ್ನಡಿಗರ ಒಗ್ಗಟ್ಟು — Devotion, Prosperity & Balaga Unity',
-    startDate: '2026-09-13',
-    endDate: '2026-09-18',
-    dateDisplay: '13th to 18th of this month',
-    venue: 'Clubhouse Grand Arena, Brigade El Dorado',
-    status: 'ongoing',
-    volunteersCount: 45,
-    actsCount: 12,
-    year: 2026,
-    posterImage: 'https://images.unsplash.com/photo-1567591370504-20a2e7c4f4a3?auto=format&fit=crop&w=1200&q=80',
-    description:
-      'Grand 5-day Sri Ganesha Chaturthi celebration by Eldorado Kannadigara Balaga with Vedic poojas, daily devotee sevas, cultural evenings, community Mahaprasada, and eco-friendly Visarjana.',
-    detailsOverview:
-      'Running from the 13th to the 18th of this month at the Clubhouse Grand Arena, bringing together all residents of Eldorado with 45 active volunteers and 12 registered cultural performances, daily Anna Santharpane, and sacred rituals.'
-  },
-  {
     id: 'rajyotsava-2026',
     slug: 'rajyotsava-2026',
     title: 'Karnataka Rajyotsava 2026',
     kannadaTitle: 'ಕನ್ನಡ ರಾಜ್ಯೋತ್ಸವ ೨೦೨೬',
     festival: 'Karnataka Rajyotsava',
     theme: 'ಸಿರಿಗನ್ನಡಂ ಗೆಲ್ಗೆ, ಸಿರಿಗನ್ನಡಂ ಬಾಳ್ಗೆ — Kannada Siri Sampada & Cultural Pride',
-    startDate: '2026-11-01',
-    endDate: '2026-11-01',
-    dateDisplay: 'November 1, 2026',
-    venue: 'Central Amphitheatre, Brigade El Dorado',
+    startDate: '2026-11-21',
+    endDate: '2026-11-22',
+    dateDisplay: '21st & 22nd November 2026',
+    venue: 'Grand Amphitheatre & Plaza, Brigade El Dorado',
     status: 'upcoming',
-    volunteersCount: 38,
-    actsCount: 18,
+    volunteersCount: 42,
+    actsCount: 20,
     year: 2026,
     posterImage: 'https://images.unsplash.com/photo-1532375810709-75b1da00537c?auto=format&fit=crop&w=1200&q=80',
     description:
-      'Celebration of Karnataka statehood day with red-and-yellow Karnataka flag hoisting, Naadageethe "Jaya Bharatha Jananiya Tanujathe", Dollu Kunitha folk arts, Kannada poetry recitations, and traditional festive delights.',
+      'Upcoming 2-day celebration of Karnataka statehood day with red-and-yellow Karnataka flag hoisting, Naadageethe "Jaya Bharatha Jananiya Tanujathe", Dollu Kunitha folk arts, Kannada poetry, cultural stage shows, and traditional festive delights.',
     detailsOverview:
-      'Join us in honoring Karnataka’s glorious cultural tapestry, Kannada language, literature, and folklore. Features an all-ages cultural lineup, authentic Karnataka cuisine stalls, and honoring local achievers.'
+      'Join us on 21st and 22nd November 2026 in honoring Karnataka’s glorious cultural tapestry, Kannada language, literature, and folklore. Features all-ages cultural performances, traditional cuisine, and volunteer sign-ups.'
+  },
+  {
+    id: 'ganesh-chaturthi-2026',
+    slug: 'ganesha-chaturthi-2026',
+    title: 'Sri Ganeshotsava 2026',
+    kannadaTitle: 'ಶ್ರೀ ಗಣೇಶೋತ್ಸವ ಮಹೋತ್ಸವ ೨೦೨೬',
+    festival: 'Ganesha Chaturthi',
+    theme: 'ಭಕ್ತಿ, ಸಮೃದ್ಧಿ ಮತ್ತು ಕನ್ನಡಿಗರ ಒಗ್ಗಟ್ಟು — Devotion, Prosperity & Balaga Unity',
+    startDate: '2026-08-23',
+    endDate: '2026-09-20',
+    dateDisplay: '23 Aug 2026 – 20 Sep 2026',
+    venue: 'Amphitheatre & Clubhouse Arena, Brigade El Dorado',
+    status: 'archived',
+    volunteersCount: 48,
+    actsCount: 16,
+    year: 2026,
+    posterImage: 'https://images.unsplash.com/photo-1567591370504-20a2e7c4f4a3?auto=format&fit=crop&w=1200&q=80',
+    description:
+      'Concluded grand Sri Ganesha Chaturthi celebration (23-08-2026 to 20-09-2026). The complete Income & Expenditure Statement, Financial Balance Sheet, and itemized accounts are published for public view and audit.',
+    detailsOverview:
+      'Total Collections: ₹ 5,90,322 | Total Expenses Incurred: ₹ 5,19,804 | Net Closing Surplus: ₹ 79,976.04 deposited in Fixed Deposit (FD) for Ganeshotsava 2027. Pending sponsor receivables: ₹ 65,000.'
   },
   {
     id: 'rajyotsava-2025',

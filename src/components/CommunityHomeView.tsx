@@ -61,6 +61,8 @@ import { BalagaNominateModal } from './balaga/BalagaNominateModal';
 import { BalagaPolicyModals } from './balaga/BalagaPolicyModals';
 import { BalagaLoginView } from './balaga/BalagaLoginView';
 import { BalagaEventDetailView } from './balaga/BalagaEventDetailView';
+import { UpcomingEventView } from './balaga/UpcomingEventView';
+import { PastEventView } from './balaga/PastEventView';
 import { GaneshaFestivalVideoShowcase } from './GaneshaFestivalVideoShowcase';
 import { auth, onAuthStateChanged, firebaseSignOut, type User } from '../lib/firebase';
 
@@ -219,8 +221,8 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
   useEffect(() => {
     const targetDateStr =
       countdownTarget === 'rajyotsava'
-        ? '2026-11-01T08:30:00+05:30'
-        : '2026-09-13T09:00:00+05:30';
+        ? '2026-11-21T08:30:00+05:30'
+        : '2026-08-23T09:00:00+05:30';
     const target = new Date(targetDateStr).getTime();
 
     const updateTimer = () => {
@@ -722,8 +724,8 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
                     </h3>
                     <p className={`text-xs ${isDark ? 'text-stone-400' : 'text-stone-500'}`}>
                       {countdownTarget === 'rajyotsava'
-                        ? 'November 1, 2026 • Grand Flag Hoisting & Kannada Cultural Acts'
-                        : '13th to 18th of this month • 5-Day Vedic Mahotsava at Clubhouse Grand Arena'}
+                        ? '21st & 22nd November 2026 • Grand Flag Hoisting, Naadageethe & Cultural Stage Shows'
+                        : 'Concluded Event (23 Aug – 20 Sep 2026) • Financial Ledger & Audit Uploaded'}
                     </p>
 
                     {/* Switch target toggle */}
@@ -737,7 +739,7 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
                             : 'bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-400'
                         }`}
                       >
-                        Rajyotsava (Nov 1)
+                        Rajyotsava (Nov 21 &amp; 22)
                       </button>
                       <button
                         onClick={() => setCountdownTarget('ganesha')}
@@ -747,7 +749,7 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
                             : 'bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-400'
                         }`}
                       >
-                        Ganesha Chaturthi
+                        Ganesha Chaturthi (Concluded)
                       </button>
                     </div>
                   </div>
@@ -779,20 +781,19 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
               </div>
             </section>
 
-            {/* BANNER SECTION: "Ganesha Chaturthi 2026 is Here!" */}
+            {/* BANNER SECTION: "Sri Ganeshotsava 2026 Concluded — Income & Expenditure Statement" */}
             <section className="max-w-6xl mx-auto px-4 sm:px-6">
-              <div className="relative rounded-3xl p-6 sm:p-8 border-2 border-red-600 bg-gradient-to-r from-red-600 via-red-600 to-amber-600 text-white shadow-lg overflow-hidden flex flex-col md:flex-row items-center justify-between gap-6">
+              <div className="relative rounded-3xl p-6 sm:p-8 border-2 border-red-600 bg-gradient-to-r from-red-800 via-red-900 to-amber-900 text-white shadow-lg overflow-hidden flex flex-col md:flex-row items-center justify-between gap-6">
                 <div className="space-y-2 max-w-xl text-center md:text-left">
                   <div className="inline-flex items-center gap-1.5 bg-yellow-400 text-stone-950 text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full tracking-wider shadow-xs">
-                    <Flame className="w-3.5 h-3.5 text-red-700 fill-red-700" />
-                    <span>Ongoing Celebration</span>
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700" />
+                    <span>Concluded Past Event</span>
                   </div>
                   <h3 className="text-2xl sm:text-3xl font-serif font-black text-yellow-300">
-                    Ganesha Chaturthi 2026 is Here!
+                    Sri Ganeshotsava 2026 — Income &amp; Expenditure Statement
                   </h3>
                   <p className="text-xs sm:text-sm text-yellow-100 leading-relaxed">
-                    Our festive lineup is running from the 13th to the 18th of this month at the Clubhouse
-                    Grand Arena! Join daily poojas, Anna Santharpane, and evening cultural programs.
+                    Total Collections: <strong>₹ 5,90,322</strong> | Total Expenses Incurred: <strong>₹ 5,19,804</strong> | Net Closing Surplus: <strong>₹ 79,976.04</strong> deposited in FD for Ganeshotsava 2027.
                   </p>
                 </div>
 
@@ -801,7 +802,8 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
                     onClick={() => handleNavigateTab('event-detail', 'ganesh-chaturthi-2026')}
                     className="px-6 py-3 rounded-xl bg-yellow-400 hover:bg-yellow-300 text-stone-950 font-black text-xs sm:text-sm shadow-md transition-all cursor-pointer inline-flex items-center gap-2 active:scale-95"
                   >
-                    <span>Join the Festivities</span>
+                    <FileText className="w-4 h-4 text-red-800" />
+                    <span>View Financial Statement &amp; Recap</span>
                     <ArrowRight className="w-4 h-4" />
                   </button>
                 </div>
@@ -2098,17 +2100,25 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
             PAGE 8: DEEP EVENT DETAIL VIEW ('/events/:slug')
            ======================================================== */}
         {activeTab === 'event-detail' && (
-          <BalagaEventDetailView
-            event={selectedEvent}
-            onBackToEvents={() => handleNavigateTab('events')}
-            onOpenContribute={() => setContributeModalOpen(true)}
-            onOpenVolunteer={() => {
-              if (!currentUser) setAuthModalOpen(true);
-              else setVolunteerModalOpen(true);
-            }}
-            onOpenNominate={() => setNominateModalOpen(true)}
-            isDark={isDark}
-          />
+          selectedEvent.status === 'upcoming' ? (
+            <UpcomingEventView
+              event={selectedEvent}
+              onBackToEvents={() => handleNavigateTab('events')}
+              onOpenVolunteer={() => {
+                if (!currentUser) setAuthModalOpen(true);
+                else setVolunteerModalOpen(true);
+              }}
+              onOpenNominate={() => setNominateModalOpen(true)}
+              isDark={isDark}
+            />
+          ) : (
+            <PastEventView
+              event={selectedEvent}
+              onBackToEvents={() => handleNavigateTab('events')}
+              onNavigateToFinancialStatement={onNavigateToGaneshotsava}
+              isDark={isDark}
+            />
+          )
         )}
       </main>
 

@@ -88,11 +88,11 @@ export const BalagaAuthModal: React.FC<BalagaAuthModalProps> = ({
 
         {/* Brand */}
         <div className="text-center space-y-2 mb-6 mt-1">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-red-600 to-amber-500 p-2 mx-auto flex items-center justify-center shadow-xs">
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-red-600 to-amber-500 p-0.5 mx-auto flex items-center justify-center shadow-xs overflow-hidden">
             <img
-              src="/lord_ganesha.svg"
-              alt="Logo"
-              className="w-full h-full object-contain filter invert"
+              src="/bhuvaneshwari_kannada_flag.jpg"
+              alt="Goddess Bhuvaneshwari Devi & Kannada Flag"
+              className="w-full h-full object-cover rounded-lg"
               referrerPolicy="no-referrer"
             />
           </div>

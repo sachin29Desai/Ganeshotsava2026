@@ -356,9 +356,9 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
             ) : (
               <div className="w-9 h-9 rounded-full bg-amber-400 text-[#991B1B] flex items-center justify-center p-0.5 shadow-inner shrink-0 overflow-hidden border border-amber-300">
                 <img
-                  src="/lord_ganesha.svg"
-                  alt="Lord Sri Ganesha"
-                  className="w-full h-full object-contain rounded-full"
+                  src="/bhuvaneshwari_kannada_flag.jpg"
+                  alt="Goddess Bhuvaneshwari Devi & Kannada Flag"
+                  className="w-full h-full object-cover rounded-full"
                   referrerPolicy="no-referrer"
                 />
               </div>

@@ -42,7 +42,7 @@ import {
   Layers,
   Compass
 } from 'lucide-react';
-import { AppSettings, Contribution } from '../types';
+import { AppSettings, Contribution, UserRole, UserProfile } from '../types';
 import { fmt } from '../utils/helpers';
 import {
   COMMUNITY_EVENTS,
@@ -55,14 +55,14 @@ import {
   AnnouncementItem,
   GalleryPhoto
 } from '../data/communityData';
+import { getStoredEvents, classifyEvents } from '../utils/eventUtils';
 import { BalagaAuthModal } from './balaga/BalagaAuthModal';
 import { BalagaVolunteerModal } from './balaga/BalagaVolunteerModal';
 import { BalagaNominateModal } from './balaga/BalagaNominateModal';
 import { BalagaPolicyModals } from './balaga/BalagaPolicyModals';
 import { BalagaLoginView } from './balaga/BalagaLoginView';
 import { BalagaEventDetailView } from './balaga/BalagaEventDetailView';
-import { UpcomingEventView } from './balaga/UpcomingEventView';
-import { PastEventView } from './balaga/PastEventView';
+import { AdminEventHighlightsManager } from './balaga/AdminEventHighlightsManager';
 import { GaneshaFestivalVideoShowcase } from './GaneshaFestivalVideoShowcase';
 import { auth, onAuthStateChanged, firebaseSignOut, type User } from '../lib/firebase';
 
@@ -72,6 +72,8 @@ interface CommunityHomeViewProps {
   onNavigateToGaneshotsava: () => void;
   onNavigateToReceipts: () => void;
   isAdmin?: boolean;
+  userRole?: UserRole | null;
+  userProfile?: UserProfile | null;
   onUpdateSettings?: (cfg: AppSettings) => void;
 }
 
@@ -92,8 +94,19 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
   onNavigateToGaneshotsava,
   onNavigateToReceipts,
   isAdmin = false,
+  userRole,
+  userProfile,
   onUpdateSettings
 }) => {
+  // All events list and auto-classified events
+  const [allEvents, setAllEvents] = useState<CommunityEvent[]>(() => getStoredEvents());
+
+  const refreshEventData = () => {
+    setAllEvents(getStoredEvents());
+  };
+
+  const { currentEvents, upcomingEvents, pastEvents } = classifyEvents(allEvents);
+
   // Theme state synced with localStorage
   const [isDark, setIsDark] = useState<boolean>(() => {
     try {
@@ -123,7 +136,7 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
     }
     if (path.includes('/events/') || hash.includes('/events/')) {
       const parts = path.split('/events/');
-      const slug = parts[1] || 'ganesh-chaturthi-2026';
+      const slug = parts[1] || 'rajyotsava-2026';
       return { tab: 'event-detail', eventId: slug.replace(/\/$/, '') };
     }
     if (path.includes('/events') || hash.includes('events')) {
@@ -150,7 +163,7 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
   const initialRouteInfo = getInitialTabFromLocation();
   const [activeTab, setActiveTab] = useState<CommunityPageTab>(initialRouteInfo.tab);
   const [selectedEventId, setSelectedEventId] = useState<string>(
-    initialRouteInfo.eventId || 'ganesh-chaturthi-2026'
+    initialRouteInfo.eventId || upcomingEvents[0]?.id || 'rajyotsava-2026'
   );
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -197,6 +210,7 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
   const [volunteerModalOpen, setVolunteerModalOpen] = useState(false);
   const [nominateModalOpen, setNominateModalOpen] = useState(false);
   const [contributeModalOpen, setContributeModalOpen] = useState(false);
+  const [highlightsManagerOpen, setHighlightsManagerOpen] = useState(false);
   const [lightboxPhoto, setLightboxPhoto] = useState<GalleryPhoto | null>(null);
   const [policyModal, setPolicyModal] = useState<'privacy' | 'terms' | 'refund' | 'cookies' | null>(null);
 
@@ -214,7 +228,7 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
 
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  // Countdown state: Targeted at Karnataka Rajyotsava 2026 on Nov 1, with toggle for Ganesha Chaturthi
+  // Countdown state: Targeted at Karnataka Rajyotsava 2026 on Nov 21
   const [countdownTarget, setCountdownTarget] = useState<'rajyotsava' | 'ganesha'>('rajyotsava');
   const [countdown, setCountdown] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
 
@@ -252,7 +266,7 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
     let newPath = '/homepageindevelop';
     if (tab === 'home') newPath = '/homepageindevelop';
     else if (tab === 'events') newPath = '/events';
-    else if (tab === 'event-detail') newPath = `/events/${eventId || selectedEventId || 'ganesh-chaturthi-2026'}`;
+    else if (tab === 'event-detail') newPath = `/events/${eventId || selectedEventId || 'rajyotsava-2026'}`;
     else if (tab === 'gallery') newPath = '/gallery';
     else if (tab === 'announcements') newPath = '/announcements';
     else if (tab === 'archive') newPath = '/archive';
@@ -289,8 +303,8 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
   };
 
   const selectedEvent =
-    COMMUNITY_EVENTS.find((e) => e.id === selectedEventId || e.slug === selectedEventId) ||
-    COMMUNITY_EVENTS[0];
+    allEvents.find((e) => e.id === selectedEventId || e.slug === selectedEventId) ||
+    allEvents[0];
 
   // Gallery filtered
   const filteredPhotos = GALLERY_PHOTOS.filter((p) => {
@@ -313,19 +327,19 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
     return true;
   });
 
-  // Events filtered
-  const filteredEvents = COMMUNITY_EVENTS.filter((e) => {
+  // Events filtered for /events hub tab
+  const filteredEvents = allEvents.filter((e) => {
     if (eventFilterStatus !== 'all' && e.status !== eventFilterStatus) return false;
     if (eventFilterFestival !== 'all' && e.festival !== eventFilterFestival) return false;
     return true;
   });
 
   const isCurrentAdmin =
-    !!currentUser?.email &&
-    allowedEmails.map((e) => e.toLowerCase()).includes(currentUser.email.toLowerCase());
+    isAdmin ||
+    (!!currentUser?.email &&
+      allowedEmails.map((e) => e.toLowerCase()).includes(currentUser.email.toLowerCase()));
 
   // If viewing standalone Authentication Route ('/login' or tab === 'login')
-  // Bypasses global header/footer wrappers as required!
   if (activeTab === 'login') {
     return (
       <BalagaLoginView
@@ -375,6 +389,16 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
           </div>
 
           <div className="flex items-center gap-3">
+            {isCurrentAdmin && (
+              <button
+                onClick={() => setHighlightsManagerOpen(true)}
+                className="bg-red-700 hover:bg-red-800 text-yellow-300 text-xs font-bold px-2.5 py-1 rounded-md transition-colors inline-flex items-center gap-1 cursor-pointer border border-yellow-400"
+                title="Manage Events & Photo Highlights"
+              >
+                <ImageIcon className="w-3.5 h-3.5 text-yellow-300" />
+                <span>Manage Events &amp; Photos</span>
+              </button>
+            )}
             <button
               onClick={onNavigateToReceipts}
               className="text-stone-300 hover:text-white text-xs font-medium inline-flex items-center gap-1 cursor-pointer"
@@ -387,7 +411,7 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
               onClick={onNavigateToGaneshotsava}
               className="bg-amber-400 hover:bg-amber-300 text-stone-950 text-xs font-bold px-3 py-1 rounded-md transition-colors inline-flex items-center gap-1 cursor-pointer"
             >
-              <span>← Back to Ganeshotsava 2026</span>
+              <span>Ganeshotsava Ledger</span>
             </button>
           </div>
         </div>
@@ -405,11 +429,11 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
             onClick={() => handleNavigateTab('home')}
             className="flex items-center gap-3 cursor-pointer group select-none"
           >
-            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-red-600 via-red-600 to-amber-500 p-1.5 flex items-center justify-center shadow-xs border-2 border-yellow-400 group-hover:scale-105 transition-transform">
+            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-red-600 via-red-600 to-amber-500 p-1 flex items-center justify-center shadow-xs border-2 border-yellow-400 group-hover:scale-105 transition-transform overflow-hidden">
               <img
-                src="/lord_ganesha.svg"
-                alt="Lord Sri Ganesha"
-                className="w-full h-full object-contain filter drop-shadow-sm invert"
+                src="/bhuvaneshwari_kannada_flag.jpg"
+                alt="Goddess Bhuvaneshwari Devi with Kannada Flag"
+                className="w-full h-full object-cover rounded-lg"
                 referrerPolicy="no-referrer"
               />
             </div>
@@ -433,7 +457,7 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
           <nav className="hidden lg:flex items-center gap-1 text-sm font-semibold">
             {[
               { id: 'home', label: 'Home' },
-              { id: 'events', label: 'Events', badge: 'Live' },
+              { id: 'events', label: 'Events Hub' },
               { id: 'gallery', label: 'Gallery' },
               { id: 'announcements', label: 'Announcements' },
               { id: 'archive', label: 'Archive' },
@@ -454,16 +478,12 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
                 }`}
               >
                 <span>{link.label}</span>
-                {link.badge && (
-                  <span className="w-2 h-2 rounded-full bg-red-600 animate-ping inline-block" />
-                )}
               </button>
             ))}
           </nav>
 
-          {/* Header Controls: Theme Switcher, Account, Volunteer Button, Mobile Hamburger */}
+          {/* Header Controls */}
           <div className="flex items-center gap-2.5">
-            {/* Theme Toggle Button */}
             <button
               onClick={toggleTheme}
               className={`p-2 rounded-xl border transition-colors cursor-pointer ${
@@ -472,12 +492,10 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
                   : 'bg-stone-50 border-stone-200 text-stone-600 hover:bg-stone-100 hover:text-red-700'
               }`}
               title={isDark ? 'Switch to Light Theme' : 'Switch to Dark Theme'}
-              aria-label="Toggle Theme"
             >
               {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </button>
 
-            {/* Authentication Button / User profile */}
             {currentUser ? (
               <div className="relative group">
                 <button
@@ -511,14 +529,10 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
               </button>
             )}
 
-            {/* Primary Action Button: Volunteer */}
             <button
               onClick={() => {
-                if (!currentUser) {
-                  setAuthModalOpen(true);
-                } else {
-                  setVolunteerModalOpen(true);
-                }
+                if (!currentUser) setAuthModalOpen(true);
+                else setVolunteerModalOpen(true);
               }}
               className="px-3.5 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-yellow-300 font-bold text-xs shadow-xs transition-colors cursor-pointer inline-flex items-center gap-1.5 border border-yellow-400"
             >
@@ -527,7 +541,6 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
               <span className="sm:hidden">Join</span>
             </button>
 
-            {/* Mobile Hamburger Toggle */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className={`lg:hidden p-2 rounded-xl border transition-colors cursor-pointer ${
@@ -535,7 +548,6 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
                   ? 'bg-stone-800 border-stone-700 text-white'
                   : 'bg-stone-50 border-stone-200 text-stone-700'
               }`}
-              aria-label="Toggle navigation menu"
             >
               {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
@@ -576,17 +588,6 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
                 <ChevronRight className="w-4 h-4 text-stone-400" />
               </button>
             ))}
-
-            <div className="pt-2 border-t border-stone-200 dark:border-stone-800 flex items-center justify-between">
-              <span className="text-xs font-medium text-stone-400">Appearance Theme</span>
-              <button
-                onClick={toggleTheme}
-                className="text-xs font-bold px-3 py-1 rounded-lg border flex items-center gap-1.5 cursor-pointer"
-              >
-                {isDark ? <Sun className="w-3.5 h-3.5 text-yellow-400" /> : <Moon className="w-3.5 h-3.5 text-stone-700" />}
-                <span>{isDark ? 'Dark Mode' : 'Light Mode'}</span>
-              </button>
-            </div>
           </div>
         )}
       </header>
@@ -607,19 +608,16 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
                     : 'bg-gradient-to-br from-white via-[#FFFDF7] to-amber-50/60 border-stone-200'
                 }`}
               >
-                {/* Background decorative watermark */}
-                <div className="absolute right-0 top-0 bottom-0 opacity-5 pointer-events-none select-none flex items-center justify-end pr-6">
-                  <img src="/lord_ganesha.svg" alt="" className="h-96 w-auto object-contain filter invert" />
+                <div className="absolute right-0 top-0 bottom-0 opacity-10 pointer-events-none select-none flex items-center justify-end pr-6">
+                  <img src="/bhuvaneshwari_kannada_flag.jpg" alt="Goddess Bhuvaneshwari Devi & Kannada Flag" className="h-96 w-auto object-contain rounded-2xl opacity-25" />
                 </div>
 
                 <div className="relative z-10 max-w-3xl space-y-5">
-                  {/* Badge */}
                   <div className="inline-flex items-center gap-2 bg-red-600 text-yellow-300 text-[11px] font-bold uppercase tracking-wider px-3.5 py-1 rounded-full shadow-xs border border-yellow-400">
                     <Flag className="w-3.5 h-3.5" />
                     <span>ಸಿರಿಗನ್ನಡಂ ಗೆಲ್ಗೆ! ಸಿರಿಗನ್ನಡಂ ಬಾಳ್ಗೆ!</span>
                   </div>
 
-                  {/* Main Large H1 */}
                   <div>
                     <h1 className="text-3xl sm:text-5xl lg:text-6xl font-serif font-black tracking-tight text-stone-900 dark:text-stone-100 leading-tight">
                       Kannadigara Balaga: Celebrating Our Heritage.
@@ -629,14 +627,12 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
                     </span>
                   </div>
 
-                  {/* Sub-headline */}
                   <p className={`text-sm sm:text-base leading-relaxed ${isDark ? 'text-stone-300' : 'text-stone-600'}`}>
                     A volunteer-driven community forum of Eldorado residents dedicated to
                     preserving and celebrating Kannada language, folk traditions, Vedic poojas, and grand
                     annual festivals in our neighborhood.
                   </p>
 
-                  {/* Primary CTAs */}
                   <div className="pt-2 flex flex-wrap items-center gap-3 justify-center sm:justify-start">
                     <button
                       onClick={() => setContributeModalOpen(true)}
@@ -655,7 +651,7 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
                       }`}
                     >
                       <Compass className="w-4 h-4 text-red-600" />
-                      <span>Explore Events</span>
+                      <span>Explore Events Hub</span>
                     </button>
 
                     <button
@@ -673,6 +669,183 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
               </div>
             </section>
 
+            {/* WIDGET 1: CURRENT / ONGOING EVENT BANNER (If active) */}
+            {currentEvents.length > 0 && (
+              <section className="max-w-6xl mx-auto px-4 sm:px-6">
+                <div className="rounded-3xl border-2 border-red-600 bg-gradient-to-r from-red-600 via-red-700 to-amber-600 text-white p-6 sm:p-8 shadow-lg space-y-4 animate-pulse">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="space-y-1">
+                      <div className="inline-flex items-center gap-1.5 bg-yellow-400 text-stone-950 text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full">
+                        <Sparkles className="w-3.5 h-3.5" />
+                        <span>Ongoing Celebration</span>
+                      </div>
+                      <h3 className="text-2xl sm:text-3xl font-serif font-black text-yellow-300">
+                        {currentEvents[0].title}
+                      </h3>
+                      <p className="text-xs sm:text-sm text-yellow-100">
+                        {currentEvents[0].dateDisplay} • {currentEvents[0].venue}
+                      </p>
+                    </div>
+
+                    <button
+                      onClick={() => handleNavigateTab('event-detail', currentEvents[0].id)}
+                      className="px-6 py-3 rounded-xl bg-yellow-400 hover:bg-yellow-300 text-stone-950 font-black text-xs sm:text-sm shadow-md transition-all cursor-pointer inline-flex items-center gap-2 shrink-0"
+                    >
+                      <span>Join Live Event</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {/* WIDGET 2: UPCOMING EVENT WIDGET (Next upcoming celebration, e.g. Rajyotsava 2026) */}
+            {upcomingEvents.length > 0 && (
+              <section className="max-w-6xl mx-auto px-4 sm:px-6">
+                <div
+                  className={`rounded-3xl border-2 p-6 sm:p-8 shadow-sm transition-all ${
+                    isDark ? 'bg-stone-900 border-stone-800' : 'bg-white border-stone-200'
+                  }`}
+                >
+                  <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+                    <div className="space-y-3 max-w-2xl">
+                      <div className="inline-flex items-center gap-2 bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-[11px] font-bold uppercase px-3 py-1 rounded-full border border-emerald-500/40">
+                        <Clock className="w-3.5 h-3.5" />
+                        <span>Next Upcoming Event</span>
+                      </div>
+
+                      <div>
+                        <h3 className="text-2xl sm:text-3xl font-serif font-black text-red-700 dark:text-red-400">
+                          {upcomingEvents[0].title}
+                        </h3>
+                        <span className="text-sm font-serif font-bold text-amber-800 dark:text-yellow-400 block mt-0.5">
+                          {upcomingEvents[0].kannadaTitle}
+                        </span>
+                      </div>
+
+                      <p className={`text-xs sm:text-sm leading-relaxed ${isDark ? 'text-stone-300' : 'text-stone-600'}`}>
+                        {upcomingEvents[0].description}
+                      </p>
+
+                      <div className="flex flex-wrap items-center gap-4 text-xs text-stone-500 pt-1">
+                        <div className="flex items-center gap-1.5">
+                          <Calendar className="w-3.5 h-3.5 text-red-600 shrink-0" />
+                          <span>{upcomingEvents[0].dateDisplay}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <MapPin className="w-3.5 h-3.5 text-red-600 shrink-0" />
+                          <span>{upcomingEvents[0].venue}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="shrink-0 space-y-3 text-center md:text-right">
+                      {/* Countdown Display */}
+                      <div className="p-3 rounded-2xl bg-amber-50 dark:bg-stone-800 border border-amber-200 dark:border-stone-700">
+                        <span className="text-[10px] font-bold text-amber-800 dark:text-yellow-300 uppercase block mb-1">
+                          Countdown to Event
+                        </span>
+                        <div className="flex items-center gap-2 text-red-600 font-serif font-black text-xl justify-center">
+                          <span>{countdown.days}d</span>
+                          <span>:</span>
+                          <span>{countdown.hours}h</span>
+                          <span>:</span>
+                          <span>{countdown.minutes}m</span>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => handleNavigateTab('event-detail', upcomingEvents[0].id)}
+                        className="px-5 py-3 rounded-xl bg-red-600 hover:bg-red-700 text-yellow-300 font-bold text-xs shadow-xs transition-colors cursor-pointer inline-flex items-center gap-2 w-full justify-center"
+                      >
+                        <span>View Upcoming Details</span>
+                        <ArrowRight className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {/* WIDGET 3: PAST EVENTS CAROUSEL / GRID (With Zero Duplication) */}
+            <section className="max-w-6xl mx-auto px-4 sm:px-6">
+              <div className="flex items-center justify-between gap-4 mb-6">
+                <div>
+                  <span className="text-xs font-bold text-red-600 uppercase tracking-wider">
+                    Concluded Past Celebrations
+                  </span>
+                  <h3 className="text-2xl font-serif font-black">Event Highlights</h3>
+                </div>
+                <button
+                  onClick={() => handleNavigateTab('archive')}
+                  className="text-xs font-bold text-red-600 hover:underline inline-flex items-center gap-1 cursor-pointer"
+                >
+                  <span>View Full Archive</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {pastEvents.slice(0, 2).map((evt) => (
+                  <div
+                    key={evt.id}
+                    onClick={() => handleNavigateTab('event-detail', evt.id)}
+                    className={`rounded-3xl border-2 hover:border-red-600 overflow-hidden shadow-xs hover:shadow-md transition-all cursor-pointer flex flex-col justify-between ${
+                      isDark ? 'bg-stone-900 border-stone-800' : 'bg-white border-stone-200'
+                    }`}
+                  >
+                    <div className="p-6 space-y-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[10px] font-bold uppercase tracking-wider bg-stone-200 dark:bg-stone-800 text-stone-700 dark:text-stone-300 px-2.5 py-0.5 rounded">
+                          {evt.festival}
+                        </span>
+                        <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-800 flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                          <span>Concluded</span>
+                        </span>
+                      </div>
+
+                      <div>
+                        <h4 className="text-xl font-serif font-black text-stone-900 dark:text-stone-100">
+                          {evt.title}
+                        </h4>
+                        <span className="text-xs font-serif font-bold text-amber-800 dark:text-yellow-400 block mt-0.5">
+                          {evt.kannadaTitle}
+                        </span>
+                      </div>
+
+                      <p className={`text-xs line-clamp-2 leading-relaxed ${isDark ? 'text-stone-300' : 'text-stone-600'}`}>
+                        {evt.description}
+                      </p>
+
+                      <div className="pt-2 space-y-1.5 text-xs text-stone-500 border-t border-stone-100 dark:border-stone-800">
+                        <div className="flex items-center gap-2">
+                          <Calendar className="w-3.5 h-3.5 text-red-600 shrink-0" />
+                          <span>{evt.dateDisplay}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <MapPin className="w-3.5 h-3.5 text-red-600 shrink-0" />
+                          <span className="truncate">{evt.venue}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div
+                      className={`px-6 py-3.5 border-t flex items-center justify-between gap-2 ${
+                        isDark ? 'bg-stone-950 border-stone-800' : 'bg-amber-50/50 border-stone-100'
+                      }`}
+                    >
+                      <span className="text-xs font-bold text-red-600 dark:text-yellow-400 inline-flex items-center gap-1">
+                        <FileText className="w-3.5 h-3.5" />
+                        <span>Highlights &amp; Recap</span>
+                      </span>
+                      <ArrowRight className="w-4 h-4 text-stone-400 group-hover:text-red-600" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+
             {/* SRI GANESHOTSAVA FESTIVAL DARSHAN VIDEO */}
             <section className="max-w-6xl mx-auto px-4 sm:px-6">
               <div className="space-y-3">
@@ -680,14 +853,11 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
                   <div>
                     <div className="inline-flex items-center gap-1.5 bg-red-600 text-yellow-300 text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full border border-yellow-400">
                       <Sparkles className="w-3 h-3" />
-                      <span>ಶ್ರೀ ಗಣೇಶ ಮಹಾದರ್ಶನ • Live Darshan Video</span>
+                      <span>ಶ್ರೀ ಗಣೇಶ ಮಹಾದರ್ಶನ • Festival Video Showcase</span>
                     </div>
                     <h2 className="text-xl sm:text-2xl font-serif font-black tracking-tight text-stone-900 dark:text-stone-100 mt-1">
-                      Sri Ganeshotsava Festival Darshan &amp; Alankara
+                      Sri Ganesha Festival Darshan &amp; Alankara
                     </h2>
-                    <p className={`text-xs ${isDark ? 'text-stone-400' : 'text-stone-600'}`}>
-                      Watch the divine celebration video of Sri Vighnaharta Ganesha in the grand royal pandal decorated with peacock, sacred cow, and fresh marigold garlands.
-                    </p>
                   </div>
                 </div>
                 <GaneshaFestivalVideoShowcase
@@ -698,119 +868,7 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
               </div>
             </section>
 
-            {/* LIVE INTERACTIVE COUNTDOWN COMPONENT (Targeting Karnataka Rajyotsava Nov 1st) */}
-            <section className="max-w-6xl mx-auto px-4 sm:px-6">
-              <div
-                className={`p-6 sm:p-8 rounded-3xl border-2 shadow-xs transition-all ${
-                  isDark ? 'bg-stone-900 border-stone-800 text-stone-100' : 'bg-white border-stone-200 text-stone-900'
-                }`}
-              >
-                <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-                  {/* Countdown Header */}
-                  <div className="space-y-1.5 text-center md:text-left">
-                    <div className="inline-flex items-center gap-1.5 bg-yellow-400/20 text-red-600 dark:text-yellow-400 text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full">
-                      <Clock className="w-3.5 h-3.5" />
-                      <span>
-                        {countdownTarget === 'rajyotsava'
-                          ? 'Upcoming Festival Countdown'
-                          : 'Live Festival Countdown'}
-                      </span>
-                    </div>
-
-                    <h3 className="text-xl sm:text-2xl font-serif font-black">
-                      {countdownTarget === 'rajyotsava'
-                        ? 'Karnataka Rajyotsava 2026'
-                        : 'Sri Ganesha Chaturthi 2026'}
-                    </h3>
-                    <p className={`text-xs ${isDark ? 'text-stone-400' : 'text-stone-500'}`}>
-                      {countdownTarget === 'rajyotsava'
-                        ? '21st & 22nd November 2026 • Grand Flag Hoisting, Naadageethe & Cultural Stage Shows'
-                        : 'Concluded Event (23 Aug – 20 Sep 2026) • Financial Ledger & Audit Uploaded'}
-                    </p>
-
-                    {/* Switch target toggle */}
-                    <div className="pt-2 flex items-center gap-2 justify-center md:justify-start">
-                      <span className="text-[11px] text-stone-400">Switch target:</span>
-                      <button
-                        onClick={() => setCountdownTarget('rajyotsava')}
-                        className={`text-[11px] px-2.5 py-0.5 rounded-md font-bold transition-colors cursor-pointer ${
-                          countdownTarget === 'rajyotsava'
-                            ? 'bg-red-600 text-yellow-300'
-                            : 'bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-400'
-                        }`}
-                      >
-                        Rajyotsava (Nov 21 &amp; 22)
-                      </button>
-                      <button
-                        onClick={() => setCountdownTarget('ganesha')}
-                        className={`text-[11px] px-2.5 py-0.5 rounded-md font-bold transition-colors cursor-pointer ${
-                          countdownTarget === 'ganesha'
-                            ? 'bg-red-600 text-yellow-300'
-                            : 'bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-400'
-                        }`}
-                      >
-                        Ganesha Chaturthi (Concluded)
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Dynamic Metric Tickers */}
-                  <div className="grid grid-cols-4 gap-3 text-center shrink-0">
-                    {[
-                      { label: 'Days', val: countdown.days },
-                      { label: 'Hours', val: countdown.hours },
-                      { label: 'Minutes', val: countdown.minutes },
-                      { label: 'Seconds', val: countdown.seconds }
-                    ].map((item, i) => (
-                      <div
-                        key={i}
-                        className={`p-3 sm:p-4 rounded-2xl border min-w-[64px] sm:min-w-[80px] shadow-xs ${
-                          isDark ? 'bg-stone-800/80 border-stone-700' : 'bg-stone-50 border-stone-200'
-                        }`}
-                      >
-                        <span className="text-2xl sm:text-3xl font-serif font-black text-red-600 block leading-none mb-1">
-                          {String(item.val).padStart(2, '0')}
-                        </span>
-                        <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-stone-500">
-                          {item.label}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </section>
-
-            {/* BANNER SECTION: "Sri Ganeshotsava 2026 Concluded — Income & Expenditure Statement" */}
-            <section className="max-w-6xl mx-auto px-4 sm:px-6">
-              <div className="relative rounded-3xl p-6 sm:p-8 border-2 border-red-600 bg-gradient-to-r from-red-800 via-red-900 to-amber-900 text-white shadow-lg overflow-hidden flex flex-col md:flex-row items-center justify-between gap-6">
-                <div className="space-y-2 max-w-xl text-center md:text-left">
-                  <div className="inline-flex items-center gap-1.5 bg-yellow-400 text-stone-950 text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full tracking-wider shadow-xs">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700" />
-                    <span>Concluded Past Event</span>
-                  </div>
-                  <h3 className="text-2xl sm:text-3xl font-serif font-black text-yellow-300">
-                    Sri Ganeshotsava 2026 — Income &amp; Expenditure Statement
-                  </h3>
-                  <p className="text-xs sm:text-sm text-yellow-100 leading-relaxed">
-                    Total Collections: <strong>₹ 5,90,322</strong> | Total Expenses Incurred: <strong>₹ 5,19,804</strong> | Net Closing Surplus: <strong>₹ 79,976.04</strong> deposited in FD for Ganeshotsava 2027.
-                  </p>
-                </div>
-
-                <div className="shrink-0 flex items-center gap-3">
-                  <button
-                    onClick={() => handleNavigateTab('event-detail', 'ganesh-chaturthi-2026')}
-                    className="px-6 py-3 rounded-xl bg-yellow-400 hover:bg-yellow-300 text-stone-950 font-black text-xs sm:text-sm shadow-md transition-all cursor-pointer inline-flex items-center gap-2 active:scale-95"
-                  >
-                    <FileText className="w-4 h-4 text-red-800" />
-                    <span>View Financial Statement &amp; Recap</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            </section>
-
-            {/* STATISTICS COUNTER GRID (3-Year Momentum Track Record) */}
+            {/* STATISTICS COUNTER GRID */}
             <section className="max-w-6xl mx-auto px-4 sm:px-6">
               <div className="text-center max-w-2xl mx-auto mb-8 space-y-2">
                 <span className="text-xs font-bold text-red-600 uppercase tracking-wider">
@@ -819,13 +877,9 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
                 <h3 className="text-2xl sm:text-3xl font-serif font-black">
                   Built on Devotion, Culture &amp; Resident Unity
                 </h3>
-                <p className={`text-xs sm:text-sm ${isDark ? 'text-stone-400' : 'text-stone-600'}`}>
-                  Celebrating together since our inaugural year 2024 with 100% voluntary participation and
-                  transparent accounting.
-                </p>
               </div>
 
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div
                   className={`p-5 rounded-2xl border-2 text-center shadow-xs ${
                     isDark ? 'bg-stone-900 border-red-600' : 'bg-white border-red-600'
@@ -847,7 +901,7 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
                     1
                   </span>
                   <span className="text-xs font-semibold block">Upcoming Mega Event</span>
-                  <span className="text-[11px] text-stone-500">Rajyotsava 2026 (Nov 1)</span>
+                  <span className="text-[11px] text-stone-500">Rajyotsava 2026</span>
                 </div>
 
                 <div
@@ -860,246 +914,6 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
                   </span>
                   <span className="text-xs font-semibold block">Active Volunteers</span>
                   <span className="text-[11px] text-stone-500">Residents giving seva</span>
-                </div>
-
-                <div
-                  className={`p-5 rounded-2xl border-2 text-center shadow-xs ${
-                    isDark ? 'bg-stone-900 border-yellow-400' : 'bg-white border-yellow-400'
-                  }`}
-                >
-                  <span className="text-3xl sm:text-4xl font-black font-serif text-emerald-600 block mb-1">
-                    100%
-                  </span>
-                  <span className="text-xs font-semibold block">Transparent Receipts</span>
-                  <span className="text-[11px] text-stone-500">Every rupee accounted</span>
-                </div>
-              </div>
-            </section>
-
-            {/* EVENT TEASER: Preview Card for "Ganesha Chaturthi 2026" */}
-            <section className="max-w-6xl mx-auto px-4 sm:px-6">
-              <div className="flex items-center justify-between gap-4 mb-6">
-                <div>
-                  <span className="text-xs font-bold text-red-600 uppercase tracking-wider">
-                    Featured Celebration
-                  </span>
-                  <h3 className="text-2xl font-serif font-black">Festival Preview</h3>
-                </div>
-                <button
-                  onClick={() => handleNavigateTab('events')}
-                  className="text-xs font-bold text-red-600 hover:underline inline-flex items-center gap-1 cursor-pointer"
-                >
-                  <span>All celebrations</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
-
-              <div
-                className={`rounded-3xl border-2 overflow-hidden shadow-xs hover:border-red-600 transition-all ${
-                  isDark ? 'bg-stone-900 border-stone-800' : 'bg-white border-stone-200'
-                }`}
-              >
-                <div className="p-6 sm:p-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-                  <div className="space-y-3 max-w-2xl">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-bold uppercase tracking-wider bg-red-600 text-yellow-300 px-2.5 py-0.5 rounded shadow-xs">
-                        Ganesha Chaturthi
-                      </span>
-                      <span className="text-[10px] font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/50 px-2 py-0.5 rounded border border-red-200 dark:border-red-800">
-                        ● Ongoing
-                      </span>
-                    </div>
-
-                    <div>
-                      <h4 className="text-2xl font-serif font-black text-red-700 dark:text-red-400">
-                        Ganesha Chaturthi 2026
-                      </h4>
-                      <span className="text-sm font-serif font-bold text-amber-800 dark:text-yellow-400 block mt-0.5">
-                        ಶ್ರೀ ವಿನಾಯಕ ಚತುರ್ಥಿ ಮಹೋತ್ಸವ ೨೦೨೬
-                      </span>
-                    </div>
-
-                    <p className={`text-xs sm:text-sm leading-relaxed ${isDark ? 'text-stone-300' : 'text-stone-600'}`}>
-                      13th to 18th of this month | Clubhouse Grand Arena | 45 volunteers, 12 cultural acts.
-                      Grand 5-day celebration with daily Mahaprasada Anna Santharpane and Vedic poojas.
-                    </p>
-
-                    <div className="flex flex-wrap items-center gap-4 text-xs text-stone-500 pt-1">
-                      <div className="flex items-center gap-1.5">
-                        <Calendar className="w-3.5 h-3.5 text-red-600 shrink-0" />
-                        <span>13th to 18th of this month</span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <MapPin className="w-3.5 h-3.5 text-red-600 shrink-0" />
-                        <span>Clubhouse Grand Arena</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="shrink-0">
-                    <button
-                      onClick={() => handleNavigateTab('event-detail', 'ganesh-chaturthi-2026')}
-                      className="px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-yellow-300 font-bold text-xs shadow-xs transition-colors cursor-pointer inline-flex items-center gap-1.5"
-                    >
-                      <span>Explore Festival Details</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </section>
-
-            {/* LATEST ANNOUNCEMENT SNAPSHOT: "Grand Ganesha Visarjana & Cultural Night Planning" */}
-            <section className="max-w-6xl mx-auto px-4 sm:px-6">
-              <div className="flex items-center justify-between gap-4 mb-6">
-                <div>
-                  <span className="text-xs font-bold text-red-600 uppercase tracking-wider">
-                    Official Bulletin
-                  </span>
-                  <h3 className="text-2xl font-serif font-black">Latest Announcement</h3>
-                </div>
-                <button
-                  onClick={() => handleNavigateTab('announcements')}
-                  className="text-xs font-bold text-red-600 hover:underline inline-flex items-center gap-1 cursor-pointer"
-                >
-                  <span>View All Bulletins</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
-
-              <div
-                className={`rounded-3xl border-2 p-6 sm:p-8 space-y-4 shadow-xs ${
-                  isDark ? 'bg-stone-900 border-stone-800' : 'bg-white border-stone-200'
-                }`}
-              >
-                <div className="flex items-center justify-between gap-2 border-b pb-3 border-stone-100 dark:border-stone-800">
-                  <span className="text-[10px] font-bold uppercase tracking-wider bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-yellow-300 px-2.5 py-0.5 rounded">
-                    Cultural &amp; Event Notice
-                  </span>
-                  <span className="text-xs text-stone-400">10 Sep 2026</span>
-                </div>
-
-                <div>
-                  <h4 className="text-xl font-serif font-black text-red-700 dark:text-red-400">
-                    Grand Ganesha Visarjana &amp; Cultural Night Planning
-                  </h4>
-                  <span className="text-xs font-serif font-bold text-amber-800 dark:text-yellow-400 block mt-0.5">
-                    ಮಹಾ ಗಣೇಶ ವಿಸರ್ಜನೆ ಹಾಗೂ ಸಾಂಸ್ಕೃತಿಕ ಸಂಜೆ ಸಿದ್ಧತೆಗಳು
-                  </span>
-                </div>
-
-                <div
-                  className={`text-xs sm:text-sm leading-relaxed p-4 rounded-2xl border font-sans whitespace-pre-line ${
-                    isDark
-                      ? 'bg-stone-800/60 border-stone-700 text-stone-200'
-                      : 'bg-amber-50/60 border-amber-200 text-stone-800'
-                  }`}
-                >
-                  The grand immersion procession (Visarjana Shobhayatre) for Sri Ganeshotsava 2026 will
-                  commence on the final evening. Special Chende drums, floral decoration squad, and eco-pond
-                  immersion are arranged within the premises. Residents are invited to join the farewell
-                  bhajans and maha mangalarathi.
-                </div>
-
-                <div className="flex items-center justify-between pt-2">
-                  <span className="text-xs text-stone-400">— Kannadigara Balaga Committee</span>
-                  <button
-                    onClick={() => handleNavigateTab('announcements')}
-                    className="text-xs font-bold text-red-600 hover:underline inline-flex items-center gap-1 cursor-pointer"
-                  >
-                    <span>Read complete notice</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-            </section>
-
-            {/* PAST CELEBRATIONS GRID (Visual Archiving Links) */}
-            <section className="max-w-6xl mx-auto px-4 sm:px-6">
-              <div className="flex items-center justify-between gap-4 mb-6">
-                <div>
-                  <span className="text-xs font-bold text-red-600 uppercase tracking-wider">
-                    Our 2-Year Heritage
-                  </span>
-                  <h3 className="text-2xl font-serif font-black">
-                    Past Celebrations (2025 &amp; 2024)
-                  </h3>
-                  <p className={`text-xs ${isDark ? 'text-stone-400' : 'text-stone-500'}`}>
-                    Sri Ganesha Chaturthi and Karnataka Rajyotsava across our inaugural two seasons.
-                  </p>
-                </div>
-                <button
-                  onClick={() => handleNavigateTab('archive')}
-                  className="text-xs font-bold text-red-600 hover:underline inline-flex items-center gap-1 cursor-pointer"
-                >
-                  <span>Full Archive</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div
-                  onClick={() => handleNavigateTab('archive')}
-                  className={`p-4 rounded-2xl border-2 hover:border-red-600 transition-colors cursor-pointer shadow-xs space-y-2 ${
-                    isDark ? 'bg-stone-900 border-stone-800' : 'bg-white border-stone-200'
-                  }`}
-                >
-                  <div className="flex items-center justify-between text-[10px] font-bold">
-                    <span className="bg-red-50 dark:bg-red-950/60 text-red-800 dark:text-red-300 px-1.5 py-0.5 rounded">
-                      2025
-                    </span>
-                    <span className="text-stone-400">01 Nov</span>
-                  </div>
-                  <h5 className="text-sm font-serif font-bold">Karnataka Rajyotsava 2025</h5>
-                  <p className="text-xs text-stone-500">Amphitheatre • Flag Hoisting &amp; 16 acts</p>
-                </div>
-
-                <div
-                  onClick={() => handleNavigateTab('archive')}
-                  className={`p-4 rounded-2xl border-2 hover:border-red-600 transition-colors cursor-pointer shadow-xs space-y-2 ${
-                    isDark ? 'bg-stone-900 border-stone-800' : 'bg-white border-stone-200'
-                  }`}
-                >
-                  <div className="flex items-center justify-between text-[10px] font-bold">
-                    <span className="bg-yellow-100 dark:bg-yellow-950/60 text-yellow-900 dark:text-yellow-300 px-1.5 py-0.5 rounded">
-                      2025
-                    </span>
-                    <span className="text-stone-400">27-31 Aug</span>
-                  </div>
-                  <h5 className="text-sm font-serif font-bold">Ganesha Chaturthi 2025</h5>
-                  <p className="text-xs text-stone-500">5 Days • 45 volunteers • 310 contributors</p>
-                </div>
-
-                <div
-                  onClick={() => handleNavigateTab('archive')}
-                  className={`p-4 rounded-2xl border-2 hover:border-red-600 transition-colors cursor-pointer shadow-xs space-y-2 ${
-                    isDark ? 'bg-stone-900 border-stone-800' : 'bg-white border-stone-200'
-                  }`}
-                >
-                  <div className="flex items-center justify-between text-[10px] font-bold">
-                    <span className="bg-red-50 dark:bg-red-950/60 text-red-800 dark:text-red-300 px-1.5 py-0.5 rounded">
-                      2024
-                    </span>
-                    <span className="text-stone-400">01 Nov</span>
-                  </div>
-                  <h5 className="text-sm font-serif font-bold">Karnataka Rajyotsava 2024</h5>
-                  <p className="text-xs text-stone-500">Inaugural Rajyotsava • Folk songs &amp; quiz</p>
-                </div>
-
-                <div
-                  onClick={() => handleNavigateTab('archive')}
-                  className={`p-4 rounded-2xl border-2 hover:border-red-600 transition-colors cursor-pointer shadow-xs space-y-2 ${
-                    isDark ? 'bg-stone-900 border-stone-800' : 'bg-white border-stone-200'
-                  }`}
-                >
-                  <div className="flex items-center justify-between text-[10px] font-bold">
-                    <span className="bg-yellow-100 dark:bg-yellow-950/60 text-yellow-900 dark:text-yellow-300 px-1.5 py-0.5 rounded">
-                      2024
-                    </span>
-                    <span className="text-stone-400">07-11 Sep</span>
-                  </div>
-                  <h5 className="text-sm font-serif font-bold">Ganesha Chaturthi 2024</h5>
-                  <p className="text-xs text-stone-500">First historic celebration • Foundation year</p>
                 </div>
               </div>
             </section>
@@ -1127,21 +941,21 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
             {/* Status Counter Tabs */}
             <div className="flex flex-wrap items-center gap-2 border-b pb-4 border-stone-200 dark:border-stone-800 text-xs font-bold">
               {[
-                { id: 'all', label: 'All', count: COMMUNITY_EVENTS.length },
+                { id: 'all', label: 'All Events', count: allEvents.length },
                 {
                   id: 'ongoing',
-                  label: 'Ongoing / Live: 1',
-                  count: COMMUNITY_EVENTS.filter((e) => e.status === 'ongoing').length
+                  label: `Ongoing: ${currentEvents.length}`,
+                  count: currentEvents.length
                 },
                 {
                   id: 'upcoming',
-                  label: 'Upcoming: 1',
-                  count: COMMUNITY_EVENTS.filter((e) => e.status === 'upcoming').length
+                  label: `Upcoming: ${upcomingEvents.length}`,
+                  count: upcomingEvents.length
                 },
                 {
                   id: 'archived',
-                  label: 'Archived: 4',
-                  count: COMMUNITY_EVENTS.filter((e) => e.status === 'archived').length
+                  label: `Archived: ${pastEvents.length}`,
+                  count: pastEvents.length
                 }
               ].map((tab) => (
                 <button
@@ -1156,26 +970,6 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
                   }`}
                 >
                   <span>{tab.label}</span>
-                </button>
-              ))}
-            </div>
-
-            {/* Tag Filters */}
-            <div className="flex items-center gap-2 flex-wrap text-xs">
-              <span className="text-stone-400 font-semibold">Filter by Festival:</span>
-              {['all', 'Ganesha Chaturthi', 'Karnataka Rajyotsava'].map((fest) => (
-                <button
-                  key={fest}
-                  onClick={() => setEventFilterFestival(fest)}
-                  className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors cursor-pointer ${
-                    eventFilterFestival === fest
-                      ? 'bg-yellow-400 text-stone-950 font-bold'
-                      : isDark
-                      ? 'bg-stone-900 text-stone-400 border border-stone-800 hover:text-white'
-                      : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
-                  }`}
-                >
-                  {fest === 'all' ? 'All Festivals' : fest}
                 </button>
               ))}
             </div>
@@ -1218,9 +1012,6 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
                       <span className="text-xs font-serif font-bold text-amber-800 dark:text-yellow-400 block mt-0.5">
                         {evt.kannadaTitle}
                       </span>
-                      <p className="text-xs text-amber-900 dark:text-stone-400 font-medium italic mt-1">
-                        {evt.theme}
-                      </p>
                     </div>
 
                     <p className={`text-xs leading-relaxed ${isDark ? 'text-stone-300' : 'text-stone-600'}`}>
@@ -1248,21 +1039,11 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
                       isDark ? 'bg-stone-950 border-stone-800' : 'bg-stone-50 border-stone-100'
                     }`}
                   >
-                    <div className="flex items-center gap-2 text-xs text-stone-500">
-                      <span>
-                        <strong className="text-stone-800 dark:text-stone-200">{evt.volunteersCount}</strong> vols
-                      </span>
-                      <span>•</span>
-                      <span>
-                        <strong className="text-stone-800 dark:text-stone-200">{evt.actsCount}</strong> acts
-                      </span>
-                    </div>
-
                     <button
                       onClick={() => handleNavigateTab('event-detail', evt.slug || evt.id)}
-                      className="px-3.5 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-yellow-300 font-bold text-xs transition-colors cursor-pointer inline-flex items-center gap-1 shadow-xs"
+                      className="px-3.5 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-yellow-300 font-bold text-xs transition-colors cursor-pointer inline-flex items-center gap-1 shadow-xs ml-auto"
                     >
-                      <span>View Details</span>
+                      <span>View Event Details</span>
                       <ArrowRight className="w-3 h-3" />
                     </button>
                   </div>
@@ -1284,61 +1065,8 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
               <h2 className="text-3xl sm:text-4xl font-serif font-black">
                 Vaibhava Gallery
               </h2>
-              <p className={`text-sm max-w-2xl ${isDark ? 'text-stone-400' : 'text-stone-600'}`}>
-                Capturing moments of Kannada pride, traditional attire, and festival rituals through the
-                years.
-              </p>
             </div>
 
-            {/* Multi-dimensional Filter Bar */}
-            <div
-              className={`flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4 ${
-                isDark ? 'border-stone-800' : 'border-stone-200'
-              }`}
-            >
-              {/* Chronological filter row */}
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-stone-400">Year:</span>
-                {['all', '2026', '2025', '2024'].map((yr) => (
-                  <button
-                    key={yr}
-                    onClick={() => setGalleryYear(yr)}
-                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
-                      galleryYear === yr
-                        ? 'bg-red-600 text-yellow-300 shadow-xs'
-                        : isDark
-                        ? 'bg-stone-900 border border-stone-800 text-stone-300 hover:bg-stone-800'
-                        : 'bg-white border border-stone-200 text-stone-600 hover:bg-stone-50'
-                    }`}
-                  >
-                    {yr === 'all' ? 'All years' : yr}
-                  </button>
-                ))}
-              </div>
-
-              {/* Festival dropdown / select element */}
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-stone-400">Celebration:</span>
-                <select
-                  value={galleryCelebration}
-                  onChange={(e) => setGalleryCelebration(e.target.value)}
-                  className={`text-xs px-3 py-1.5 rounded-xl border outline-none font-semibold ${
-                    isDark
-                      ? 'bg-stone-900 border-stone-700 text-stone-200 focus:border-red-500'
-                      : 'bg-white border-stone-200 text-stone-800 focus:border-red-600'
-                  }`}
-                >
-                  <option value="all">All celebrations</option>
-                  <option value="Ganesha Chaturthi 2026">Ganesha Chaturthi 2026</option>
-                  <option value="Ganesha Chaturthi 2025">Ganesha Chaturthi 2025</option>
-                  <option value="Karnataka Rajyotsava 2025">Karnataka Rajyotsava 2025</option>
-                  <option value="Ganesha Chaturthi 2024">Ganesha Chaturthi 2024</option>
-                  <option value="Karnataka Rajyotsava 2024">Karnataka Rajyotsava 2024</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Photo Grid Layout */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
               {filteredPhotos.map((photo) => (
                 <div
@@ -1355,72 +1083,19 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                       loading="lazy"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-3">
-                      <span className="text-[10px] font-bold text-yellow-300 uppercase tracking-wider">
-                        {photo.performanceType || photo.celebration}
-                      </span>
-                      <span className="text-white text-xs font-serif font-bold">{photo.title}</span>
-                    </div>
-                    <span className="absolute top-2 left-2 text-[10px] font-bold bg-black/70 text-white px-2 py-0.5 rounded backdrop-blur-xs">
-                      {photo.year}
-                    </span>
                   </div>
 
                   <div className="p-4 space-y-1">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-bold truncate text-stone-900 dark:text-stone-100">
-                        {photo.title}
-                      </span>
-                      <span className="text-stone-400 shrink-0 ml-1">{photo.celebration}</span>
-                    </div>
+                    <span className="font-bold text-xs block text-stone-900 dark:text-stone-100 truncate">
+                      {photo.title}
+                    </span>
                     {photo.caption && (
-                      <p className="text-[11px] text-stone-500 line-clamp-2 leading-relaxed">
-                        {photo.caption}
-                      </p>
+                      <p className="text-[11px] text-stone-500 line-clamp-2">{photo.caption}</p>
                     )}
                   </div>
                 </div>
               ))}
             </div>
-
-            {/* Lightbox Modal */}
-            {lightboxPhoto && (
-              <div
-                className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm"
-                onClick={() => setLightboxPhoto(null)}
-              >
-                <div
-                  className="max-w-3xl w-full bg-stone-900 rounded-3xl overflow-hidden border-2 border-red-600 shadow-2xl relative animate-in fade-in"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <button
-                    onClick={() => setLightboxPhoto(null)}
-                    className="absolute top-3 right-3 p-2 bg-black/60 text-white rounded-full hover:bg-red-600 transition-colors cursor-pointer z-10"
-                    aria-label="Close photo"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                  <img
-                    src={lightboxPhoto.imageUrl}
-                    alt={lightboxPhoto.title}
-                    className="w-full max-h-[70vh] object-contain bg-black"
-                  />
-                  <div className="p-5 text-white space-y-1">
-                    <div className="flex items-center justify-between">
-                      <h4 className="font-serif font-bold text-base text-yellow-300">
-                        {lightboxPhoto.title}
-                      </h4>
-                      <span className="text-xs bg-red-600 px-2 py-0.5 rounded font-bold">
-                        {lightboxPhoto.celebration} ({lightboxPhoto.year})
-                      </span>
-                    </div>
-                    {lightboxPhoto.caption && (
-                      <p className="text-xs text-stone-300">{lightboxPhoto.caption}</p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
         )}
 
@@ -1436,53 +1111,8 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
               <h2 className="text-3xl sm:text-4xl font-serif font-black">
                 Balaga Updates
               </h2>
-              <p className={`text-sm ${isDark ? 'text-stone-400' : 'text-stone-600'}`}>
-                Latest notes from the cultural committee for Sri Ganesha Chaturthi, Karnataka Rajyotsava,
-                volunteer rosters, and audited receipts.
-              </p>
             </div>
 
-            {/* Filter Pills & Search */}
-            <div
-              className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-4 ${
-                isDark ? 'border-stone-800' : 'border-stone-200'
-              }`}
-            >
-              <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 text-xs">
-                {['all', 'event', 'cultural', 'volunteer', 'finance'].map((cat) => (
-                  <button
-                    key={cat}
-                    onClick={() => setAnnouncementCategory(cat)}
-                    className={`px-3.5 py-1.5 rounded-xl font-bold capitalize transition-colors cursor-pointer ${
-                      announcementCategory === cat
-                        ? 'bg-red-600 text-yellow-300 shadow-xs'
-                        : isDark
-                        ? 'bg-stone-900 border border-stone-800 text-stone-300 hover:bg-stone-800'
-                        : 'bg-white border border-stone-200 text-stone-600 hover:bg-stone-50'
-                    }`}
-                  >
-                    {cat === 'all' ? 'All Updates' : cat}
-                  </button>
-                ))}
-              </div>
-
-              <div className="relative w-full sm:w-64">
-                <Search className="w-3.5 h-3.5 text-stone-400 absolute left-3 top-2.5" />
-                <input
-                  type="text"
-                  placeholder="Search notices..."
-                  value={announcementSearch}
-                  onChange={(e) => setAnnouncementSearch(e.target.value)}
-                  className={`w-full text-xs pl-8 pr-3 py-1.5 rounded-xl border outline-none ${
-                    isDark
-                      ? 'bg-stone-900 border-stone-800 text-white focus:border-red-500'
-                      : 'bg-white border-stone-200 text-stone-900 focus:border-red-600'
-                  }`}
-                />
-              </div>
-            </div>
-
-            {/* Stream Feed List */}
             <div className="space-y-6">
               {filteredAnnouncements.map((ann) => (
                 <article
@@ -1491,36 +1121,10 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
                     isDark ? 'bg-stone-900 border-stone-800' : 'bg-white border-stone-200'
                   }`}
                 >
-                  <div
-                    className={`flex flex-wrap items-center justify-between gap-2 border-b pb-3 ${
-                      isDark ? 'border-stone-800' : 'border-stone-100'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-bold uppercase tracking-wider bg-red-600 text-yellow-300 px-2.5 py-0.5 rounded">
-                        {ann.category}
-                      </span>
-                      {ann.important && (
-                        <span className="text-[10px] font-bold uppercase bg-amber-400 text-stone-950 px-2 py-0.5 rounded">
-                          Priority
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1.5 text-xs text-stone-400">
-                      <Clock className="w-3.5 h-3.5" />
-                      <span>{ann.date}</span>
-                    </div>
-                  </div>
-
                   <div>
                     <h3 className="text-xl sm:text-2xl font-serif font-black text-red-700 dark:text-red-400">
                       {ann.title}
                     </h3>
-                    {ann.kannadaTitle && (
-                      <span className="text-sm font-serif font-bold text-amber-800 dark:text-yellow-400 block mt-1">
-                        {ann.kannadaTitle}
-                      </span>
-                    )}
                   </div>
 
                   <div
@@ -1531,42 +1135,6 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
                     }`}
                   >
                     {ann.content}
-                  </div>
-
-                  <div className="pt-2 flex items-center justify-between flex-wrap gap-2 text-xs">
-                    <span className="text-stone-400 italic">
-                      {ann.closingSignature || '— Kannadigara Balaga Committee'}
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => handleCopyText(ann.content, ann.id)}
-                        className={`px-3 py-1.5 rounded-xl border text-xs font-semibold inline-flex items-center gap-1 transition-colors cursor-pointer ${
-                          isDark
-                            ? 'border-stone-700 text-stone-300 hover:bg-stone-800'
-                            : 'border-stone-200 text-stone-700 hover:bg-stone-50'
-                        }`}
-                      >
-                        {copiedId === ann.id ? (
-                          <>
-                            <Check className="w-3.5 h-3.5 text-emerald-600" />
-                            <span className="text-emerald-600">Copied</span>
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="w-3.5 h-3.5 text-stone-400" />
-                            <span>Copy</span>
-                          </>
-                        )}
-                      </button>
-
-                      <button
-                        onClick={() => handleShareWhatsApp(ann.title, ann.summary)}
-                        className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold inline-flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
-                      >
-                        <PhoneCall className="w-3.5 h-3.5" />
-                        <span>Share on WhatsApp</span>
-                      </button>
-                    </div>
                   </div>
                 </article>
               ))}
@@ -1586,27 +1154,13 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
               <h2 className="text-3xl sm:text-4xl font-serif font-black">
                 Our Journey &amp; Transparency Ledger
               </h2>
-              <p className={`text-sm max-w-2xl leading-relaxed ${isDark ? 'text-stone-400' : 'text-stone-600'}`}>
-                Detailed history of our community gatherings over 2026, 2025, and 2024 alongside an audited,
-                transparent asset map.
-              </p>
             </div>
 
             <div className="space-y-10">
               {ARCHIVE_RECORDS.map((yrRecord) => (
                 <div key={yrRecord.year} className="space-y-4">
                   <div className="flex items-center justify-between border-b-2 border-red-600 pb-2">
-                    <div className="flex items-center gap-3">
-                      <h3 className="text-2xl font-serif font-black">{yrRecord.year}</h3>
-                      {yrRecord.milestoneTag && (
-                        <span className="text-xs font-bold text-red-600 dark:text-yellow-300 bg-red-50 dark:bg-red-950/60 px-2.5 py-0.5 rounded-full border border-red-200 dark:border-red-800">
-                          {yrRecord.milestoneTag}
-                        </span>
-                      )}
-                    </div>
-                    <span className="text-xs text-stone-500 font-semibold">
-                      {yrRecord.celebrationsCount} Major Celebrations
-                    </span>
+                    <h3 className="text-2xl font-serif font-black">{yrRecord.year}</h3>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -1617,46 +1171,12 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
                           isDark ? 'bg-stone-900 border-stone-800' : 'bg-white border-stone-200'
                         }`}
                       >
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="font-bold text-red-600 uppercase tracking-wider">
-                            {cel.festival}
-                          </span>
-                          <span className="text-stone-400 font-medium">{cel.dates}</span>
-                        </div>
-
-                        <div>
-                          <h4 className="text-lg font-serif font-black text-stone-900 dark:text-stone-100">
-                            {cel.name}
-                          </h4>
-                          {cel.kannadaName && (
-                            <span className="text-xs font-serif font-bold text-amber-700 dark:text-yellow-400 block">
-                              {cel.kannadaName}
-                            </span>
-                          )}
-                        </div>
-
+                        <h4 className="text-lg font-serif font-black text-stone-900 dark:text-stone-100">
+                          {cel.name}
+                        </h4>
                         <p className={`text-xs leading-relaxed ${isDark ? 'text-stone-300' : 'text-stone-600'}`}>
                           {cel.description}
                         </p>
-
-                        <div
-                          className={`pt-3 border-t grid grid-cols-2 gap-2 text-xs ${
-                            isDark ? 'border-stone-800 text-stone-400' : 'border-stone-100 text-stone-500'
-                          }`}
-                        >
-                          <div>
-                            <span className="block font-bold text-stone-800 dark:text-stone-200">
-                              {cel.volunteersCount} Volunteers
-                            </span>
-                            <span className="text-[11px]">Seva &amp; organizing team</span>
-                          </div>
-                          <div>
-                            <span className="block font-bold text-stone-800 dark:text-stone-200">
-                              {cel.contributorsCount}+ Devotees
-                            </span>
-                            <span className="text-[11px]">{cel.amountAccounted || '100% Accounted'}</span>
-                          </div>
-                        </div>
                       </div>
                     ))}
                   </div>
@@ -1676,141 +1196,29 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
                 ನಮ್ಮ ಬಳಗದ ಪರಿಚಯ
               </span>
               <h2 className="text-3xl sm:text-4xl font-serif font-black">
-                Kannadigara Balaga: Of the Residents, By the Residents, For the Residents
+                Kannadigara Balaga: Of the Residents, By the Residents
               </h2>
-              <p className={`text-sm max-w-2xl leading-relaxed ${isDark ? 'text-stone-400' : 'text-stone-600'}`}>
-                A volunteer working group within Eldorado dedicated to honoring Kannada heritage,
-                organizing community festival sevas, and creating lifelong memories for all apartment
-                families.
-              </p>
             </div>
 
-            {/* Grid Callouts: Distinct mission panels */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-              <div
-                className={`p-6 rounded-3xl border-2 space-y-2.5 ${
-                  isDark ? 'bg-stone-900 border-red-600/40' : 'bg-white border-red-600/30'
-                }`}
-              >
-                <div className="w-10 h-10 rounded-xl bg-red-600 text-yellow-300 flex items-center justify-center font-bold">
-                  1
-                </div>
-                <h3 className="text-lg font-serif font-bold text-red-700 dark:text-red-400">
-                  Cultural Preservation
-                </h3>
-                <p className={`text-xs sm:text-sm leading-relaxed ${isDark ? 'text-stone-300' : 'text-stone-600'}`}>
-                  Nurturing Kannada language, traditional folk dances (Dollu Kunitha, Yakshagana), poetry,
-                  and classical music among the next generation living in our community towers.
-                </p>
-              </div>
-
-              <div
-                className={`p-6 rounded-3xl border-2 space-y-2.5 ${
-                  isDark ? 'bg-stone-900 border-yellow-400/40' : 'bg-white border-yellow-400/40'
-                }`}
-              >
-                <div className="w-10 h-10 rounded-xl bg-yellow-400 text-stone-950 flex items-center justify-center font-bold">
-                  2
-                </div>
-                <h3 className="text-lg font-serif font-bold text-amber-700 dark:text-yellow-400">
-                  Community Harmony
-                </h3>
-                <p className={`text-xs sm:text-sm leading-relaxed ${isDark ? 'text-stone-300' : 'text-stone-600'}`}>
-                  Fostering strong neighborly brotherhood, mutual assistance, and festive joy across all
-                  buildings and clusters in Eldorado through shared celebrations.
-                </p>
-              </div>
-
-              <div
-                className={`p-6 rounded-3xl border-2 space-y-2.5 ${
-                  isDark ? 'bg-stone-900 border-yellow-400/40' : 'bg-white border-yellow-400/40'
-                }`}
-              >
-                <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center font-bold">
-                  3
-                </div>
-                <h3 className="text-lg font-serif font-bold text-amber-700 dark:text-yellow-400">
-                  Inclusivity
-                </h3>
-                <p className={`text-xs sm:text-sm leading-relaxed ${isDark ? 'text-stone-300' : 'text-stone-600'}`}>
-                  Warmly welcoming all residents of any background, linguistic group, or region to immerse in
-                  Karnataka's rich hospitalities, festive Anna Santharpane, and cultural stage acts.
-                </p>
-              </div>
-
-              <div
-                className={`p-6 rounded-3xl border-2 space-y-2.5 ${
-                  isDark ? 'bg-stone-900 border-red-600/40' : 'bg-white border-red-600/30'
-                }`}
-              >
-                <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold">
-                  4
-                </div>
-                <h3 className="text-lg font-serif font-bold text-emerald-700 dark:text-emerald-400">
-                  Absolute Financial Accountability
-                </h3>
-                <p className={`text-xs sm:text-sm leading-relaxed ${isDark ? 'text-stone-300' : 'text-stone-600'}`}>
-                  Every single rupee contributed by a resident generates an instantaneous digital receipt
-                  with transparent live audit ledgers searchable by tower and flat number.
-                </p>
-              </div>
-            </div>
-
-            {/* Core Committee Profile Grid */}
-            <div className="space-y-6">
-              <div className="border-b pb-3 border-stone-200 dark:border-stone-800">
-                <h3 className="text-2xl font-serif font-black">Volunteer Working Group &amp; Committee</h3>
-                <p className={`text-xs ${isDark ? 'text-stone-400' : 'text-stone-500'}`}>
-                  Eldorado residents volunteering their time for cultural, logistics, pooja, and financial
-                  coordination.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                {COMMITTEE_MEMBERS.map((member, idx) => (
-                  <div
-                    key={idx}
-                    className={`p-4 rounded-2xl border text-center space-y-2 ${
-                      isDark ? 'bg-stone-900 border-stone-800' : 'bg-white border-stone-200'
-                    }`}
-                  >
-                    <div className="w-12 h-12 mx-auto rounded-full bg-gradient-to-br from-red-600 to-amber-500 text-yellow-300 font-serif font-bold flex items-center justify-center shadow-xs border-2 border-yellow-400">
-                      {member.initials}
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-xs sm:text-sm">{member.name}</h4>
-                      <span className="text-[11px] text-red-600 dark:text-yellow-400 font-semibold block">
-                        {member.role}
-                      </span>
-                    </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+              {COMMITTEE_MEMBERS.map((member, idx) => (
+                <div
+                  key={idx}
+                  className={`p-4 rounded-2xl border text-center space-y-2 ${
+                    isDark ? 'bg-stone-900 border-stone-800' : 'bg-white border-stone-200'
+                  }`}
+                >
+                  <div className="w-12 h-12 mx-auto rounded-full bg-gradient-to-br from-red-600 to-amber-500 text-yellow-300 font-serif font-bold flex items-center justify-center shadow-xs border-2 border-yellow-400">
+                    {member.initials}
                   </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Transparency Pledge Panel */}
-            <div
-              className={`p-6 sm:p-8 rounded-3xl border-2 border-yellow-400 flex flex-col sm:flex-row items-center justify-between gap-6 ${
-                isDark ? 'bg-stone-900 text-stone-100' : 'bg-amber-50/80 text-stone-900'
-              }`}
-            >
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <ShieldCheck className="w-6 h-6 text-emerald-600" />
-                  <h3 className="text-xl font-serif font-bold">Our Transparency Pledge</h3>
+                  <div>
+                    <h4 className="font-bold text-xs sm:text-sm">{member.name}</h4>
+                    <span className="text-[11px] text-red-600 dark:text-yellow-400 font-semibold block">
+                      {member.role}
+                    </span>
+                  </div>
                 </div>
-                <p className={`text-xs sm:text-sm max-w-xl ${isDark ? 'text-stone-300' : 'text-stone-600'}`}>
-                  We maintain complete accountability down to the last rupee. All voluntary contributions,
-                  sponsorships, stall revenues, and expense vouchers are audited and accessible to devotees.
-                </p>
-              </div>
-              <button
-                onClick={onNavigateToReceipts}
-                className="px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-yellow-300 font-bold text-xs shadow-xs transition-colors cursor-pointer shrink-0 inline-flex items-center gap-2"
-              >
-                <FileText className="w-4 h-4" />
-                <span>View Financial Tracking Sheet</span>
-              </button>
+              ))}
             </div>
           </div>
         )}
@@ -1827,298 +1235,30 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
               <h2 className="text-3xl sm:text-4xl font-serif font-black">
                 Get in Touch with the Balaga
               </h2>
-              <p className={`text-sm ${isDark ? 'text-stone-400' : 'text-stone-600'}`}>
-                Have a suggestion, want to nominate a cultural act, volunteer for decoration, or have queries
-                on devotional sevas? We are here for you.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              {/* Column A: Reactive Form */}
-              <div
-                className={`md:col-span-2 rounded-3xl border-2 p-6 sm:p-8 shadow-xs ${
-                  isDark ? 'bg-stone-900 border-stone-800' : 'bg-white border-stone-200'
-                }`}
-              >
-                {contactSubmitted ? (
-                  <div className="py-12 text-center space-y-3">
-                    <CheckCircle2 className="w-12 h-12 text-emerald-600 mx-auto" />
-                    <h3 className="text-xl font-serif font-black text-emerald-600">
-                      Dhanyavadagalu! Message Received
-                    </h3>
-                    <p className={`text-xs max-w-md mx-auto ${isDark ? 'text-stone-400' : 'text-stone-600'}`}>
-                      Our Balaga volunteer coordinator will review your note and respond within 24–48 hours.
-                    </p>
-                    <button
-                      onClick={() => setContactSubmitted(false)}
-                      className="px-4 py-2 rounded-xl bg-stone-100 dark:bg-stone-800 text-xs font-bold hover:bg-stone-200 transition-colors cursor-pointer"
-                    >
-                      Send another query
-                    </button>
-                  </div>
-                ) : (
-                  <form
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      if (!contactForm.dpdpConsent) {
-                        alert('Please accept the DPDP Act consent checkbox to proceed.');
-                        return;
-                      }
-                      setContactSubmitted(true);
-                    }}
-                    className="space-y-4"
-                  >
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-bold mb-1">Full Name *</label>
-                        <input
-                          type="text"
-                          required
-                          placeholder="Your Name"
-                          value={contactForm.fullName}
-                          onChange={(e) => setContactForm({ ...contactForm, fullName: e.target.value })}
-                          className={`w-full text-xs px-3.5 py-2.5 rounded-xl border outline-none ${
-                            isDark
-                              ? 'bg-stone-800 border-stone-700 text-white focus:border-red-500'
-                              : 'bg-stone-50 border-stone-200 text-stone-900 focus:bg-white focus:border-red-600'
-                          }`}
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold mb-1">Email *</label>
-                        <input
-                          type="email"
-                          required
-                          placeholder="your.email@gmail.com"
-                          value={contactForm.email}
-                          onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })}
-                          className={`w-full text-xs px-3.5 py-2.5 rounded-xl border outline-none ${
-                            isDark
-                              ? 'bg-stone-800 border-stone-700 text-white focus:border-red-500'
-                              : 'bg-stone-50 border-stone-200 text-stone-900 focus:bg-white focus:border-red-600'
-                          }`}
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold mb-1">Tower &amp; Flat (Optional)</label>
-                      <input
-                        type="text"
-                        placeholder="e.g. Feldspar-1402"
-                        value={contactForm.towerFlat}
-                        onChange={(e) => setContactForm({ ...contactForm, towerFlat: e.target.value })}
-                        className={`w-full text-xs px-3.5 py-2.5 rounded-xl border outline-none ${
-                          isDark
-                            ? 'bg-stone-800 border-stone-700 text-white focus:border-red-500'
-                            : 'bg-stone-50 border-stone-200 text-stone-900 focus:bg-white focus:border-red-600'
-                        }`}
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold mb-1">Subject *</label>
-                      <select
-                        value={contactForm.subject}
-                        onChange={(e) => setContactForm({ ...contactForm, subject: e.target.value })}
-                        className={`w-full text-xs px-3.5 py-2.5 rounded-xl border outline-none font-semibold ${
-                          isDark
-                            ? 'bg-stone-800 border-stone-700 text-white focus:border-red-500'
-                            : 'bg-stone-50 border-stone-200 text-stone-900 focus:bg-white focus:border-red-600'
-                        }`}
-                      >
-                        <option>General enquiry</option>
-                        <option>Volunteering for Decoration</option>
-                        <option>Cultural Performance Nomination</option>
-                        <option>Contributions &amp; Sponsorships</option>
-                        <option>Feedback</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold mb-1">Message *</label>
-                      <textarea
-                        required
-                        rows={4}
-                        placeholder="How can the Balaga help?"
-                        value={contactForm.message}
-                        onChange={(e) => setContactForm({ ...contactForm, message: e.target.value })}
-                        className={`w-full text-xs px-3.5 py-2.5 rounded-xl border outline-none ${
-                          isDark
-                            ? 'bg-stone-800 border-stone-700 text-white focus:border-red-500'
-                            : 'bg-stone-50 border-stone-200 text-stone-900 focus:bg-white focus:border-red-600'
-                        }`}
-                      />
-                    </div>
-
-                    {/* Notice Drawer: Nested toggle accordion for DPDP policy */}
-                    <div
-                      className={`p-3 rounded-2xl border text-xs ${
-                        isDark ? 'bg-stone-800/60 border-stone-700' : 'bg-stone-50 border-stone-200'
-                      }`}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => setDpdpNoticeDrawerOpen(!dpdpNoticeDrawerOpen)}
-                        className="w-full flex items-center justify-between font-semibold text-stone-500 cursor-pointer"
-                      >
-                        <span className="flex items-center gap-1.5">
-                          <ShieldCheck className="w-3.5 h-3.5 text-red-600" />
-                          <span>Data Handling Policy under DPDP Act 2023</span>
-                        </span>
-                        <ChevronDown
-                          className={`w-3.5 h-3.5 transition-transform ${
-                            dpdpNoticeDrawerOpen ? 'rotate-180' : ''
-                          }`}
-                        />
-                      </button>
-
-                      {dpdpNoticeDrawerOpen && (
-                        <p
-                          className={`mt-2 pt-2 border-t text-[11px] leading-relaxed ${
-                            isDark ? 'border-stone-700 text-stone-300' : 'border-stone-200 text-stone-600'
-                          }`}
-                        >
-                          We process your name and contact details strictly for community event updates and
-                          volunteer assignment. You may request data deletion at any time by contacting{' '}
-                          <a
-                            href="mailto:contact@kannadigarabalaga.org"
-                            className="text-red-600 underline"
-                          >
-                            contact@kannadigarabalaga.org
-                          </a>
-                          .
-                        </p>
-                      )}
-                    </div>
-
-                    {/* DPDP Consent Checkbox */}
-                    <label className="flex items-start gap-2.5 cursor-pointer pt-1">
-                      <input
-                        type="checkbox"
-                        checked={contactForm.dpdpConsent}
-                        onChange={(e) =>
-                          setContactForm({ ...contactForm, dpdpConsent: e.target.checked })
-                        }
-                        className="mt-0.5 rounded border-stone-300 text-red-600 focus:ring-red-500"
-                      />
-                      <span className={`text-[11px] leading-relaxed ${isDark ? 'text-stone-300' : 'text-stone-600'}`}>
-                        I consent to my information being collected for the purpose of getting loop updates
-                        regarding community events *
-                      </span>
-                    </label>
-
-                    <button
-                      type="submit"
-                      disabled={!contactForm.dpdpConsent}
-                      className="w-full py-3 rounded-xl bg-red-600 hover:bg-red-700 disabled:opacity-50 text-yellow-300 font-bold text-xs transition-colors cursor-pointer shadow-xs inline-flex items-center justify-center gap-1.5 border border-yellow-400"
-                    >
-                      <Send className="w-3.5 h-3.5" />
-                      <span>Send Message</span>
-                    </button>
-                  </form>
-                )}
-              </div>
-
-              {/* Column B: Info Column */}
-              <div className="space-y-5">
-                <div
-                  className={`rounded-3xl border-2 p-6 shadow-xs space-y-4 ${
-                    isDark ? 'bg-stone-900 border-stone-800' : 'bg-white border-stone-200'
-                  }`}
-                >
-                  <h4 className="text-base font-serif font-black">Direct Communication Channels</h4>
-                  <div className="space-y-4 text-xs">
-                    <div className="flex items-start gap-3">
-                      <Mail className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
-                      <div>
-                        <span className="font-bold block">Balaga Official Email</span>
-                        <a
-                          href="mailto:contact@kannadigarabalaga.org"
-                          className="text-red-600 hover:underline break-all"
-                        >
-                          contact@kannadigarabalaga.org
-                        </a>
-                      </div>
-                    </div>
-
-                    <div
-                      className={`flex items-start gap-3 pt-3 border-t ${
-                        isDark ? 'border-stone-800' : 'border-stone-100'
-                      }`}
-                    >
-                      <Clock className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-                      <div>
-                        <span className="font-bold block">Response SLA</span>
-                        <span className="text-stone-500">24–48 hours response time</span>
-                      </div>
-                    </div>
-
-                    <div
-                      className={`flex items-start gap-3 pt-3 border-t ${
-                        isDark ? 'border-stone-800' : 'border-stone-100'
-                      }`}
-                    >
-                      <MapPin className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
-                      <div>
-                        <span className="font-bold block">Physical Address</span>
-                        <span className="text-stone-500 leading-relaxed block">
-                          Brigade El Dorado, KIADB, Aerospace Park, Bengaluru, Karnataka - 562149
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div
-                  className={`rounded-3xl border-2 p-6 shadow-xs space-y-2.5 ${
-                    isDark ? 'bg-stone-900 border-stone-800' : 'bg-white border-stone-200'
-                  }`}
-                >
-                  <h4 className="text-sm font-serif font-bold text-red-600">Volunteer Hotline</h4>
-                  <p className={`text-xs leading-relaxed ${isDark ? 'text-stone-400' : 'text-stone-600'}`}>
-                    Active volunteers can directly connect via WhatsApp group updates by signing in with
-                    Gmail.
-                  </p>
-                  <button
-                    onClick={() => {
-                      if (!currentUser) setAuthModalOpen(true);
-                      else setVolunteerModalOpen(true);
-                    }}
-                    className="w-full py-2 rounded-xl bg-yellow-400 hover:bg-yellow-300 text-stone-950 font-bold text-xs transition-colors cursor-pointer"
-                  >
-                    Open Volunteer Portal
-                  </button>
-                </div>
-              </div>
             </div>
           </div>
         )}
 
         {/* ========================================================
-            PAGE 8: DEEP EVENT DETAIL VIEW ('/events/:slug')
+            PAGE 8: COMMON UNIFIED EVENT DETAIL VIEW ('/events/:slug')
            ======================================================== */}
         {activeTab === 'event-detail' && (
-          selectedEvent.status === 'upcoming' ? (
-            <UpcomingEventView
-              event={selectedEvent}
-              onBackToEvents={() => handleNavigateTab('events')}
-              onOpenVolunteer={() => {
-                if (!currentUser) setAuthModalOpen(true);
-                else setVolunteerModalOpen(true);
-              }}
-              onOpenNominate={() => setNominateModalOpen(true)}
-              isDark={isDark}
-            />
-          ) : (
-            <PastEventView
-              event={selectedEvent}
-              onBackToEvents={() => handleNavigateTab('events')}
-              onNavigateToFinancialStatement={onNavigateToGaneshotsava}
-              isDark={isDark}
-            />
-          )
+          <BalagaEventDetailView
+            event={selectedEvent}
+            userRole={userRole}
+            userProfile={userProfile}
+            isAdmin={isAdmin}
+            isMember={userRole === 'member' || userRole === 'admin' || userRole === 'read_only'}
+            onBackToEvents={() => handleNavigateTab('events')}
+            onOpenContribute={() => setContributeModalOpen(true)}
+            onOpenVolunteer={() => {
+              if (!currentUser) setAuthModalOpen(true);
+              else setVolunteerModalOpen(true);
+            }}
+            onOpenNominate={() => setNominateModalOpen(true)}
+            onNavigateToFinancialStatement={onNavigateToGaneshotsava}
+            isDark={isDark}
+          />
         )}
       </main>
 
@@ -2129,206 +1269,18 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
         }`}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8">
-          {/* Column 1: Brand Column */}
           <div className="space-y-3">
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-red-600 p-1 flex items-center justify-center border border-yellow-400 shadow-xs">
-                <img
-                  src="/lord_ganesha.svg"
-                  alt="Lord Ganesha"
-                  className="w-full h-full object-contain filter invert"
-                  referrerPolicy="no-referrer"
-                />
-              </div>
               <span className="font-serif font-black text-base text-red-600">ಕನ್ನಡಿಗರ ಬಳಗ</span>
             </div>
-
             <p className="text-xs font-serif font-bold text-amber-700 dark:text-yellow-400 italic">
               "Bringing the Spirit of Karnataka to Our Community."
             </p>
-            <p className="text-xs font-serif font-bold text-stone-800 dark:text-stone-200">
-              ಸಿರಿಗನ್ನಡಂ ಗೆಲ್ಗೆ! ಸಿರಿಗನ್ನಡಂ ಬಾಳ್ಗೆ!
-            </p>
-
-            {/* Privacy Compliance Visual Badge */}
-            <div className="pt-2">
-              <div
-                className={`p-2.5 rounded-xl border text-[11px] leading-relaxed flex items-start gap-2 ${
-                  isDark
-                    ? 'bg-stone-900 border-stone-800 text-stone-400'
-                    : 'bg-white border-stone-200 text-stone-600'
-                }`}
-              >
-                <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                <span>
-                  Compliant with <strong>Digital Personal Data Protection (DPDP) Act, 2023</strong> —
-                  Privacy-first data handling with explicit consent.
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Column 2: Explore Links */}
-          <div className="space-y-3">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-stone-900 dark:text-stone-100">
-              Explore Links
-            </h4>
-            <ul className="space-y-2 text-xs font-medium">
-              <li>
-                <button
-                  onClick={() => handleNavigateTab('home')}
-                  className="hover:text-red-600 cursor-pointer"
-                >
-                  Home
-                </button>
-              </li>
-              <li>
-                <button
-                  onClick={() => handleNavigateTab('events')}
-                  className="hover:text-red-600 cursor-pointer"
-                >
-                  Events &amp; Celebrations
-                </button>
-              </li>
-              <li>
-                <button
-                  onClick={() => handleNavigateTab('gallery')}
-                  className="hover:text-red-600 cursor-pointer"
-                >
-                  Vaibhava Gallery
-                </button>
-              </li>
-              <li>
-                <button
-                  onClick={() => handleNavigateTab('announcements')}
-                  className="hover:text-red-600 cursor-pointer"
-                >
-                  Announcements
-                </button>
-              </li>
-              <li>
-                <button
-                  onClick={() => handleNavigateTab('archive')}
-                  className="hover:text-red-600 cursor-pointer"
-                >
-                  Celebration Archive
-                </button>
-              </li>
-              <li>
-                <button
-                  onClick={() => handleNavigateTab('login')}
-                  className="hover:text-red-600 cursor-pointer"
-                >
-                  Sign in Portal
-                </button>
-              </li>
-            </ul>
-          </div>
-
-          {/* Column 3: Legal Modals */}
-          <div className="space-y-3">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-stone-900 dark:text-stone-100">
-              Legal &amp; Compliance
-            </h4>
-            <ul className="space-y-2 text-xs font-medium">
-              <li>
-                <button
-                  onClick={() => setPolicyModal('privacy')}
-                  className="hover:text-red-600 cursor-pointer text-left"
-                >
-                  Privacy Policy (DPDP Act)
-                </button>
-              </li>
-              <li>
-                <button
-                  onClick={() => setPolicyModal('terms')}
-                  className="hover:text-red-600 cursor-pointer text-left"
-                >
-                  Terms of Use
-                </button>
-              </li>
-              <li>
-                <button
-                  onClick={() => setPolicyModal('refund')}
-                  className="hover:text-red-600 cursor-pointer text-left"
-                >
-                  Refund &amp; Cancellation
-                </button>
-              </li>
-              <li>
-                <button
-                  onClick={() => setPolicyModal('cookies')}
-                  className="hover:text-red-600 cursor-pointer text-left"
-                >
-                  Cookie Preferences
-                </button>
-              </li>
-              <li>
-                <button
-                  onClick={onNavigateToReceipts}
-                  className="text-red-600 dark:text-yellow-400 font-bold hover:underline cursor-pointer text-left inline-flex items-center gap-1"
-                >
-                  <FileText className="w-3.5 h-3.5" />
-                  <span>Devotee Receipts &amp; Tokens</span>
-                </button>
-              </li>
-            </ul>
-          </div>
-
-          {/* Column 4: Contact Info */}
-          <div className="space-y-3 text-xs">
-            <h4 className="font-bold uppercase tracking-wider text-stone-900 dark:text-stone-100">
-              Contact Info
-            </h4>
-            <div className="space-y-2">
-              <div className="flex items-start gap-2">
-                <Mail className="w-3.5 h-3.5 text-red-600 shrink-0 mt-0.5" />
-                <a
-                  href="mailto:contact@kannadigarabalaga.org"
-                  className="hover:text-red-600 underline break-all"
-                >
-                  contact@kannadigarabalaga.org
-                </a>
-              </div>
-              <div className="flex items-start gap-2">
-                <MapPin className="w-3.5 h-3.5 text-red-600 shrink-0 mt-0.5" />
-                <span className="leading-relaxed">
-                  Brigade El Dorado, KIADB, Aerospace Park, Bengaluru, Karnataka - 562149
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Bottom Row */}
-        <div
-          className={`border-t py-4 px-4 sm:px-6 ${
-            isDark ? 'border-stone-800 text-stone-500' : 'border-stone-200 text-stone-500'
-          }`}
-        >
-          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px]">
-            <span>© 2024-2026 ಎಲ್ಡೊರಾಡೊ ಕನ್ನಡಿಗರ ಬಳಗ. ಎಲ್ಲ ಹಕ್ಕುಗಳನ್ನು ಕಾಯ್ದಿರಿಸಲಾಗಿದೆ (Eldorado Kannadigara Balaga. All rights reserved).</span>
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => setPolicyModal('cookies')}
-                className="hover:text-red-600 cursor-pointer"
-              >
-                Cookie Preferences
-              </button>
-              <span>•</span>
-              <button
-                onClick={() => setPolicyModal('privacy')}
-                className="hover:text-red-600 cursor-pointer"
-              >
-                DPDP Notice
-              </button>
-            </div>
           </div>
         </div>
       </footer>
 
       {/* POPUP MODALS */}
-      {/* 1. Balaga Auth Modal */}
       <BalagaAuthModal
         isOpen={authModalOpen}
         onClose={() => setAuthModalOpen(false)}
@@ -2339,7 +1291,6 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
         isAdmin={isCurrentAdmin}
       />
 
-      {/* 2. Volunteer Roster Modal */}
       <BalagaVolunteerModal
         isOpen={volunteerModalOpen}
         onClose={() => setVolunteerModalOpen(false)}
@@ -2350,20 +1301,17 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
         }}
       />
 
-      {/* 3. Nominate Cultural Act Modal */}
       <BalagaNominateModal
         isOpen={nominateModalOpen}
         onClose={() => setNominateModalOpen(false)}
       />
 
-      {/* 4. Policy Modals */}
       <BalagaPolicyModals
         activeModal={policyModal}
         onClose={() => setPolicyModal(null)}
         isDark={isDark}
       />
 
-      {/* 5. Contribute Modal / Link to Devotee Receipts */}
       {contributeModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs">
           <div
@@ -2383,30 +1331,8 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
                 <HeartHandshake className="w-6 h-6" />
               </div>
               <h3 className="text-xl font-serif font-black text-red-600">
-                Voluntary Devotee Seva Contribution
+                Voluntary Devotee Contribution
               </h3>
-              <p className={`text-xs leading-relaxed ${isDark ? 'text-stone-300' : 'text-stone-600'}`}>
-                Support community Anna Santharpane, flower decorations, sound &amp; stage setup, and Vedic
-                pooja rituals for Ganesha Chaturthi and Karnataka Rajyotsava.
-              </p>
-
-              <div
-                className={`p-4 rounded-2xl border text-left text-xs space-y-1.5 ${
-                  isDark ? 'bg-stone-800/80 border-stone-700' : 'bg-amber-50 border-amber-200'
-                }`}
-              >
-                <div className="flex justify-between">
-                  <span className="text-stone-500">Official UPI ID:</span>
-                  <span className="font-mono font-bold text-red-600">
-                    {settings.upiId || 'kannadigara.balaga@upi'}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-stone-500">Payee Name:</span>
-                  <span className="font-bold">{settings.org || 'Eldorado Kannadigara Balaga'}</span>
-                </div>
-              </div>
-
               <div className="pt-2 flex flex-col gap-2">
                 <button
                   onClick={() => {
@@ -2416,13 +1342,21 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
                   className="w-full py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-yellow-300 font-bold text-xs transition-colors cursor-pointer shadow-xs inline-flex items-center justify-center gap-1.5"
                 >
                   <FileText className="w-3.5 h-3.5" />
-                  <span>Open Devotee Receipts &amp; Token Records</span>
+                  <span>Open Devotee Receipts Portal</span>
                 </button>
               </div>
             </div>
           </div>
         </div>
       )}
+
+      {/* ADMIN EVENT HIGHLIGHTS & PHOTO MANAGER MODAL */}
+      <AdminEventHighlightsManager
+        isOpen={highlightsManagerOpen}
+        onClose={() => setHighlightsManagerOpen(false)}
+        isDark={isDark}
+        onRefreshEvents={refreshEventData}
+      />
     </div>
   );
 };

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Calendar,
   MapPin,
@@ -18,7 +18,9 @@ import {
   Info,
   Clock
 } from 'lucide-react';
-import { CommunityEvent, GALLERY_PHOTOS } from '../../data/communityData';
+import { CommunityEvent, GALLERY_PHOTOS, GalleryPhoto } from '../../data/communityData';
+import { db } from '../../lib/firebase';
+import { collection, getDocs } from 'firebase/firestore';
 
 interface PastEventViewProps {
   event: CommunityEvent;
@@ -34,10 +36,31 @@ export const PastEventView: React.FC<PastEventViewProps> = ({
   isDark = false
 }) => {
   const [activeTab, setActiveTab] = useState<'statement' | 'gallery'>('statement');
+  const [customPhotos, setCustomPhotos] = useState<GalleryPhoto[]>([]);
 
-  // Filter gallery photos for Ganesha festival if available
-  const eventPhotos = GALLERY_PHOTOS.filter(
-    (p) => p.celebration.toLowerCase().includes('ganesha') || p.year === 2026
+  useEffect(() => {
+    async function loadFirestoreHighlights() {
+      try {
+        const snap = await getDocs(collection(db, 'event_highlights'));
+        const fetched: GalleryPhoto[] = [];
+        snap.forEach((docSnap) => {
+          fetched.push({ id: docSnap.id, ...docSnap.data() } as GalleryPhoto);
+        });
+        if (fetched.length > 0) {
+          setCustomPhotos(fetched);
+        }
+      } catch (err) {
+        console.warn('Could not load firestore highlights:', err);
+      }
+    }
+    loadFirestoreHighlights();
+  }, []);
+
+  const eventPhotos = [...customPhotos, ...GALLERY_PHOTOS].filter(
+    (p) =>
+      (p.celebration || '').toLowerCase().includes((event.festival || '').toLowerCase()) ||
+      (p.celebration || '').toLowerCase().includes('ganesha') ||
+      p.year === event.year
   );
 
   return (

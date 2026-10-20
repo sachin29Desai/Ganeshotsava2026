@@ -91,11 +91,11 @@ export const BalagaLoginView: React.FC<BalagaLoginViewProps> = ({
 
           {/* Logo & Branding */}
           <div className="text-center space-y-2 mb-8">
-            <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-red-600 via-red-600 to-amber-500 p-2.5 flex items-center justify-center shadow-md border-2 border-yellow-400">
+            <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-red-600 via-red-600 to-amber-500 p-1 flex items-center justify-center shadow-md border-2 border-yellow-400 overflow-hidden">
               <img
-                src="/lord_ganesha.svg"
-                alt="Lord Sri Ganesha"
-                className="w-full h-full object-contain filter invert drop-shadow-sm"
+                src="/bhuvaneshwari_kannada_flag.jpg"
+                alt="Goddess Bhuvaneshwari Devi & Kannada Flag"
+                className="w-full h-full object-cover rounded-xl"
                 referrerPolicy="no-referrer"
               />
             </div>

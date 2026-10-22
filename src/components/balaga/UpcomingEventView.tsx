@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { CommunityEvent } from '../../data/communityData';
 import { EventCustomInfo } from './EventInfoAndPhotosEditorModal';
+import { EventVolunteersList } from './EventVolunteersList';
 
 interface UpcomingEventViewProps {
   event: CommunityEvent;
@@ -298,6 +299,14 @@ export const UpcomingEventView: React.FC<UpcomingEventViewProps> = ({
           </div>
         </div>
       </section>
+
+      {/* Event-Specific Volunteers List Section */}
+      <EventVolunteersList
+        eventId={event.id}
+        eventTitle={displayTitle}
+        onOpenVolunteerModal={() => onOpenVolunteer()}
+        isDark={isDark}
+      />
 
       {/* Volunteer & Nomination Registration Callout */}
       <section className="grid grid-cols-1 md:grid-cols-2 gap-6">

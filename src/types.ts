@@ -104,6 +104,7 @@ export interface UserProfile {
   flat: string;
   mobile: string;
   role: UserRole;
+  passwordHash?: string; // Hashed password for mobile/email authentication
   status?: 'verified' | 'unverified';
   photoUrl?: string; // Captured photo / selfie data URL
   username?: string;
@@ -113,6 +114,20 @@ export interface UserProfile {
   accessRequested?: boolean; // When user clicks "Request for details"
   accessRequestNotes?: string;
   accessRequestedAt?: string;
+}
+
+export interface EventVolunteer {
+  id: string;
+  eventId: string;
+  eventTitle: string;
+  name: string;
+  email: string;
+  mobile: string;
+  flat: string;
+  department: string;
+  availability?: string;
+  notes?: string;
+  createdAt: string;
 }
 
 export interface AppSettings {

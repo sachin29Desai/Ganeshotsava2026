@@ -70,38 +70,65 @@ export const DEFAULT_SEVAS: SevaCatalogueItem[] = [
 
 export const INITIAL_STATE: AppState = {
   expenses: [
-    { id: '1788182059860', item: 'Ganesha Idol + Stone Work', est: 58000, adv: 0, bal: 58000, act: 58000 },
-    { id: '1788182074852', item: 'Lightings and Decorations and Event Management', est: 300000, adv: 215001, bal: 84999, act: 215001 },
-    { id: '1788182092539', item: 'Pendal', est: 60000, adv: 0, bal: 60000, act: 60000 },
-    { id: '1788182105355', item: 'Dhol', est: 75000, adv: 0, bal: 75000, act: 75000 },
-    { id: '1788182119929', item: 'Pujari(Priest) + Pooja Items', est: 20000, adv: 0, bal: 20000, act: 20000 },
-    { id: '1788182136085', item: 'Pooja Flowers', est: 15000, adv: 0, bal: 15000, act: 15000 },
-    { id: '1788182156979', item: 'Banner(prints,etc)', est: 5000, adv: 0, bal: 5000, act: 5000 },
-    { id: '1788182170675', item: 'Gratitude Gifts for our Sponsors', est: 10000, adv: 0, bal: 10000, act: 10000 },
-    { id: '1788182183762', item: 'Laddoo + Sweets', est: 40000, adv: 0, bal: 40000, act: 40000 },
-    { id: '1788182198126', item: 'Anna Prasadam', est: 400000, adv: 0, bal: 400000, act: 400000 },
-    { id: '1788182216029', item: 'Transportations', est: 10000, adv: 0, bal: 10000, act: 10000 },
-    { id: '1788182241424', item: 'Cleaning(staff, needs, etc)', est: 5000, adv: 0, bal: 5000, act: 5000 },
-    { id: '1788182284933', item: 'Misc', est: 10000, adv: 0, bal: 10000, act: 10000 }
+    { id: 'exp_1', item: 'Lightings Decorations & Event Manager', est: 271001, adv: 271001, bal: 0, act: 271001 },
+    { id: 'exp_2', item: 'Anna Prasadam', est: 115000, adv: 115000, bal: 0, act: 115000 },
+    { id: 'exp_3', item: 'Pendal', est: 56000, adv: 56000, bal: 0, act: 56000 },
+    { id: 'exp_4', item: 'Ganesha Idol + Stone Work', est: 53000, adv: 53000, bal: 0, act: 53000 },
+    { id: 'exp_5', item: 'Crackers', est: 26100, adv: 26100, bal: 0, act: 26100 },
+    { id: 'exp_6', item: 'Pooja Flowers and Fruits', est: 19650, adv: 19650, bal: 0, act: 19650 },
+    { id: 'exp_7', item: 'Pujari-Priest-Pandith Ji', est: 12277, adv: 12277, bal: 0, act: 12277 },
+    { id: 'exp_8', item: 'Laddoo + Sweets', est: 12160, adv: 12160, bal: 0, act: 12160 },
+    { id: 'exp_9', item: 'Misc', est: 9738, adv: 9738, bal: 0, act: 9738 },
+    { id: 'exp_10', item: 'Flags(big & small) & bunting', est: 9800, adv: 9800, bal: 0, act: 9800 },
+    { id: 'exp_11', item: 'Community Cooking', est: 8632, adv: 8632, bal: 0, act: 8632 },
+    { id: 'exp_12', item: 'Mementos 130*65', est: 8450, adv: 8450, bal: 0, act: 8450 },
+    { id: 'exp_13', item: 'Transportations', est: 7500, adv: 7500, bal: 0, act: 7500 },
+    { id: 'exp_14', item: 'Visarjana Shawls + HeadBands', est: 5386, adv: 5386, bal: 0, act: 5386 },
+    { id: 'exp_15', item: 'Cleaning(staff, needs, etc)', est: 5000, adv: 5000, bal: 0, act: 5000 },
+    { id: 'exp_16', item: 'GANESHA BANER PRINTING 2*3, 7*4', est: 1800, adv: 1800, bal: 0, act: 1800 },
+    { id: 'exp_17', item: 'BESCOM APPROVAL CHARGES', est: 1150, adv: 1150, bal: 0, act: 1150 },
+    { id: 'exp_18', item: 'Pooja Items', est: 2078, adv: 2078, bal: 0, act: 2078 },
+    { id: 'exp_19', item: 'POSTER PRINTING PAPER', est: 350, adv: 350, bal: 0, act: 350 },
+    { id: 'exp_20', item: 'WATER BOTTLES FOR EDUCATION FEST', est: 540, adv: 540, bal: 0, act: 540 },
+    { id: 'exp_21', item: 'Bank charges sms charges for sept qtr', est: 182.96, adv: 182.96, bal: 0, act: 182.96 }
   ],
   contributions: [
     {
-      id: '1788183261795',
-      rcptNo: 'GE-2026-0001',
-      name: 'Abhishek',
-      flat: 'B-1254',
-      amt: 1000,
-      date: '2026-08-29',
-      pay: 'UPI',
-      txn: '6607281455',
-      notes: ''
+      id: 'ct_347_residents',
+      rcptNo: 'GE-2026-SUMMARY',
+      name: 'Voluntary Contributions (347 Residents)',
+      flat: 'Eldorado Residents',
+      amt: 329322,
+      date: '2026-09-18',
+      pay: 'UPI/Bank',
+      txn: 'VOL-347-RESIDENTS',
+      notes: '347 resident voluntary contributions for Sri Ganeshotsava 2026'
     }
   ],
-  sponsors: [],
+  sponsors: [
+    {
+      id: 'sp_10_partners',
+      invNo: 'GNS-SP-2026',
+      det: 'Sponsorship Partners (10 Partners)',
+      est: 330650,
+      act: 295650,
+      date: '2026-09-18',
+      payMode: 'Bank Transfer',
+      notes: '10 sponsorship partners (Received ₹2,95,650, Outstanding ₹35,000 dues)'
+    }
+  ],
   commercialStalls: DEFAULT_COMMERCIAL_STALLS,
   sevas: [],
   sevaCatalogue: DEFAULT_SEVAS,
-  hundi: [],
+  hundi: [
+    {
+      id: 'hundi_2026',
+      det: 'Hundi collections counted during Ganeshotsava 2026',
+      act: 11861,
+      date: '2026-09-18',
+      notes: 'Total Hundi collections counted during Ganeshotsava 2026'
+    }
+  ],
   settings: {
     org: 'Eldorado',
     location: 'Eldorado ganeshotsava 2026',

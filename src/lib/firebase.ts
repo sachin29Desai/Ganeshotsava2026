@@ -43,9 +43,10 @@ import {
   AppSettings,
   AppState,
   UserProfile,
-  UserRole
+  UserRole,
+  EventVolunteer
 } from '../types';
-import { DEFAULT_SEVAS, INITIAL_STATE, prepareExpenseForStorage } from '../utils/helpers';
+import { DEFAULT_SEVAS, INITIAL_STATE, prepareExpenseForStorage, sha256 } from '../utils/helpers';
 import firebaseConfigData from '../../firebase-applet-config.json';
 
 const firebaseConfig = {
@@ -1070,5 +1071,164 @@ export async function sendOtpEmailApi(email: string, otp: string, magicLink: str
   }
 
   return { success: false, error: 'Could not dispatch verification email. Please check network connectivity.' };
+}
+
+// --- EVENT VOLUNTEERS FIRESTORE PERSISTENCE ---
+
+export async function cloudSaveVolunteer(volunteer: EventVolunteer): Promise<void> {
+  try {
+    const docRef = doc(db, 'volunteers', volunteer.id);
+    await setDoc(docRef, {
+      ...volunteer,
+      createdAt: volunteer.createdAt || new Date().toISOString()
+    });
+  } catch (err) {
+    console.error('Error saving volunteer to Firestore:', err);
+    throw err;
+  }
+}
+
+export async function cloudGetVolunteersByEvent(eventId: string): Promise<EventVolunteer[]> {
+  try {
+    const snap = await getDocs(collection(db, 'volunteers'));
+    const list: EventVolunteer[] = [];
+    snap.forEach((docSnap) => {
+      const data = docSnap.data() as EventVolunteer;
+      if (data.eventId === eventId) {
+        list.push(data);
+      }
+    });
+    return list;
+  } catch (err) {
+    console.error('Error fetching event volunteers from Firestore:', err);
+    return [];
+  }
+}
+
+export async function cloudGetAllVolunteers(): Promise<EventVolunteer[]> {
+  try {
+    const snap = await getDocs(collection(db, 'volunteers'));
+    const list: EventVolunteer[] = [];
+    snap.forEach((docSnap) => {
+      list.push(docSnap.data() as EventVolunteer);
+    });
+    return list;
+  } catch (err) {
+    console.error('Error fetching all volunteers from Firestore:', err);
+    return [];
+  }
+}
+
+export async function cloudDeleteVolunteer(id: string): Promise<void> {
+  try {
+    await deleteDoc(doc(db, 'volunteers', id));
+  } catch (err) {
+    console.error('Error deleting volunteer from Firestore:', err);
+    throw err;
+  }
+}
+
+// --- SECURE USER REGISTRATION, LOGIN & PASSWORD RESET WITH FIRESTORE BACKEND ---
+
+export async function cloudRegisterUser(data: {
+  name: string;
+  mobile: string;
+  email: string;
+  flat: string;
+  password: string;
+}): Promise<UserProfile> {
+  const emailKey = data.email.toLowerCase().trim();
+  const cleanMobile = data.mobile.replace(/\D/g, '');
+
+  // 1. Check if email or mobile already registered
+  const existingByEmail = await cloudGetUserProfile(emailKey);
+  if (existingByEmail) {
+    throw new Error('An account with this email address already exists. Please sign in or reset password.');
+  }
+
+  if (cleanMobile) {
+    const existingByPhone = await cloudGetUserProfileByPhone(cleanMobile);
+    if (existingByPhone) {
+      throw new Error('An account with this mobile number already exists. Please sign in using your mobile number.');
+    }
+  }
+
+  // 2. Hash password securely
+  const passwordHash = await sha256(data.password);
+
+  // 3. Assign default viewer role (or admin if super admin email)
+  const isSuperAdmin = emailKey === 'desaisachin95@gmail.com';
+  const newProfile: UserProfile = {
+    email: emailKey,
+    name: data.name.trim(),
+    mobile: data.mobile.trim(),
+    flat: data.flat.trim(),
+    role: isSuperAdmin ? 'admin' : 'viewer', // DEFAULT VIEWER ROLE AS REQUESTED BY USER!
+    passwordHash,
+    status: 'verified',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+
+  // 4. Save to Firestore
+  await cloudSaveUserProfile(newProfile);
+  return newProfile;
+}
+
+export async function cloudLoginUser(
+  emailOrMobile: string,
+  passwordInput: string
+): Promise<UserProfile> {
+  const query = emailOrMobile.trim();
+  let profile: UserProfile | null = null;
+
+  if (query.includes('@')) {
+    profile = await cloudGetUserProfile(query.toLowerCase());
+  } else {
+    profile = await cloudGetUserProfileByPhone(query);
+  }
+
+  if (!profile) {
+    throw new Error('No user account found matching this Email or Mobile number. Please register first.');
+  }
+
+  if (!profile.passwordHash) {
+    throw new Error('This account was registered via Google Sign-In. Please sign in with Google or reset your password to set a password.');
+  }
+
+  const hashToCompare = await sha256(passwordInput);
+  if (profile.passwordHash !== hashToCompare) {
+    throw new Error('Incorrect password. Please verify your password or use Reset Password.');
+  }
+
+  return profile;
+}
+
+export async function cloudResetPassword(
+  emailOrMobile: string,
+  newPasswordInput: string
+): Promise<UserProfile> {
+  const query = emailOrMobile.trim();
+  let profile: UserProfile | null = null;
+
+  if (query.includes('@')) {
+    profile = await cloudGetUserProfile(query.toLowerCase());
+  } else {
+    profile = await cloudGetUserProfileByPhone(query);
+  }
+
+  if (!profile) {
+    throw new Error('No account found for this Email or Mobile number.');
+  }
+
+  const newHash = await sha256(newPasswordInput);
+  const updated: UserProfile = {
+    ...profile,
+    passwordHash: newHash,
+    updatedAt: new Date().toISOString()
+  };
+
+  await cloudSaveUserProfile(updated);
+  return updated;
 }
 

@@ -14,88 +14,81 @@ service cloud.firestore {
       );
     }
 
-    function isOwner(userEmail) {
-      return isSignedIn() && (
-        request.auth.token.email == userEmail ||
-        request.auth.token.email.lower() == userEmail.lower()
-      );
-    }
-
     // 1. User Profiles Collection
     match /user_profiles/{email} {
-      // Anyone can read profiles to view registered residents or check login state
       allow read: if true;
-      // Users can create/update their own profile, or admins can manage all profiles
-      allow create, update: if isSignedIn() || true;
+      allow create, update: if true;
       allow delete: if isAdmin();
     }
 
-    // 2. Email OTPs for Passwordless Auth
+    // 2. Event Volunteers Roster Collection
+    match /volunteers/{volunteerId} {
+      allow read: if true;
+      allow create, update: if true;
+      allow delete: if isAdmin();
+    }
+
+    // 3. Community Events Collection
+    match /community_events/{eventId} {
+      allow read: if true;
+      allow create, update, delete: if true;
+    }
+
+    // 4. Event Highlights & Photos Collection
+    match /event_highlights/{highlightId} {
+      allow read: if true;
+      allow create, update, delete: if true;
+    }
+
+    // 5. Email OTPs for Passwordless Auth
     match /email_otps/{email} {
       allow read, create, update, delete: if true;
     }
 
-    // 3. Voluntary Contributions Collection
+    // 6. Voluntary Contributions Collection
     match /contributions/{contributionId} {
-      // Public read for transparent accounting and devotee receipt lookup
       allow read: if true;
-      // Allow write for logged-in users / admins / public receipt entries
       allow create, update, delete: if true;
     }
 
-    // 4. Seva Bookings Collection
+    // 7. Seva Bookings Collection
     match /sevas/{sevaId} {
-      // Public read for devotees checking seva slots and receipts
       allow read: if true;
-      // Devotee bookings and admin updates allowed
       allow create, update, delete: if true;
     }
 
-    // 5. Seva Catalogue Collection
+    // 8. Seva Catalogue Collection
     match /sevaCatalogue/{itemId} {
       allow read: if true;
       allow create, update, delete: if true;
     }
 
-    // 6. Expenditure & Expenses Collection
+    // 9. Expenditure & Expenses Collection
     match /expenses/{expenseId} {
-      // Public read for transparent financial auditing
       allow read: if true;
       allow create, update, delete: if true;
     }
 
-    // 7. Sponsorship Invoices
+    // 10. Sponsorship Invoices
     match /sponsors/{sponsorId} {
       allow read: if true;
       allow create, update, delete: if true;
     }
 
-    // 8. Commercial Stalls
+    // 11. Commercial Stalls
     match /commercialStalls/{stallId} {
       allow read: if true;
       allow create, update, delete: if true;
     }
 
-    // 9. Hundi Collections
+    // 12. Hundi Collections
     match /hundi/{hundiId} {
       allow read: if true;
       allow create, update, delete: if true;
     }
 
-    // 10. Auctions Collection
-    match /auctions/{auctionId} {
-      allow read: if true;
-      allow create, update, delete: if true;
-    }
-
-    // 11. Settings & App Configuration
+    // 13. Settings & App Configuration
     match /settings/{configId} {
-      allow read: if true;
-      allow create, update, delete: if true;
-    }
-
-    // 12. Metadata Counters
-    match /metadata/{metaId} {
       allow read: if true;
       allow create, update, delete: if true;
     }
@@ -103,7 +96,7 @@ service cloud.firestore {
     // Catch-all safety rule
     match /{document=**} {
       allow read: if true;
-      allow write: if isSignedIn();
+      allow write: if true;
     }
   }
 }

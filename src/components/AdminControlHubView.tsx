@@ -67,10 +67,10 @@ export const AdminControlHubView: React.FC<AdminControlHubViewProps> = ({
   const [detailsOverview, setDetailsOverview] = useState(custom.detailsOverview || currentEvent?.detailsOverview || '');
   
   // Financial Summary State
-  const [totalIncome, setTotalIncome] = useState(custom.totalIncome || '₹ 5,90,322');
-  const [totalExpense, setTotalExpense] = useState(custom.totalExpense || '₹ 5,19,804');
-  const [netSurplus, setNetSurplus] = useState(custom.netSurplus || '₹ 79,976.04');
-  const [pendingReceivables, setPendingReceivables] = useState(custom.pendingReceivables || '₹ 65,000');
+  const [totalIncome, setTotalIncome] = useState(custom.totalIncome || '₹ 7,34,333');
+  const [totalExpense, setTotalExpense] = useState(custom.totalExpense || '₹ 6,19,706.96');
+  const [netSurplus, setNetSurplus] = useState(custom.netSurplus || '₹ 1,14,626.04');
+  const [pendingReceivables, setPendingReceivables] = useState(custom.pendingReceivables || '₹ 35,000');
   const [auditNote, setAuditNote] = useState(custom.auditNote || 'Formal expense audit completed and accounts published.');
 
   // Photos List State
@@ -102,10 +102,10 @@ export const AdminControlHubView: React.FC<AdminControlHubViewProps> = ({
     setDescription(evCustom.description || ev?.description || '');
     setDetailsOverview(evCustom.detailsOverview || ev?.detailsOverview || '');
 
-    setTotalIncome(evCustom.totalIncome || (ev?.festival === 'Ganesha Chaturthi' ? '₹ 5,90,322' : '₹ 1,65,000'));
-    setTotalExpense(evCustom.totalExpense || (ev?.festival === 'Ganesha Chaturthi' ? '₹ 5,19,804' : '₹ 1,20,000'));
-    setNetSurplus(evCustom.netSurplus || (ev?.festival === 'Ganesha Chaturthi' ? '₹ 79,976.04' : '₹ 45,000'));
-    setPendingReceivables(evCustom.pendingReceivables || (ev?.festival === 'Ganesha Chaturthi' ? '₹ 65,000' : '₹ 0'));
+    setTotalIncome(evCustom.totalIncome || (ev?.festival === 'Ganesha Chaturthi' ? '₹ 7,34,333' : '₹ 1,65,000'));
+    setTotalExpense(evCustom.totalExpense || (ev?.festival === 'Ganesha Chaturthi' ? '₹ 6,19,706.96' : '₹ 1,20,000'));
+    setNetSurplus(evCustom.netSurplus || (ev?.festival === 'Ganesha Chaturthi' ? '₹ 1,14,626.04' : '₹ 45,000'));
+    setPendingReceivables(evCustom.pendingReceivables || (ev?.festival === 'Ganesha Chaturthi' ? '₹ 35,000' : '₹ 0'));
     setAuditNote(evCustom.auditNote || 'Formal expense audit completed and accounts published.');
 
     const defaultPhotos = GALLERY_PHOTOS.filter(

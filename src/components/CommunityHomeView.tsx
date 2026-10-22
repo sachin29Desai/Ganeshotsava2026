@@ -404,11 +404,11 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
             onClick={() => handleNavigateTab('home')}
             className="flex items-center gap-3 cursor-pointer group select-none"
           >
-            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-red-600 via-red-600 to-amber-500 p-1.5 flex items-center justify-center shadow-xs border-2 border-yellow-400 group-hover:scale-105 transition-transform">
+            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-red-600 via-red-600 to-amber-500 p-0.5 flex items-center justify-center shadow-xs border-2 border-yellow-400 group-hover:scale-105 transition-transform overflow-hidden">
               <img
-                src="/lord_ganesha.svg"
-                alt="Lord Sri Ganesha"
-                className="w-full h-full object-contain filter drop-shadow-sm invert"
+                src="/assets/aistudio/image_8b234ce0.png"
+                alt="Goddess Bhuvaneshwari Devi & Kannada Flag"
+                className="w-full h-full object-cover rounded-lg"
                 referrerPolicy="no-referrer"
               />
             </div>
@@ -804,7 +804,7 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
                     Sri Ganeshotsava 2026 — Income &amp; Expenditure Statement
                   </h3>
                   <p className="text-xs sm:text-sm text-yellow-100 leading-relaxed">
-                    Total Collections: <strong>₹ 5,90,322</strong> | Total Expenses Incurred: <strong>₹ 5,19,804</strong> | Net Closing Surplus: <strong>₹ 79,976.04</strong> deposited in FD for Ganeshotsava 2027.
+                    Total Collections: <strong>₹ 7,34,333</strong> | Total Expenses Incurred: <strong>₹ 6,19,706.96</strong> | Net Closing Surplus: <strong>₹ 1,14,626.04</strong> deposited in FD for Ganeshotsava 2027.
                   </p>
                 </div>
 
@@ -972,10 +972,10 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
                           Financial Overview
                         </span>
                         <div className="text-xl font-black text-amber-900 dark:text-yellow-300">
-                          {customInfos[pastEvents[activePastEventIndex].id]?.totalIncome || '₹ 5,90,322 Collected'}
+                          {customInfos[pastEvents[activePastEventIndex].id]?.totalIncome || '₹ 7,34,333 Collected'}
                         </div>
                         <p className="text-[11px] text-amber-800/80 dark:text-amber-200/80 font-medium">
-                          Closing Surplus: {customInfos[pastEvents[activePastEventIndex].id]?.netSurplus || '₹ 79,976.04'} in FD
+                          Closing Surplus: {customInfos[pastEvents[activePastEventIndex].id]?.netSurplus || '₹ 1,14,626.04'} in FD
                         </p>
                       </div>
 
@@ -2180,11 +2180,11 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
           {/* Column 1: Brand Column */}
           <div className="space-y-3">
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-red-600 p-1 flex items-center justify-center border border-yellow-400 shadow-xs">
+              <div className="w-8 h-8 rounded-lg bg-red-600 p-0.5 flex items-center justify-center border border-yellow-400 shadow-xs overflow-hidden">
                 <img
-                  src="/lord_ganesha.svg"
-                  alt="Lord Ganesha"
-                  className="w-full h-full object-contain filter invert"
+                  src="/assets/aistudio/image_8b234ce0.png"
+                  alt="Goddess Bhuvaneshwari Devi & Kannada Flag"
+                  className="w-full h-full object-cover rounded-md"
                   referrerPolicy="no-referrer"
                 />
               </div>
@@ -2392,16 +2392,25 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
         isOpen={volunteerModalOpen}
         onClose={() => setVolunteerModalOpen(false)}
         currentUser={currentUser}
+        eventId={selectedEvent.id}
+        eventTitle={selectedEvent.title}
         onRequireLogin={() => {
           setVolunteerModalOpen(false);
           setAuthModalOpen(true);
         }}
+        isDark={isDark}
       />
 
       {/* 3. Nominate Cultural Act Modal */}
       <BalagaNominateModal
         isOpen={nominateModalOpen}
         onClose={() => setNominateModalOpen(false)}
+        currentUser={currentUser}
+        onOpenAuth={() => {
+          setNominateModalOpen(false);
+          setAuthModalOpen(true);
+        }}
+        isDark={isDark}
       />
 
       {/* 4. Policy Modals */}

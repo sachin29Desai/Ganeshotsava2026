@@ -112,7 +112,7 @@ export const COMMUNITY_EVENTS: CommunityEvent[] = [
     description:
       'Concluded grand Sri Ganesha Chaturthi celebration (completed on 18th of last month). The complete Income & Expenditure Statement, Financial Balance Sheet, and itemized accounts are published for public view and audit.',
     detailsOverview:
-      'Total Collections: ₹ 5,90,322 | Total Expenses Incurred: ₹ 5,19,804 | Net Closing Surplus: ₹ 79,976.04 deposited in Fixed Deposit (FD) for Ganeshotsava 2027. Pending sponsor receivables: ₹ 65,000.'
+      'Total Collections: ₹ 7,34,333 | Total Expenses Incurred: ₹ 6,19,706.96 | Net Closing Surplus: ₹ 1,14,626.04 deposited in Fixed Deposit (FD) for Ganeshotsava 2027. Pending sponsor receivables: ₹ 35,000.'
   },
   {
     id: 'rajyotsava-2025',

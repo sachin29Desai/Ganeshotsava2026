@@ -1,12 +1,36 @@
 import React, { useState } from 'react';
-import { X, ShieldCheck, CheckCircle2, AlertCircle, User as UserIcon, LogOut, Plus, Trash2 } from 'lucide-react';
-import { auth, googleProvider, signInWithPopup, firebaseSignOut, type User } from '../../lib/firebase';
+import {
+  X,
+  ShieldCheck,
+  CheckCircle2,
+  AlertCircle,
+  User as UserIcon,
+  LogOut,
+  LogIn,
+  UserPlus,
+  RefreshCw,
+  Loader2,
+  Lock,
+  Mail,
+  PhoneCall
+} from 'lucide-react';
+import {
+  auth,
+  googleProvider,
+  signInWithPopup,
+  firebaseSignOut,
+  cloudRegisterUser,
+  cloudLoginUser,
+  cloudResetPassword,
+  type User
+} from '../../lib/firebase';
+import { UserProfile } from '../../types';
 
 interface BalagaAuthModalProps {
   isOpen: boolean;
   onClose: () => void;
   currentUser: User | null;
-  onUserChange: (user: User | null) => void;
+  onUserChange: (user: User | null, profile?: UserProfile | null) => void;
   allowedEmails: string[];
   onUpdateAllowedEmails: (emails: string[]) => void;
   isAdmin: boolean;
@@ -21,9 +45,25 @@ export const BalagaAuthModal: React.FC<BalagaAuthModalProps> = ({
   onUpdateAllowedEmails,
   isAdmin
 }) => {
+  const [activeTab, setActiveTab] = useState<'login' | 'register' | 'forgot'>('login');
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [newEmailInput, setNewEmailInput] = useState('');
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  // Login inputs
+  const [loginQuery, setLoginQuery] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+
+  // Register inputs
+  const [regName, setRegName] = useState('');
+  const [regMobile, setRegMobile] = useState('');
+  const [regEmail, setRegEmail] = useState('');
+  const [regPassword, setRegPassword] = useState('');
+
+  // Reset inputs
+  const [resetQuery, setResetQuery] = useState('');
+  const [resetPassword, setResetPassword] = useState('');
 
   if (!isOpen) return null;
 
@@ -33,14 +73,23 @@ export const BalagaAuthModal: React.FC<BalagaAuthModalProps> = ({
     try {
       if (auth) {
         const result = await signInWithPopup(auth, googleProvider);
-        onUserChange(result.user);
+        const email = result.user.email || '';
+        const userProf: UserProfile = {
+          email: email.toLowerCase(),
+          name: result.user.displayName || email.split('@')[0],
+          mobile: '',
+          flat: '',
+          role: email.toLowerCase() === 'desaisachin95@gmail.com' ? 'admin' : 'viewer',
+          status: 'verified',
+          createdAt: new Date().toISOString()
+        };
+        onUserChange(result.user, userProf);
         onClose();
       } else {
-        throw new Error('Firebase Auth unavailable in current environment');
+        throw new Error('Firebase Auth unavailable');
       }
-    } catch (err: unknown) {
-      console.warn('Google popup error:', err);
-      setError('Google Sign-in popup was blocked or closed. Please allow popups and complete sign in through your Gmail account.');
+    } catch (err: any) {
+      setError('Google Sign-in popup was blocked or closed. Please try Mobile/Email & Password.');
     } finally {
       setLoading(false);
     }
@@ -48,93 +97,152 @@ export const BalagaAuthModal: React.FC<BalagaAuthModalProps> = ({
 
   const handleSignOut = async () => {
     try {
-      if (auth) {
-        await firebaseSignOut(auth);
-      }
+      if (auth) await firebaseSignOut(auth);
     } catch (e) {
       console.warn(e);
     }
-    onUserChange(null);
+    onUserChange(null, null);
   };
 
-  const handleAddAllowedEmail = () => {
-    const email = newEmailInput.trim().toLowerCase();
-    if (!email || !email.includes('@')) return;
-    if (!allowedEmails.includes(email)) {
-      onUpdateAllowedEmails([...allowedEmails, email]);
-      setNewEmailInput('');
+  const handleLoginSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!loginQuery.trim() || !loginPassword) {
+      setError('Please enter Email/Mobile and Password.');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const prof = await cloudLoginUser(loginQuery, loginPassword);
+      const syntheticUser = {
+        uid: `db_${prof.email.replace(/[^a-z0-9]/g, '_')}`,
+        email: prof.email,
+        displayName: prof.name
+      } as unknown as User;
+
+      onUserChange(syntheticUser, prof);
+      onClose();
+    } catch (err: any) {
+      setError(err?.message || 'Login failed.');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleRemoveAllowedEmail = (emailToRemove: string) => {
-    onUpdateAllowedEmails(allowedEmails.filter((e) => e !== emailToRemove));
+  const handleRegisterSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!regName.trim() || !regMobile.trim() || !regEmail.trim() || !regPassword) {
+      setError('All fields (Name, Mobile, Email, Password) are mandatory.');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const prof = await cloudRegisterUser({
+        name: regName,
+        mobile: regMobile,
+        email: regEmail,
+        flat: '',
+        password: regPassword
+      });
+
+      const syntheticUser = {
+        uid: `db_${prof.email.replace(/[^a-z0-9]/g, '_')}`,
+        email: prof.email,
+        displayName: prof.name
+      } as unknown as User;
+
+      onUserChange(syntheticUser, prof);
+      onClose();
+    } catch (err: any) {
+      setError(err?.message || 'Registration failed.');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const userEmail = currentUser?.email?.toLowerCase() || '';
-  const isEmailAllowed = allowedEmails.map((e) => e.toLowerCase()).includes(userEmail);
+  const handleResetSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetQuery.trim() || !resetPassword) {
+      setError('Please enter registered Email/Mobile and new password.');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      await cloudResetPassword(resetQuery, resetPassword);
+      setSuccessMsg('Password updated successfully! Please sign in.');
+      setTimeout(() => {
+        setActiveTab('login');
+        setSuccessMsg(null);
+      }, 1500);
+    } catch (err: any) {
+      setError(err?.message || 'Password reset failed.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-      <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border-2 border-red-600 relative animate-in fade-in zoom-in-95 max-h-[90vh] overflow-y-auto">
+      <div className="bg-white dark:bg-stone-900 rounded-2xl max-w-md w-full p-6 shadow-2xl border-2 border-red-600 dark:border-stone-800 relative animate-in fade-in zoom-in-95 max-h-[90vh] overflow-y-auto text-stone-900 dark:text-stone-100">
         {/* Karnataka Flag Header Strip */}
         <div className="h-2 w-full rounded-t-xl bg-gradient-to-r from-red-600 via-red-500 to-amber-400 absolute top-0 left-0" />
 
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 text-stone-400 hover:text-stone-700 p-1 cursor-pointer"
+          className="absolute top-4 right-4 text-stone-400 hover:text-stone-700 dark:hover:text-white p-1 cursor-pointer"
         >
           <X className="w-5 h-5" />
         </button>
 
-        {/* Brand */}
-        <div className="text-center space-y-2 mb-6 mt-1">
+        {/* Brand Header */}
+        <div className="text-center space-y-2 mb-5 mt-1">
           <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-red-600 to-amber-500 p-0.5 mx-auto flex items-center justify-center shadow-xs overflow-hidden">
             <img
-              src="/bhuvaneshwari_kannada_flag.jpg"
+              src="/assets/aistudio/image_8b234ce0.png"
               alt="Goddess Bhuvaneshwari Devi & Kannada Flag"
               className="w-full h-full object-cover rounded-lg"
               referrerPolicy="no-referrer"
             />
           </div>
-          <h3 className="text-xl font-serif font-black text-red-900">
-            ಎಲ್ ಡೊರಾಡೊ ಕನ್ನಡಿಗರ ಬಳಗ
+          <div className="inline-block bg-yellow-400/20 text-red-600 dark:text-yellow-400 border border-yellow-400/50 text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full tracking-wider">
+            ಕನ್ನಡಿಗರ ಬಳಗ
+          </div>
+          <h3 className="text-lg font-serif font-black text-red-700 dark:text-red-500">
+            Kannadigara Balaga Portal
           </h3>
-          <p className="text-xs text-stone-600">
-            Sign in with Gmail for Volunteer Access &amp; Balaga Portal
-          </p>
         </div>
 
-        {/* Current User Status */}
+        {/* Current Signed In status */}
         {currentUser ? (
-          <div className="bg-amber-50 border border-amber-300 rounded-xl p-4 mb-6 space-y-3">
+          <div className="bg-amber-50 dark:bg-stone-800 border border-amber-300 dark:border-stone-700 rounded-xl p-4 mb-4 space-y-3 text-xs">
             <div className="flex items-center gap-3">
-              {currentUser.photoURL ? (
-                <img
-                  src={currentUser.photoURL}
-                  alt={currentUser.displayName || ''}
-                  className="w-10 h-10 rounded-full border border-amber-400"
-                />
-              ) : (
-                <div className="w-10 h-10 rounded-full bg-red-600 text-yellow-300 flex items-center justify-center font-bold font-serif">
-                  {currentUser.displayName ? currentUser.displayName[0].toUpperCase() : 'U'}
-                </div>
-              )}
+              <div className="w-9 h-9 rounded-full bg-red-600 text-yellow-300 flex items-center justify-center font-bold">
+                {currentUser.displayName ? currentUser.displayName[0].toUpperCase() : 'U'}
+              </div>
               <div className="overflow-hidden">
-                <h4 className="text-xs font-bold text-stone-900 truncate">
+                <h4 className="font-bold text-stone-900 dark:text-stone-100 truncate">
                   {currentUser.displayName || 'Resident Member'}
                 </h4>
-                <p className="text-[11px] text-stone-600 truncate">{currentUser.email}</p>
+                <p className="text-[11px] text-stone-600 dark:text-stone-300 truncate">{currentUser.email}</p>
               </div>
             </div>
 
-            <div className="flex items-center justify-between pt-2 border-t border-amber-200 text-xs">
-              <span className="flex items-center gap-1 font-bold text-emerald-700">
+            <div className="flex items-center justify-between pt-2 border-t border-amber-200 dark:border-stone-700">
+              <span className="flex items-center gap-1 font-bold text-emerald-700 dark:text-emerald-400">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                <span>Signed In with Gmail</span>
+                <span>Signed In</span>
               </span>
               <button
                 onClick={handleSignOut}
-                className="text-red-700 hover:text-red-900 font-bold inline-flex items-center gap-1 cursor-pointer"
+                className="text-red-700 dark:text-red-400 hover:underline font-bold inline-flex items-center gap-1 cursor-pointer"
               >
                 <LogOut className="w-3.5 h-3.5" />
                 <span>Sign Out</span>
@@ -142,104 +250,200 @@ export const BalagaAuthModal: React.FC<BalagaAuthModalProps> = ({
             </div>
           </div>
         ) : (
-          <div className="space-y-4 mb-6">
-            <button
-              onClick={handleGoogleSignIn}
-              disabled={loading}
-              className="w-full py-3 px-4 rounded-xl border-2 border-stone-300 hover:border-red-600 hover:bg-stone-50 font-bold text-xs text-stone-800 transition-all shadow-xs inline-flex items-center justify-center gap-3 cursor-pointer disabled:opacity-50"
-            >
-              <svg className="w-4 h-4" viewBox="0 0 24 24">
-                <path
-                  fill="#4285F4"
-                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                />
-                <path
-                  fill="#34A853"
-                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                />
-                <path
-                  fill="#FBBC05"
-                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-                />
-                <path
-                  fill="#EA4335"
-                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-                />
-              </svg>
-              <span>{loading ? 'Connecting with Gmail...' : 'Sign in with Gmail'}</span>
-            </button>
-
-            {error && (
-              <p className="text-[11px] text-amber-800 bg-amber-50 p-2.5 rounded-xl border border-amber-200">
-                {error}
-              </p>
-            )}
-
-            <p className="text-[11px] text-center text-stone-500 leading-relaxed">
-              Login is exclusively enabled through Gmail to verify verified residency and committee volunteer status.
-            </p>
-          </div>
-        )}
-
-        {/* Admin Manage Allowed Logins Section */}
-        {isAdmin && (
-          <div className="border-t border-stone-200 pt-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-red-900 flex items-center gap-1.5">
-                <ShieldCheck className="w-4 h-4 text-red-600" />
-                <span>Admin: Approved Gmail Logins List</span>
-              </span>
-              <span className="text-[10px] bg-red-100 text-red-800 font-bold px-1.5 py-0.5 rounded">
-                {allowedEmails.length} permitted
-              </span>
-            </div>
-            <p className="text-[11px] text-stone-500">
-              Only approved Gmails can access committee admin tools. Add resident emails below:
-            </p>
-
-            <div className="flex gap-2">
-              <input
-                type="email"
-                placeholder="new.admin@gmail.com"
-                value={newEmailInput}
-                onChange={(e) => setNewEmailInput(e.target.value)}
-                className="flex-1 text-xs px-3 py-1.5 border border-stone-300 rounded-lg outline-none focus:border-red-600"
-              />
+          <div className="space-y-4">
+            {/* Navigation Tabs */}
+            <div className="flex border-b border-stone-200 dark:border-stone-800 font-bold text-xs">
               <button
-                onClick={handleAddAllowedEmail}
-                className="px-3 py-1.5 bg-amber-400 hover:bg-amber-300 text-stone-950 font-bold text-xs rounded-lg inline-flex items-center gap-1 cursor-pointer"
+                onClick={() => {
+                  setActiveTab('login');
+                  setError(null);
+                }}
+                className={`flex-1 py-2 text-center border-b-2 transition-colors cursor-pointer ${
+                  activeTab === 'login' ? 'border-red-600 text-red-700 dark:text-yellow-400 font-black' : 'border-transparent text-stone-400'
+                }`}
               >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Add</span>
+                Sign In
+              </button>
+              <button
+                onClick={() => {
+                  setActiveTab('register');
+                  setError(null);
+                }}
+                className={`flex-1 py-2 text-center border-b-2 transition-colors cursor-pointer ${
+                  activeTab === 'register' ? 'border-red-600 text-red-700 dark:text-yellow-400 font-black' : 'border-transparent text-stone-400'
+                }`}
+              >
+                Register
+              </button>
+              <button
+                onClick={() => {
+                  setActiveTab('forgot');
+                  setError(null);
+                }}
+                className={`flex-1 py-2 text-center border-b-2 transition-colors cursor-pointer ${
+                  activeTab === 'forgot' ? 'border-red-600 text-red-700 dark:text-yellow-400 font-black' : 'border-transparent text-stone-400'
+                }`}
+              >
+                Forgot Password
               </button>
             </div>
 
-            <div className="max-h-32 overflow-y-auto space-y-1.5 pt-1">
-              {allowedEmails.map((email) => (
-                <div
-                  key={email}
-                  className="flex items-center justify-between bg-stone-50 px-2.5 py-1.5 rounded-lg border border-stone-200 text-xs"
-                >
-                  <span className="font-mono text-stone-700 text-[11px] truncate">{email}</span>
-                  {allowedEmails.length > 1 && (
-                    <button
-                      onClick={() => handleRemoveAllowedEmail(email)}
-                      className="text-stone-400 hover:text-red-600 p-0.5"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  )}
+            {error && (
+              <div className="p-3 rounded-xl bg-red-50 dark:bg-red-950/60 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 text-xs font-semibold">
+                {error}
+              </div>
+            )}
+
+            {successMsg && (
+              <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 text-xs font-semibold">
+                {successMsg}
+              </div>
+            )}
+
+            {/* TAB: LOGIN */}
+            {activeTab === 'login' && (
+              <form onSubmit={handleLoginSubmit} className="space-y-3 text-xs">
+                <div>
+                  <label className="block font-bold mb-1 text-stone-800 dark:text-stone-200">Email or Mobile *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Registered email or 10-digit mobile"
+                    value={loginQuery}
+                    onChange={(e) => setLoginQuery(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 text-stone-900 dark:text-stone-100 rounded-xl outline-none focus:border-red-600 dark:focus:border-yellow-400 font-medium"
+                  />
                 </div>
-              ))}
-            </div>
+                <div>
+                  <label className="block font-bold mb-1 text-stone-800 dark:text-stone-200">Password *</label>
+                  <input
+                    type="password"
+                    required
+                    placeholder="Enter password"
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 text-stone-900 dark:text-stone-100 rounded-xl outline-none focus:border-red-600 dark:focus:border-yellow-400 font-medium"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-yellow-300 font-bold shadow-xs cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogIn className="w-4 h-4" />}
+                  <span>Sign In</span>
+                </button>
+
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    onClick={handleGoogleSignIn}
+                    disabled={loading}
+                    className="w-full py-2 px-3 rounded-xl border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-800 hover:bg-stone-50 font-bold text-stone-700 dark:text-stone-200 cursor-pointer inline-flex items-center justify-center gap-2"
+                  >
+                    <span>Google Sign-In</span>
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* TAB: REGISTER */}
+            {activeTab === 'register' && (
+              <form onSubmit={handleRegisterSubmit} className="space-y-3 text-xs">
+                <div>
+                  <label className="block font-bold mb-1 text-stone-800 dark:text-stone-200">Full Name *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Full name"
+                    value={regName}
+                    onChange={(e) => setRegName(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 text-stone-900 dark:text-stone-100 rounded-xl outline-none focus:border-red-600 dark:focus:border-yellow-400 font-medium"
+                  />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div>
+                    <label className="block font-bold mb-1 text-stone-800 dark:text-stone-200">Mobile *</label>
+                    <input
+                      type="tel"
+                      required
+                      placeholder="10-digit mobile"
+                      value={regMobile}
+                      onChange={(e) => setRegMobile(e.target.value)}
+                      className="w-full px-3.5 py-2.5 bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 text-stone-900 dark:text-stone-100 rounded-xl outline-none focus:border-red-600 dark:focus:border-yellow-400 font-medium"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold mb-1 text-stone-800 dark:text-stone-200">Email Address *</label>
+                    <input
+                      type="email"
+                      required
+                      placeholder="name@example.com"
+                      value={regEmail}
+                      onChange={(e) => setRegEmail(e.target.value)}
+                      className="w-full px-3.5 py-2.5 bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 text-stone-900 dark:text-stone-100 rounded-xl outline-none focus:border-red-600 dark:focus:border-yellow-400 font-medium"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block font-bold mb-1 text-stone-800 dark:text-stone-200">Create Password *</label>
+                  <input
+                    type="password"
+                    required
+                    placeholder="Password (min 6 chars)"
+                    value={regPassword}
+                    onChange={(e) => setRegPassword(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 text-stone-900 dark:text-stone-100 rounded-xl outline-none focus:border-red-600 dark:focus:border-yellow-400 font-medium"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-yellow-300 font-bold shadow-xs cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
+                  <span>Register Account</span>
+                </button>
+              </form>
+            )}
+
+            {/* TAB: FORGOT PASSWORD */}
+            {activeTab === 'forgot' && (
+              <form onSubmit={handleResetSubmit} className="space-y-3 text-xs">
+                <div>
+                  <label className="block font-bold mb-1 text-stone-800 dark:text-stone-200">Registered Email or Mobile *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Enter email or mobile"
+                    value={resetQuery}
+                    onChange={(e) => setResetQuery(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 text-stone-900 dark:text-stone-100 rounded-xl outline-none focus:border-red-600 dark:focus:border-yellow-400 font-medium"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold mb-1 text-stone-800 dark:text-stone-200">New Password *</label>
+                  <input
+                    type="password"
+                    required
+                    placeholder="New password (min 6 chars)"
+                    value={resetPassword}
+                    onChange={(e) => setResetPassword(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 text-stone-900 dark:text-stone-100 rounded-xl outline-none focus:border-red-600 dark:focus:border-yellow-400 font-medium"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-yellow-300 font-bold shadow-xs cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                  <span>Reset Password</span>
+                </button>
+              </form>
+            )}
           </div>
         )}
-
-        <div className="mt-4 pt-3 border-t border-stone-100 text-center">
-          <p className="text-[10px] text-stone-400">
-            Kannadigara Balaga Portal • Secured with Google Identity &amp; DPDP compliance
-          </p>
-        </div>
       </div>
     </div>
   );

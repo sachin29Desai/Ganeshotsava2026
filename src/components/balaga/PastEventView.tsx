@@ -65,10 +65,10 @@ export const PastEventView: React.FC<PastEventViewProps> = ({
   const displayOverview = customInfo?.detailsOverview || customInfo?.description || event.detailsOverview || event.description;
 
   // Dynamic Financials Overview
-  const totalIncome = customInfo?.totalIncome || (event.festival === 'Ganesha Chaturthi' ? '₹ 5,90,322' : '₹ 1,65,000');
-  const totalExpense = customInfo?.totalExpense || (event.festival === 'Ganesha Chaturthi' ? '₹ 5,19,804' : '₹ 1,20,000');
-  const netSurplus = customInfo?.netSurplus || (event.festival === 'Ganesha Chaturthi' ? '₹ 79,976.04' : '₹ 45,000');
-  const pendingReceivables = customInfo?.pendingReceivables || (event.festival === 'Ganesha Chaturthi' ? '₹ 65,000' : '₹ 0');
+  const totalIncome = customInfo?.totalIncome || (event.festival === 'Ganesha Chaturthi' ? '₹ 7,34,333' : '₹ 1,65,000');
+  const totalExpense = customInfo?.totalExpense || (event.festival === 'Ganesha Chaturthi' ? '₹ 6,19,706.96' : '₹ 1,20,000');
+  const netSurplus = customInfo?.netSurplus || (event.festival === 'Ganesha Chaturthi' ? '₹ 1,14,626.04' : '₹ 45,000');
+  const pendingReceivables = customInfo?.pendingReceivables || (event.festival === 'Ganesha Chaturthi' ? '₹ 35,000' : '₹ 0');
   const auditNote = customInfo?.auditNote || 'The official audit is completed and accounts are verified by the resident committee.';
 
   return (

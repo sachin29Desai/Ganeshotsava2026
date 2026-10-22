@@ -1804,7 +1804,7 @@ export function App() {
             ) : (
               <div className="w-10 h-10 rounded-full bg-amber-400 text-[#991B1B] flex items-center justify-center p-0.5 shadow-inner shrink-0 overflow-hidden border border-amber-300">
                 <img
-                  src="/bhuvaneshwari_kannada_flag.jpg"
+                  src="/assets/aistudio/image_8b234ce0.png"
                   alt="Goddess Bhuvaneshwari Devi & Kannada Flag"
                   className="w-full h-full object-cover rounded-full"
                   referrerPolicy="no-referrer"

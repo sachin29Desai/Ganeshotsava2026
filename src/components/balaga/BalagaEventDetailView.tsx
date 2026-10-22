@@ -26,6 +26,7 @@ import { CommunityEvent, GALLERY_PHOTOS, GalleryPhoto, GANESHA_FAQS } from '../.
 import { db } from '../../lib/firebase';
 import { collection, getDocs } from 'firebase/firestore';
 import { UserRole, UserProfile } from '../../types';
+import { EventVolunteersList } from './EventVolunteersList';
 
 interface BalagaEventDetailViewProps {
   event: CommunityEvent;
@@ -266,6 +267,14 @@ export const BalagaEventDetailView: React.FC<BalagaEventDetailViewProps> = ({
         )}
       </section>
 
+      {/* Event-Specific Volunteers List */}
+      <EventVolunteersList
+        eventId={event.id}
+        eventTitle={event.title}
+        onOpenVolunteerModal={() => onOpenVolunteer()}
+        isDark={isDark}
+      />
+
       {/* 2. Photo Gallery & Moments Highlights */}
       <section className="space-y-4">
         <div className="flex items-center justify-between">
@@ -336,10 +345,10 @@ export const BalagaEventDetailView: React.FC<BalagaEventDetailViewProps> = ({
                   <Coins className="w-5 h-5 text-emerald-600" />
                 </div>
                 <div className="text-2xl font-black text-emerald-700 dark:text-emerald-400">
-                  ₹ 5,90,322
+                  ₹ 7,34,333
                 </div>
                 <p className="text-[11px] text-stone-500">
-                  Voluntary Devotee Contributions + Corporate Sponsors
+                  Voluntary Devotee Contributions + Corporate Sponsors + Commercial Stalls + Hundi
                 </p>
               </div>
 
@@ -353,7 +362,7 @@ export const BalagaEventDetailView: React.FC<BalagaEventDetailViewProps> = ({
                   <Receipt className="w-5 h-5 text-red-600" />
                 </div>
                 <div className="text-2xl font-black text-red-700 dark:text-red-400">
-                  ₹ 5,19,804
+                  ₹ 6,19,706.96
                 </div>
                 <p className="text-[11px] text-stone-500">
                   100% bank-processed vendor &amp; supplier settlements
@@ -366,7 +375,7 @@ export const BalagaEventDetailView: React.FC<BalagaEventDetailViewProps> = ({
                   <TrendingUp className="w-5 h-5 text-amber-600" />
                 </div>
                 <div className="text-2xl font-black text-amber-700 dark:text-yellow-400">
-                  ₹ 79,976.04
+                  ₹ 1,14,626.04
                 </div>
                 <p className="text-[11px] text-amber-900/80 dark:text-amber-200/80 font-medium">
                   Deposited in Fixed Deposit (FD) for future celebrations
@@ -383,7 +392,7 @@ export const BalagaEventDetailView: React.FC<BalagaEventDetailViewProps> = ({
                   <Clock className="w-5 h-5 text-blue-600" />
                 </div>
                 <div className="text-2xl font-black text-blue-700 dark:text-blue-400">
-                  ₹ 65,000
+                  ₹ 35,000
                 </div>
                 <p className="text-[11px] text-stone-500">
                   Pending sponsor receivables under active follow-up

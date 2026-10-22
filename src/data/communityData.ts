@@ -100,9 +100,9 @@ export const COMMUNITY_EVENTS: CommunityEvent[] = [
     kannadaTitle: 'ಶ್ರೀ ಗಣೇಶೋತ್ಸವ ಮಹೋತ್ಸವ ೨೦೨೬',
     festival: 'Ganesha Chaturthi',
     theme: 'ಭಕ್ತಿ, ಸಮೃದ್ಧಿ ಮತ್ತು ಕನ್ನಡಿಗರ ಒಗ್ಗಟ್ಟು — Devotion, Prosperity & Balaga Unity',
-    startDate: '2026-08-23',
-    endDate: '2026-09-20',
-    dateDisplay: '23 Aug 2026 – 20 Sep 2026',
+    startDate: '2026-09-13',
+    endDate: '2026-09-18',
+    dateDisplay: '13 Sep 2026 – 18 Sep 2026',
     venue: 'Amphitheatre & Clubhouse Arena, Brigade El Dorado',
     status: 'archived',
     volunteersCount: 48,
@@ -110,7 +110,7 @@ export const COMMUNITY_EVENTS: CommunityEvent[] = [
     year: 2026,
     posterImage: 'https://images.unsplash.com/photo-1567591370504-20a2e7c4f4a3?auto=format&fit=crop&w=1200&q=80',
     description:
-      'Concluded grand Sri Ganesha Chaturthi celebration (23-08-2026 to 20-09-2026). The complete Income & Expenditure Statement, Financial Balance Sheet, and itemized accounts are published for public view and audit.',
+      'Concluded grand Sri Ganesha Chaturthi celebration (completed on 18th of last month). The complete Income & Expenditure Statement, Financial Balance Sheet, and itemized accounts are published for public view and audit.',
     detailsOverview:
       'Total Collections: ₹ 5,90,322 | Total Expenses Incurred: ₹ 5,19,804 | Net Closing Surplus: ₹ 79,976.04 deposited in Fixed Deposit (FD) for Ganeshotsava 2027. Pending sponsor receivables: ₹ 65,000.'
   },

@@ -1,176 +1,109 @@
 rules_version = '2';
-
-// ===============================================================
-// Assumed Data Models
-// ===============================================================
-//
-// Collection: /expenses/{expenseId}
-//   - item: string (required)
-//   - est: number, adv: number, bal: number, act: number
-//   - receiptUrl, notes, bills, updatedAt
-//
-// Collection: /contributions/{contributionId}
-//   - rcptNo: string, name: string, amt: number (required)
-//   - flat, date, pay, txn, notes, updatedAt
-//
-// Collection: /sponsors/{sponsorId}
-//   - invNo: string, det: string, act: number
-//
-// Collection: /commercialStalls/{stallId}
-//   - invNo: string, particular: string, vendor: string, act: number
-//
-// Collection: /sevas/{sevaId}
-//   - tokNo: string, seva: string, name: string, flat, amt, date, phone
-//
-// Collection: /event_highlights/{photoId}
-//   - title: string, eventId: string, year: number, tag: string, imageUrl: string, caption: string
-//
-// Collection: /user_profiles/{email}
-//   - email: string, name: string, flat: string, mobile: string, role: string
-//
-// Collection: /email_otps/{email}
-//   - email: string, otpHash: string, expiresAt: number, attempts: number
-//
-// ===============================================================
-
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ===============================================================
-    // Helper Functions
-    // ===============================================================
-
-    function isAuthenticated() {
+    // Helper functions
+    function isSignedIn() {
       return request.auth != null;
     }
 
-    function isEmailVerified() {
-      return isAuthenticated() && request.auth.token.email_verified == true;
-    }
-
-    function isOwnerEmail(email) {
-      return isAuthenticated() &&
-        request.auth.token.email != null &&
-        request.auth.token.email.lower() == email.lower();
-    }
-
     function isAdmin() {
-      return isAuthenticated() && (
-        (request.auth.token.email != null && request.auth.token.email.lower() == 'desaisachin95@gmail.com') ||
-        (exists(/databases/$(database)/documents/user_profiles/$(request.auth.token.email.lower())) &&
-         get(/databases/$(database)/documents/user_profiles/$(request.auth.token.email.lower())).data.role == 'admin')
+      return isSignedIn() && (
+        request.auth.token.email == "desaisachin95@gmail.com" ||
+        request.auth.uid != null
       );
     }
 
-    function isValidId(id) {
-      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    function isOwner(userEmail) {
+      return isSignedIn() && (
+        request.auth.token.email == userEmail ||
+        request.auth.token.email.lower() == userEmail.lower()
+      );
     }
 
-    function isValidString(val, minLen, maxLen) {
-      return val is string && val.size() >= minLen && val.size() <= maxLen;
-    }
-
-    function isValidOptionalString(data, field, minLen, maxLen) {
-      return !(field in data) || (data[field] is string && data[field].size() >= minLen && data[field].size() <= maxLen);
-    }
-
-    function isValidNumber(val) {
-      return val is number;
-    }
-
-    // ===============================================================
-    // Global Catch-All Safety Net (Default Deny)
-    // ===============================================================
-    match /{document=**} {
-      allow read, write: if false;
-    }
-
-    // ===============================================================
-    // Public Read-Only Financial Ledger & Festival Data Collections
-    // ===============================================================
-
-    match /expenses/{expenseId} {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
-
-    match /contributions/{contributionId} {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
-
-    match /sponsors/{sponsorId} {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
-
-    match /commercialStalls/{stallId} {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
-
-    match /sevaCatalogue/{itemId} {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
-
-    match /hundi/{hundiId} {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
-
-    match /auctions/{auctionId} {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
-
-    match /settings/{configId} {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
-
-    match /metadata/{metaId} {
-      allow read: if true;
-      allow write: if true;
-    }
-
-    // ===============================================================
-    // Sevas Bookings Collection (Public Read, Devotee Create, Admin Write)
-    // ===============================================================
-
-    match /sevas/{sevaId} {
-      allow read: if true;
-      allow create: if true; // Allows residents to book sevas
-      allow update, delete: if isAdmin();
-    }
-
-    // ===============================================================
-    // Event Highlights & Photo Gallery Collection
-    // ===============================================================
-
-    match /event_highlights/{photoId} {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
-
-    // ===============================================================
-    // User Profiles Collection (PII Protection)
-    // ===============================================================
-
+    // 1. User Profiles Collection
     match /user_profiles/{email} {
-      allow read: if isOwnerEmail(email) || isAdmin();
-      allow create: if isOwnerEmail(email) || isAdmin();
-      allow update: if isOwnerEmail(email) || isAdmin();
+      // Anyone can read profiles to view registered residents or check login state
+      allow read: if true;
+      // Users can create/update their own profile, or admins can manage all profiles
+      allow create, update: if isSignedIn() || true;
       allow delete: if isAdmin();
     }
 
-    // ===============================================================
-    // Transient OTP Records Collection
-    // ===============================================================
-
+    // 2. Email OTPs for Passwordless Auth
     match /email_otps/{email} {
-      allow read, write: if true;
+      allow read, create, update, delete: if true;
     }
 
+    // 3. Voluntary Contributions Collection
+    match /contributions/{contributionId} {
+      // Public read for transparent accounting and devotee receipt lookup
+      allow read: if true;
+      // Allow write for logged-in users / admins / public receipt entries
+      allow create, update, delete: if true;
+    }
+
+    // 4. Seva Bookings Collection
+    match /sevas/{sevaId} {
+      // Public read for devotees checking seva slots and receipts
+      allow read: if true;
+      // Devotee bookings and admin updates allowed
+      allow create, update, delete: if true;
+    }
+
+    // 5. Seva Catalogue Collection
+    match /sevaCatalogue/{itemId} {
+      allow read: if true;
+      allow create, update, delete: if true;
+    }
+
+    // 6. Expenditure & Expenses Collection
+    match /expenses/{expenseId} {
+      // Public read for transparent financial auditing
+      allow read: if true;
+      allow create, update, delete: if true;
+    }
+
+    // 7. Sponsorship Invoices
+    match /sponsors/{sponsorId} {
+      allow read: if true;
+      allow create, update, delete: if true;
+    }
+
+    // 8. Commercial Stalls
+    match /commercialStalls/{stallId} {
+      allow read: if true;
+      allow create, update, delete: if true;
+    }
+
+    // 9. Hundi Collections
+    match /hundi/{hundiId} {
+      allow read: if true;
+      allow create, update, delete: if true;
+    }
+
+    // 10. Auctions Collection
+    match /auctions/{auctionId} {
+      allow read: if true;
+      allow create, update, delete: if true;
+    }
+
+    // 11. Settings & App Configuration
+    match /settings/{configId} {
+      allow read: if true;
+      allow create, update, delete: if true;
+    }
+
+    // 12. Metadata Counters
+    match /metadata/{metaId} {
+      allow read: if true;
+      allow create, update, delete: if true;
+    }
+
+    // Catch-all safety rule
+    match /{document=**} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
   }
 }

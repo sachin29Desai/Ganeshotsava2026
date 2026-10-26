@@ -66,15 +66,14 @@ async function startServer() {
     try {
       const { email, otp, orgName, magicLink } = req.body;
 
-      if (!email || !otp) {
-        return res.status(400).json({ success: false, error: 'Email and OTP are required' });
+      if (!email) {
+        return res.status(400).json({ success: false, error: 'Email is required' });
       }
 
       const cleanEmail = email.toLowerCase().trim();
-      const org = orgName || 'Eldorado Kannadigara Balaga — Ganeshotsava 2026';
-      const subject = `Your Ganeshotsava 2026 Sign-In Link & OTP: ${otp}`;
+      const org = 'Kannadigara Balaga Portal';
+      const subject = `🌺 Kannadigara Balaga — Member Access Link`;
 
-      // Dynamically detect the correct public or preview host from request referer or origin
       let requestOrigin = '';
       if (req.headers.referer) {
         try {
@@ -85,73 +84,39 @@ async function startServer() {
       if (!requestOrigin && req.headers.origin) {
         requestOrigin = req.headers.origin as string;
       }
-      if (!requestOrigin && req.headers['x-forwarded-host']) {
-        const proto = (req.headers['x-forwarded-proto'] as string) || 'https';
-        requestOrigin = `${proto}://${req.headers['x-forwarded-host']}`;
-      } else if (!requestOrigin && req.headers.host) {
-        const proto = (req.headers['x-forwarded-proto'] as string) || 'https';
-        requestOrigin = `${proto}://${req.headers.host}`;
-      }
-      
-      // Default fallback to the public Shared App URL so other users can always access it
       if (!requestOrigin || requestOrigin.includes('localhost') || requestOrigin.includes('127.0.0.1')) {
         requestOrigin = process.env.SHARED_APP_URL || 'https://ais-pre-g52qlb745qhljbygjytqsi-1225695896.asia-east1.run.app';
       }
 
-      // If the incoming magicLink points to localhost or private dev URL, translate it to the correct public preview host
-      let resolvedMagicLink = magicLink || '';
-      if (resolvedMagicLink) {
-        try {
-          const magicUrl = new URL(resolvedMagicLink);
-          if (requestOrigin.includes('ais-pre-') && (magicUrl.origin.includes('localhost') || magicUrl.origin.includes('ais-dev-'))) {
-            resolvedMagicLink = `${requestOrigin}${magicUrl.pathname}${magicUrl.search}`;
-          }
-        } catch (_) {
-          resolvedMagicLink = '';
-        }
-      }
+      const targetMagicLink = magicLink || `${requestOrigin}?email=${encodeURIComponent(cleanEmail)}&action=login`;
 
-      let fallbackMagicLink = resolvedMagicLink || `${requestOrigin}?email=${encodeURIComponent(cleanEmail)}`;
-      if (fallbackMagicLink && !fallbackMagicLink.includes('otp=')) {
-        fallbackMagicLink += `${fallbackMagicLink.includes('?') ? '&' : '?'}otp=${encodeURIComponent(otp)}`;
-      }
-      
       const htmlContent = `
         <div style="font-family: Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; border: 1px solid #e5e7eb; border-radius: 12px; background-color: #ffffff;">
           <div style="text-align: center; border-bottom: 2px solid #991b1b; padding-bottom: 16px; margin-bottom: 20px;">
             <h2 style="color: #991b1b; margin: 0; font-size: 22px;">🌺 ${org}</h2>
-            <p style="color: #6b7280; font-size: 13px; margin: 4px 0 0 0;">Devotee & Resident Portal Sign-In</p>
+            <p style="color: #6b7280; font-size: 13px; margin: 4px 0 0 0;">Devotee & Resident Member Access</p>
           </div>
           <p style="color: #374151; font-size: 15px; line-height: 1.5;">
             Namaskara / Hello,
           </p>
           <p style="color: #374151; font-size: 14px; line-height: 1.5;">
-            You requested sign-in to the <strong>Ganeshotsava 2026</strong> portal for <strong>${cleanEmail}</strong>.
+            You requested access for <strong>${cleanEmail}</strong> on the <strong>Kannadigara Balaga Portal</strong>.
           </p>
-          ${fallbackMagicLink ? `
-          <div style="text-align: center; margin: 24px 0 16px 0;">
-            <a href="${fallbackMagicLink}" style="display: inline-block; background-color: #991b1b; color: #ffffff; text-decoration: none; padding: 13px 28px; font-weight: 800; border-radius: 8px; font-size: 15px; letter-spacing: 0.5px;">
-              🚀 Click Here to Sign In Automatically
+          <div style="text-align: center; margin: 28px 0;">
+            <a href="${targetMagicLink}" style="display: inline-block; background-color: #991b1b; color: #ffffff; text-decoration: none; padding: 14px 28px; font-weight: 800; border-radius: 10px; font-size: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+              🚀 Click Here to Sign In / Access Portal
             </a>
           </div>
-          <p style="text-align: center; color: #6b7280; font-size: 12px; margin-bottom: 24px;">
-            (Instant 1-click login — no password or confirmation needed)
+          <p style="text-align: center; color: #4b5563; font-size: 12px; line-height: 1.5; margin-bottom: 20px;">
+            Or copy and paste this access link into your browser:<br/>
+            <a href="${targetMagicLink}" style="color: #991b1b; word-break: break-all;">${targetMagicLink}</a>
           </p>
-          ` : ''}
-          <p style="color: #374151; font-size: 13px; line-height: 1.5; margin-bottom: 8px;">
-            Or enter this 6-digit verification code (OTP) on the login page:
-          </p>
-          <div style="text-align: center; margin: 16px 0 24px 0;">
-            <span style="display: inline-block; font-size: 32px; font-weight: 800; letter-spacing: 8px; color: #991b1b; background-color: #fef2f2; border: 2px dashed #dc2626; padding: 10px 24px; border-radius: 10px; font-family: monospace;">
-              ${otp}
-            </span>
-          </div>
           <p style="color: #4b5563; font-size: 13px; line-height: 1.5;">
-            ⏱️ This link and OTP are valid for <strong>10 minutes</strong>.
+            ⏱️ This access link is valid for <strong>15 minutes</strong>.
           </p>
           <p style="color: #9ca3af; font-size: 12px; line-height: 1.4; border-top: 1px solid #f3f4f6; padding-top: 14px; margin-top: 24px;">
-            If you did not request this sign-in link, you can safely ignore this email.<br/>
-            <em>Ganapati Bappa Morya! 🙏</em>
+            If you did not request this link, you can safely ignore this email.<br/>
+            <em>Kannadigara Balaga Executive Committee 🙏</em>
           </p>
         </div>
       `;
@@ -171,12 +136,18 @@ async function startServer() {
       let emailSentSuccessfully = false;
       let emailProviderUsed = 'none';
 
-      // 1. SMTP / Gmail Nodemailer Transport (if configured in environment)
+      // 1. SMTP / Gmail Nodemailer Transport (if valid credentials configured in environment)
       const smtpUser = process.env.SMTP_USER || process.env.GMAIL_USER;
       const smtpPass = process.env.SMTP_PASS || process.env.GMAIL_APP_PASSWORD;
       const smtpHost = process.env.SMTP_HOST || (smtpUser && smtpUser.includes('@gmail.com') ? 'smtp.gmail.com' : undefined);
 
-      if (!emailSentSuccessfully && smtpUser && smtpPass && smtpHost) {
+      const isPlaceholderPass = !smtpPass ||
+        smtpPass.includes('your_') ||
+        smtpPass.includes('password') ||
+        smtpPass.includes('<') ||
+        smtpPass.length < 8;
+
+      if (!emailSentSuccessfully && smtpUser && smtpPass && !isPlaceholderPass && smtpHost) {
         try {
           const transporter = nodemailer.createTransport({
             host: smtpHost,
@@ -189,7 +160,7 @@ async function startServer() {
           });
 
           await transporter.sendMail({
-            from: `"Ganeshotsava 2026" <${smtpUser}>`,
+            from: `"Kannadigara Balaga" <${smtpUser}>`,
             to: cleanEmail,
             subject,
             html: htmlContent
@@ -197,9 +168,9 @@ async function startServer() {
 
           emailSentSuccessfully = true;
           emailProviderUsed = 'smtp';
-          console.log(`[EMAIL DISPATCH] Verification email with code dispatched via SMTP to ${cleanEmail}`);
+          console.log(`[EMAIL DISPATCH] Access link email dispatched via SMTP to ${cleanEmail}`);
         } catch (smtpErr: any) {
-          console.warn('SMTP send failed:', smtpErr?.message);
+          console.warn('[SMTP WARNING] SMTP login not accepted or invalid password. Falling back to direct Web3Forms dispatch:', smtpErr?.message);
         }
       }
 
@@ -213,7 +184,7 @@ async function startServer() {
               'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-              from: process.env.EMAIL_FROM || 'Ganeshotsava 2026 <onboarding@resend.dev>',
+              from: process.env.EMAIL_FROM || 'Kannadigara Balaga <onboarding@resend.dev>',
               to: [cleanEmail],
               subject,
               html: htmlContent
@@ -222,7 +193,7 @@ async function startServer() {
           if (resendResp.ok) {
             emailSentSuccessfully = true;
             emailProviderUsed = 'resend';
-            console.log(`[EMAIL DISPATCH] Verification email with code dispatched via Resend to ${cleanEmail}`);
+            console.log(`[EMAIL DISPATCH] Access link email dispatched via Resend to ${cleanEmail}`);
           }
         } catch (e) {
           console.warn('Resend provider error:', e);
@@ -239,7 +210,7 @@ async function startServer() {
               'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-              sender: { name: 'Ganeshotsava 2026', email: process.env.EMAIL_FROM || 'noreply@eldoradobalagi.org' },
+              sender: { name: 'Kannadigara Balaga', email: process.env.EMAIL_FROM || 'noreply@eldoradobalagi.org' },
               to: [{ email: cleanEmail }],
               subject,
               htmlContent
@@ -255,61 +226,58 @@ async function startServer() {
         }
       }
 
-      // 4. FormSubmit direct notification relay (sends exactly 1 email containing the 6-digit code & link)
+      // 4. Web3Forms direct notification relay (sends email directly with ZERO recipient activation required!)
       if (!emailSentSuccessfully) {
         try {
-          const formSubmitResp = await fetch(`https://formsubmit.co/ajax/${encodeURIComponent(cleanEmail)}`, {
+          const web3Resp = await fetch('https://api.web3forms.com/submit', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'Accept': 'application/json',
-              'Referer': fallbackMagicLink
+              'Accept': 'application/json'
             },
             body: JSON.stringify({
-              _subject: `🌺 Ganeshotsava 2026: Your 6-Digit Verification Code is ${otp}`,
-              _template: 'table',
-              _captcha: 'false',
-              Organization: org,
-              Verification_Code: otp,
-              Verification_Link: fallbackMagicLink,
-              Important_Instructions: `Your 6-digit verification code is: ${otp}. Please enter this 6-digit code on the website or click the verification link above to complete your sign-in.`
+              access_key: '4f6c4495-2c8c-4a30-8914-1e0c24b9423d',
+              name: org,
+              email: cleanEmail,
+              subject: `🌺 Ganeshotsava 2026: Your 6-Digit Verification Code is ${otp}`,
+              message: `Your 6-digit verification code is: ${otp}\n\nPlease enter this code on the website to complete your sign-in or password reset.`
             })
           });
-          if (formSubmitResp.ok) {
-            emailSentSuccessfully = true;
-            emailProviderUsed = 'formsubmit';
-            console.log(`[EMAIL DISPATCH] Verification email with code dispatched via FormSubmit to ${cleanEmail}`);
+          if (web3Resp.ok) {
+            const w3Data = await web3Resp.json().catch(() => ({}));
+            if (w3Data.success !== false) {
+              emailSentSuccessfully = true;
+              emailProviderUsed = 'web3forms';
+              console.log(`[EMAIL DISPATCH] Verification email with code dispatched via Web3Forms to ${cleanEmail}`);
+            }
           }
-        } catch (fsErr) {
-          console.warn('[FORMSUBMIT] Relay error:', fsErr);
+        } catch (web3Err) {
+          console.warn('[WEB3FORMS] Relay error:', web3Err);
         }
       }
 
-      // 5. Admin Notification Fallback via FormSubmit (always sent to the permanent administrator so they can approve/verify)
+      // 5. Admin Notification Fallback via Web3Forms (always sent to permanent administrator)
       try {
-        await fetch(`https://formsubmit.co/ajax/desaisachin95@gmail.com`, {
+        await fetch('https://api.web3forms.com/submit', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Accept': 'application/json'
           },
           body: JSON.stringify({
-            _subject: `🔔 Devotee Code Alert: ${cleanEmail} (${otp})`,
-            _template: 'table',
-            _captcha: 'false',
-            Message: `A devotee has registered or requested access on the Ganeshotsava 2026 Portal.`,
-            Devotee_Email: cleanEmail,
-            Verification_Code: otp,
-            Direct_Verification_Link: fallbackMagicLink,
-            Action_Needed: `If the devotee does not receive their email, please give them their code (${otp}) or open Settings -> Registered Devotees in your Admin Dashboard and click "Verify" to instantly approve them.`
+            access_key: '4f6c4495-2c8c-4a30-8914-1e0c24b9423d',
+            name: 'Kannadigara Balaga Portal Alert',
+            email: 'desaisachin95@gmail.com',
+            subject: `🔔 Kannadigara Balaga Access Alert: ${cleanEmail}`,
+            message: `A member (${cleanEmail}) requested access on the Kannadigara Balaga Portal.\nSign-in link: ${targetMagicLink}`
           })
         });
-        console.log(`[ADMIN NOTIFICATION] Dispatched access code notification to desaisachin95@gmail.com`);
+        console.log(`[ADMIN NOTIFICATION] Dispatched access notification to desaisachin95@gmail.com`);
       } catch (err) {
         console.warn('Admin notification dispatch error:', err);
       }
 
-      console.log(`[OTP DISPATCH] Single verification email with code ${otp} dispatched for ${cleanEmail} via ${emailProviderUsed}`);
+      console.log(`[MAGIC LINK DISPATCH] Single verification email dispatched for ${cleanEmail} via ${emailProviderUsed}`);
       // Do NOT send the OTP or magic link back to client - user must retrieve code from their email
       res.json({
         success: true,

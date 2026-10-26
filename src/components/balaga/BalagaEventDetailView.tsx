@@ -272,6 +272,7 @@ export const BalagaEventDetailView: React.FC<BalagaEventDetailViewProps> = ({
         eventId={event.id}
         eventTitle={event.title}
         onOpenVolunteerModal={() => onOpenVolunteer()}
+        isAdmin={isAdmin}
         isDark={isDark}
       />
 

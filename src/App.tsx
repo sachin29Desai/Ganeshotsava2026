@@ -336,15 +336,38 @@ export function App() {
   const isGlobalAdminEmail = currentEmail === 'desaisachin95@gmail.com';
   const adminEmailList = ['desaisachin95@gmail.com'];
 
+  // Temporary Member Read-Only Financial View Mode State
+  const [isMemberFinancialsReadOnly, setIsMemberFinancialsReadOnly] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    const params = new URLSearchParams(window.location.search);
+    return (
+      params.get('access') === 'member_financials' ||
+      params.get('view') === 'member_financials' ||
+      params.has('financial_token') ||
+      params.has('financials_token') ||
+      params.has('financials')
+    );
+  });
+
+  const [copiedMemberFinancialsToast, setCopiedMemberFinancialsToast] = useState(false);
+
+  const handleCopyMemberFinancialsLink = () => {
+    const origin = window.location.origin;
+    const link = `${origin}/statement?access=member_financials&token=kb_fin_${Date.now()}`;
+    navigator.clipboard.writeText(link);
+    setCopiedMemberFinancialsToast(true);
+    setTimeout(() => setCopiedMemberFinancialsToast(false), 4000);
+  };
+
   // 1. Admin (Full access: ONLY desaisachin95@gmail.com has admin rights)
-  const isAdmin = isAuthenticated && isGlobalAdminEmail;
+  const isAdmin = !isMemberFinancialsReadOnly && isAuthenticated && isGlobalAdminEmail;
   // 2. Member (Read-Only Complete Data: can view all records across all modules, cannot create/edit/delete)
-  const isMember = isAuthenticated && !isAdmin && (userRole === 'member' || userRole === 'read_only' || userRole === 'sponsor');
+  const isMember = isMemberFinancialsReadOnly || (isAuthenticated && !isAdmin && (userRole === 'member' || userRole === 'read_only' || userRole === 'sponsor'));
   // 3. Viewer (Only Income & Expenditure Statement and Expenditure payments with high-level details only)
-  const isViewer = (!isAuthenticated) || (isAuthenticated && !isAdmin && !isMember);
+  const isViewer = !isMemberFinancialsReadOnly && ((!isAuthenticated) || (isAuthenticated && !isAdmin && !isMember));
 
   // Backward compatibility aliases
-  const isReadOnly = isMember;
+  const isReadOnly = isMember || isMemberFinancialsReadOnly;
   const isUnassigned = isViewer;
 
   const [settingsSubTab, setSettingsSubTab] = useState<'general' | 'users'>('general');
@@ -1774,7 +1797,7 @@ export function App() {
   }
 
   // D. If not authenticated, force show the login/registration gate (devotee landing/registration page)
-  if (!isAuthenticated) {
+  if (!isAuthenticated && !isMemberFinancialsReadOnly) {
     return (
       <CommitteeAuthGate
         settings={settings}
@@ -1789,6 +1812,35 @@ export function App() {
 
   return (
     <div id="mainAppView" className="min-h-screen bg-[#FDFBF7] text-[#1A1A1A] flex flex-col font-sans selection:bg-[#991B1B] selection:text-white pb-12">
+      {/* Member Read-Only Financial View Mode Banner */}
+      {isMemberFinancialsReadOnly && (
+        <div className="bg-amber-400 text-stone-950 px-4 py-2 text-xs font-bold flex items-center justify-between shadow-md border-b border-amber-500 z-50">
+          <div className="flex items-center gap-2">
+            <Eye className="w-4 h-4 text-stone-950 shrink-0" />
+            <span>ℹ️ Kannadigara Balaga Member Read-Only Financial View Mode Active (View-Only Access)</span>
+          </div>
+          <button
+            onClick={() => {
+              const url = new URL(window.location.href);
+              url.searchParams.delete('access');
+              url.searchParams.delete('financials');
+              url.searchParams.delete('token');
+              window.location.href = url.pathname;
+            }}
+            className="text-[10px] bg-stone-900 text-amber-300 font-extrabold px-2.5 py-1 rounded-full hover:bg-stone-800 transition-colors cursor-pointer"
+          >
+            Exit Member View
+          </button>
+        </div>
+      )}
+
+      {/* Copied Member Financial Link Toast */}
+      {copiedMemberFinancialsToast && (
+        <div className="fixed bottom-6 right-6 bg-stone-900 text-amber-300 border border-amber-400/50 px-4 py-3 rounded-2xl shadow-2xl z-50 text-xs font-extrabold flex items-center gap-2 animate-bounce">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>✓ Member Read-Only Financial Link copied! Share with members for view-only data.</span>
+        </div>
+      )}
       {/* 1. TOP HEADER */}
       <header className="bg-[#991B1B] text-white shadow-md border-b-2 border-[#7F1D1D] no-print sticky top-0 z-30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3">
@@ -2022,6 +2074,16 @@ export function App() {
                 >
                   <Save className={`w-3 h-3 ${isSaving ? 'animate-bounce' : ''}`} />
                   <span>{isSaving ? 'Saving...' : hasUnsavedChanges ? 'Save *' : 'Save'}</span>
+                </button>
+
+                {/* Copy Temporary Member Financial View Link (Admin Only) */}
+                <button
+                  onClick={handleCopyMemberFinancialsLink}
+                  className="px-2.5 py-1 rounded-full font-bold uppercase tracking-wider inline-flex items-center gap-1.5 transition-colors cursor-pointer text-[11px] bg-amber-400 text-stone-950 hover:bg-amber-300 shadow-xs"
+                  title="Copy Temporary Member Read-Only Financial View Link for members"
+                >
+                  <Share2 className="w-3 h-3 text-[#991B1B]" />
+                  <span>Member Financial Link</span>
                 </button>
 
                 {/* Manage Devotee Roles Button (Admin Only) */}

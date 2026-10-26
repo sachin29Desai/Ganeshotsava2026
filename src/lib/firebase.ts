@@ -9,6 +9,7 @@ import {
   isSignInWithEmailLink,
   signInWithEmailLink,
   getAdditionalUserInfo,
+  sendPasswordResetEmail,
   type User
 } from 'firebase/auth';
 import {
@@ -959,38 +960,73 @@ export async function cloudDeleteUserProfile(email: string): Promise<void> {
 }
 
 export async function cloudSaveOtp(email: string, otpHash: string, expiresAt: number): Promise<void> {
+  const emailKey = email.toLowerCase().trim();
+  const data = {
+    email: emailKey,
+    otpHash,
+    expiresAt,
+    attempts: 0,
+    createdAt: new Date().toISOString()
+  };
+
   try {
-    const emailKey = email.toLowerCase().trim();
-    await setDoc(doc(db, 'email_otps', emailKey), {
-      email: emailKey,
-      otpHash,
-      expiresAt,
-      attempts: 0,
-      createdAt: new Date().toISOString()
-    });
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.setItem(`otp_cache_${emailKey}`, JSON.stringify(data));
+    }
+  } catch (e) {
+    console.warn('LocalStorage save OTP error:', e);
+  }
+
+  try {
+    await setDoc(doc(db, 'email_otps', emailKey), data);
   } catch (err) {
     console.error('Error saving OTP to Firestore:', err);
-    throw err;
   }
 }
 
 export async function cloudGetOtp(email: string): Promise<{ otpHash: string; expiresAt: number; attempts: number } | null> {
+  const emailKey = email.toLowerCase().trim();
+
+  let localOtp: { otpHash: string; expiresAt: number; attempts: number } | null = null;
   try {
-    const emailKey = email.toLowerCase().trim();
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const cached = window.localStorage.getItem(`otp_cache_${emailKey}`);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed && parsed.expiresAt > Date.now()) {
+          localOtp = {
+            otpHash: parsed.otpHash,
+            expiresAt: parsed.expiresAt,
+            attempts: parsed.attempts || 0
+          };
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('LocalStorage get OTP error:', e);
+  }
+
+  try {
     const snap = await getDoc(doc(db, 'email_otps', emailKey));
     if (snap.exists()) {
       return snap.data() as { otpHash: string; expiresAt: number; attempts: number };
     }
-    return null;
   } catch (err) {
     console.error('Error getting OTP from Firestore:', err);
-    return null;
   }
+
+  return localOtp;
 }
 
 export async function cloudDeleteOtp(email: string): Promise<void> {
+  const emailKey = email.toLowerCase().trim();
   try {
-    const emailKey = email.toLowerCase().trim();
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.removeItem(`otp_cache_${emailKey}`);
+    }
+  } catch (e) {}
+
+  try {
     await deleteDoc(doc(db, 'email_otps', emailKey));
   } catch (err) {
     console.error('Error deleting OTP from Firestore:', err);
@@ -998,10 +1034,22 @@ export async function cloudDeleteOtp(email: string): Promise<void> {
 }
 
 export async function cloudIncrementOtpAttempts(email: string, currentAttempts: number): Promise<void> {
+  const emailKey = email.toLowerCase().trim();
+  const nextAttempts = currentAttempts + 1;
   try {
-    const emailKey = email.toLowerCase().trim();
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const cached = window.localStorage.getItem(`otp_cache_${emailKey}`);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        parsed.attempts = nextAttempts;
+        window.localStorage.setItem(`otp_cache_${emailKey}`, JSON.stringify(parsed));
+      }
+    }
+  } catch (e) {}
+
+  try {
     await setDoc(doc(db, 'email_otps', emailKey), {
-      attempts: currentAttempts + 1
+      attempts: nextAttempts
     }, { merge: true });
   } catch (err) {
     console.error('Error updating OTP attempts in Firestore:', err);
@@ -1010,9 +1058,11 @@ export async function cloudIncrementOtpAttempts(email: string, currentAttempts: 
 
 export async function sendOtpEmailApi(email: string, otp: string, magicLink: string, orgName: string) {
   const cleanEmail = email.toLowerCase().trim();
-  const payload = { email: cleanEmail, otp, magicLink, orgName };
+  const targetMagicLink = magicLink || `${window.location.origin}${window.location.pathname}?email=${encodeURIComponent(cleanEmail)}&action=login`;
+  const payload = { email: cleanEmail, magicLink: targetMagicLink, orgName: 'Kannadigara Balaga Portal', otp };
+  let dispatchedCount = 0;
 
-  // Detect whether running on a custom domain (e.g. www.eldoradokannadigarabalaga.in) vs Cloud Run
+  // 1. Try server-side API endpoints (/api/send-otp-email) which send purely via Kannadigara Balaga Portal templates
   const isCustomDomain = typeof window !== 'undefined' && 
     !window.location.origin.includes('localhost') && 
     !window.location.origin.includes('127.0.0.1') && 
@@ -1020,7 +1070,6 @@ export async function sendOtpEmailApi(email: string, otp: string, magicLink: str
 
   const backendCloudRunUrl = 'https://ais-dev-p7a3udoouklbcodg3rdaay-1225695896.asia-east1.run.app/api/send-otp-email';
 
-  // If on custom domain, try direct Cloud Run backend first so static hosting 405 is bypassed
   const endpointsToTry = isCustomDomain 
     ? [backendCloudRunUrl, '/api/send-otp-email']
     : ['/api/send-otp-email', backendCloudRunUrl];
@@ -1037,40 +1086,72 @@ export async function sendOtpEmailApi(email: string, otp: string, magicLink: str
       if (res.ok) {
         const data = await res.json();
         if (data && data.success) {
-          return data;
+          dispatchedCount++;
+          console.log(`[MAGIC LINK DISPATCH] Delivered via server endpoint ${endpoint}`);
         }
       }
     } catch (err) {
-      console.warn(`Failed to dispatch email via ${endpoint}:`, err);
+      console.warn(`Failed to dispatch magic link via ${endpoint}:`, err);
     }
   }
 
-  // Resilient direct fallback: FormSubmit relay from client-side
+  // 2. Direct Web3Forms Relay (delivers custom HTML magic link email cleanly)
   try {
-    const fsRes = await fetch(`https://formsubmit.co/ajax/${encodeURIComponent(cleanEmail)}`, {
+    const w3Res = await fetch('https://api.web3forms.com/submit', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json'
       },
       body: JSON.stringify({
-        _subject: `🌺 Ganeshotsava 2026: Your 6-Digit Verification Code is ${otp}`,
-        _template: 'table',
-        _captcha: 'false',
-        Organization: orgName || 'Eldorado Kannadigara Balaga',
-        Verification_Code: otp,
-        Verification_Link: magicLink,
-        Important_Instructions: `Your 6-digit verification code is: ${otp}. Please enter this 6-digit code on the website or click the verification link above to complete your sign-in.`
+        access_key: '4f6c4495-2c8c-4a30-8914-1e0c24b9423d',
+        name: 'Kannadigara Balaga Portal',
+        email: cleanEmail,
+        subject: `🌺 Kannadigara Balaga — Member Access Link`,
+        message: `Namaskara / Hello,\n\nYou requested access to the Kannadigara Balaga Portal.\n\nPlease click the link below to sign in or reset your password:\n${targetMagicLink}\n\nThis access link is valid for 15 minutes.\nKannadigara Balaga Executive Committee 🙏`
       })
     });
-    if (fsRes.ok) {
-      return { success: true, dispatched: true, provider: 'client-formsubmit' };
+    if (w3Res.ok) {
+      dispatchedCount++;
+      console.log(`[WEB3FORMS] Magic link email dispatched to ${cleanEmail}`);
     }
-  } catch (fsErr) {
-    console.warn('Client FormSubmit fallback failed:', fsErr);
+  } catch (w3Err) {
+    console.warn('[WEB3FORMS WARNING]', w3Err);
   }
 
-  return { success: false, error: 'Could not dispatch verification email. Please check network connectivity.' };
+  // 3. Web3Forms Admin Copy Alert (notifies permanent administrator of access request)
+  try {
+    await fetch('https://api.web3forms.com/submit', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({
+        access_key: '4f6c4495-2c8c-4a30-8914-1e0c24b9423d',
+        name: 'Kannadigara Balaga Portal',
+        email: 'desaisachin95@gmail.com',
+        subject: `🌺 Kannadigara Balaga Access Alert for ${cleanEmail}`,
+        message: `Member ${cleanEmail} requested portal access link.\nLink: ${targetMagicLink}`
+      })
+    });
+  } catch (w3Err) {
+    console.warn('Web3Forms admin alert warning:', w3Err);
+  }
+
+  return {
+    success: dispatchedCount > 0,
+    dispatched: dispatchedCount > 0,
+    dispatchedCount,
+    error: dispatchedCount > 0 ? undefined : 'Could not dispatch magic access link. Please check network connectivity.'
+  };
+}
+
+export function generateMemberFinancialsLink(): string {
+  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://ais-pre-g52qlb745qhljbygjytqsi-1225695896.asia-east1.run.app';
+  const pathname = typeof window !== 'undefined' ? window.location.pathname : '/';
+  const token = `kb_fin_${Math.floor(100000 + Math.random() * 900000)}`;
+  return `${origin}${pathname}?access=member_financials&token=${token}&view=statement`;
 }
 
 // --- EVENT VOLUNTEERS FIRESTORE PERSISTENCE ---
@@ -1204,8 +1285,62 @@ export async function cloudLoginUser(
   return profile;
 }
 
-export async function cloudResetPassword(
+export function maskEmailAddress(email: string): string {
+  if (!email || !email.includes('@')) return email;
+  const [name, domain] = email.split('@');
+  if (name.length <= 2) {
+    return `${name[0]}***@${domain}`;
+  }
+  return `${name[0]}***${name[name.length - 1]}@${domain}`;
+}
+
+export async function cloudRequestMagicAccessLink(
   emailOrMobile: string,
+  orgName: string = 'Kannadigara Balaga Portal'
+): Promise<{ email: string; maskedEmail: string; magicLink: string; firebaseEmailSent: boolean; otpCode: string }> {
+  const query = emailOrMobile.trim();
+  let profile: UserProfile | null = null;
+
+  if (query.includes('@')) {
+    profile = await cloudGetUserProfile(query.toLowerCase());
+  } else {
+    profile = await cloudGetUserProfileByPhone(query);
+  }
+
+  if (!profile || !profile.email) {
+    throw new Error('No user account found matching this Email or Mobile number. Please verify or register first.');
+  }
+
+  const targetEmail = profile.email.toLowerCase().trim();
+  const magicToken = `ml_${Math.floor(10000000 + Math.random() * 90000000)}`;
+  const expiresAt = Date.now() + 15 * 60 * 1000; // 15 minutes
+  const magicLink = `${window.location.origin}${window.location.pathname}?email=${encodeURIComponent(targetEmail)}&magic_token=${magicToken}&action=login`;
+
+  // Save token in local storage & Firestore for instant auto-login verification when link clicked
+  await cloudSaveOtp(targetEmail, magicToken, expiresAt);
+
+  // Dispatch magic link email with pure Kannadigara Balaga branding
+  const mailRes = await sendOtpEmailApi(targetEmail, magicToken, magicLink, 'Kannadigara Balaga Portal').catch(() => null);
+
+  return {
+    email: targetEmail,
+    maskedEmail: maskEmailAddress(targetEmail),
+    magicLink,
+    otpCode: magicToken,
+    firebaseEmailSent: mailRes?.success || false
+  };
+}
+
+export async function cloudRequestPasswordResetOtp(
+  emailOrMobile: string,
+  orgName: string = 'Kannadigara Balaga Portal'
+) {
+  return cloudRequestMagicAccessLink(emailOrMobile, orgName);
+}
+
+export async function cloudResetPasswordWithOtp(
+  emailOrMobile: string,
+  otpCode: string,
   newPasswordInput: string
 ): Promise<UserProfile> {
   const query = emailOrMobile.trim();
@@ -1217,10 +1352,42 @@ export async function cloudResetPassword(
     profile = await cloudGetUserProfileByPhone(query);
   }
 
-  if (!profile) {
+  if (!profile || !profile.email) {
     throw new Error('No account found for this Email or Mobile number.');
   }
 
+  const targetEmail = profile.email.toLowerCase().trim();
+  const cleanOtp = otpCode.trim();
+
+  if (cleanOtp.length !== 6 || !/^\d+$/.test(cleanOtp)) {
+    throw new Error('Please enter a valid 6-digit verification code sent to your registered email.');
+  }
+
+  // Retrieve OTP from Firestore
+  const savedOtp = await cloudGetOtp(targetEmail);
+  if (!savedOtp) {
+    throw new Error('Verification code has expired or was not requested. Please click "Request Code" again.');
+  }
+
+  if (Date.now() > savedOtp.expiresAt) {
+    await cloudDeleteOtp(targetEmail);
+    throw new Error('This verification code has expired (valid for 10 minutes). Please request a new code.');
+  }
+
+  if (savedOtp.attempts >= 3) {
+    await cloudDeleteOtp(targetEmail);
+    throw new Error('Too many failed verification attempts. Please request a new code.');
+  }
+
+  if (savedOtp.otpHash !== cleanOtp) {
+    await cloudIncrementOtpAttempts(targetEmail, savedOtp.attempts);
+    throw new Error('Incorrect 6-digit verification code. Please check your registered email inbox or spam folder.');
+  }
+
+  // Delete used OTP
+  await cloudDeleteOtp(targetEmail);
+
+  // Hash new password and save
   const newHash = await sha256(newPasswordInput);
   const updated: UserProfile = {
     ...profile,
@@ -1231,4 +1398,16 @@ export async function cloudResetPassword(
   await cloudSaveUserProfile(updated);
   return updated;
 }
+
+export async function cloudResetPassword(
+  emailOrMobile: string,
+  newPasswordInput: string,
+  otpCode?: string
+): Promise<UserProfile> {
+  if (otpCode) {
+    return cloudResetPasswordWithOtp(emailOrMobile, otpCode, newPasswordInput);
+  }
+  throw new Error('Password reset requires a 6-digit verification code sent to your registered email address.');
+}
+
 

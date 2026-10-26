@@ -299,6 +299,22 @@ export const StatementView: React.FC<StatementViewProps> = ({
               <span>Print</span>
             </button>
 
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={() => {
+                  const link = `${window.location.origin}/statement?access=member_financials&token=kb_fin_${Date.now()}`;
+                  navigator.clipboard.writeText(link);
+                  alert('✓ Temporary Member Read-Only Financial Link copied to clipboard!\n\nShare this link with members to grant view-only access to all financial details.');
+                }}
+                className="bg-amber-100 border border-amber-300 hover:bg-amber-200 text-[#991B1B] text-xs font-bold uppercase tracking-wider px-3.5 py-2.5 rounded-xl shadow-xs inline-flex items-center gap-1.5 transition-all cursor-pointer"
+                title="Copy Temporary Member Read-Only Financial Link for members"
+              >
+                <Share2 className="w-3.5 h-3.5 text-[#991B1B]" />
+                <span>Member Financial Link</span>
+              </button>
+            )}
+
             <button
               type="button"
               onClick={onShareWhatsApp}

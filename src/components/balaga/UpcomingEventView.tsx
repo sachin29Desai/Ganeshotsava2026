@@ -305,6 +305,7 @@ export const UpcomingEventView: React.FC<UpcomingEventViewProps> = ({
         eventId={event.id}
         eventTitle={displayTitle}
         onOpenVolunteerModal={() => onOpenVolunteer()}
+        isAdmin={isAdmin}
         isDark={isDark}
       />
 

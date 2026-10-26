@@ -110,22 +110,22 @@ export const CommitteeAuthGate: React.FC<CommitteeAuthGateProps> = ({
     setInfoMessage(null);
     setMailDeliveryFailed(false);
     
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
-    const continueUrl = `${window.location.origin}${window.location.pathname}?email=${encodeURIComponent(targetEmail)}&otp=${otp}`;
+    const magicToken = `ml_${Math.floor(10000000 + Math.random() * 90000000)}`;
+    const expiresAt = Date.now() + 15 * 60 * 1000; // 15 minutes
+    const continueUrl = `${window.location.origin}${window.location.pathname}?email=${encodeURIComponent(targetEmail)}&magic_token=${magicToken}&action=login`;
 
     try {
-      // 1. Save OTP to Firestore
-      await cloudSaveOtp(targetEmail, otp, expiresAt);
+      // 1. Save token to Firestore & Local Storage
+      await cloudSaveOtp(targetEmail, magicToken, expiresAt);
 
-      // 2. Dispatch single verification email with code via server email dispatcher
-      const proxyResult = await sendOtpEmailApi(targetEmail, otp, continueUrl, settings.org);
+      // 2. Dispatch magic access link email
+      const proxyResult = await sendOtpEmailApi(targetEmail, magicToken, continueUrl, 'Kannadigara Balaga Portal');
       if (!proxyResult || !proxyResult.success) {
-        console.warn('Backend proxy OTP mail failed:', proxyResult?.error);
+        console.warn('Backend magic link mail notice:', proxyResult?.error);
         setMailDeliveryFailed(true);
       }
       
-      // Move to OTP screen
+      // Move to link sent confirmation screen
       setOtpSentState(targetEmail);
     } catch (err: any) {
       console.error('Failed to initialize OTP flow:', err);

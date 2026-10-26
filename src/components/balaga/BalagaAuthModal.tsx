@@ -21,6 +21,8 @@ import {
   firebaseSignOut,
   cloudRegisterUser,
   cloudLoginUser,
+  cloudRequestPasswordResetOtp,
+  cloudResetPasswordWithOtp,
   cloudResetPassword,
   type User
 } from '../../lib/firebase';
@@ -62,7 +64,10 @@ export const BalagaAuthModal: React.FC<BalagaAuthModalProps> = ({
   const [regPassword, setRegPassword] = useState('');
 
   // Reset inputs
+  const [resetStep, setResetStep] = useState<'request' | 'verify'>('request');
   const [resetQuery, setResetQuery] = useState('');
+  const [resetOtp, setResetOtp] = useState('');
+  const [maskedTargetEmail, setMaskedTargetEmail] = useState('');
   const [resetPassword, setResetPassword] = useState('');
 
   if (!isOpen) return null;
@@ -165,10 +170,10 @@ export const BalagaAuthModal: React.FC<BalagaAuthModalProps> = ({
     }
   };
 
-  const handleResetSubmit = async (e: React.FormEvent) => {
+  const handleRequestResetOtp = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!resetQuery.trim() || !resetPassword) {
-      setError('Please enter registered Email/Mobile and new password.');
+    if (!resetQuery.trim()) {
+      setError('Please enter registered Email or Mobile number.');
       return;
     }
 
@@ -176,12 +181,42 @@ export const BalagaAuthModal: React.FC<BalagaAuthModalProps> = ({
     setError(null);
 
     try {
-      await cloudResetPassword(resetQuery, resetPassword);
-      setSuccessMsg('Password updated successfully! Please sign in.');
+      const res = await cloudRequestPasswordResetOtp(resetQuery, 'Eldorado Kannadigara Balaga');
+      setMaskedTargetEmail(res.maskedEmail);
+      setResetStep('verify');
+      setSuccessMsg(`Verification code sent! Dispatched to ${res.maskedEmail}. Please check your inbox.`);
+    } catch (err: any) {
+      setError(err?.message || 'No user profile found matching this Email or Mobile number.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResetSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetOtp.trim() || resetOtp.trim().length !== 6) {
+      setError('Please enter the 6-digit verification code sent to your registered email.');
+      return;
+    }
+
+    if (!resetPassword) {
+      setError('Please enter your new password.');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      await cloudResetPasswordWithOtp(resetQuery, resetOtp, resetPassword);
+      setSuccessMsg('Password updated successfully! Please sign in with your new password.');
+      setResetStep('request');
+      setResetOtp('');
+      setResetPassword('');
       setTimeout(() => {
         setActiveTab('login');
         setSuccessMsg(null);
-      }, 1500);
+      }, 2000);
     } catch (err: any) {
       setError(err?.message || 'Password reset failed.');
     } finally {
@@ -409,38 +444,86 @@ export const BalagaAuthModal: React.FC<BalagaAuthModalProps> = ({
 
             {/* TAB: FORGOT PASSWORD */}
             {activeTab === 'forgot' && (
-              <form onSubmit={handleResetSubmit} className="space-y-3 text-xs">
-                <div>
-                  <label className="block font-bold mb-1 text-stone-800 dark:text-stone-200">Registered Email or Mobile *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Enter email or mobile"
-                    value={resetQuery}
-                    onChange={(e) => setResetQuery(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 text-stone-900 dark:text-stone-100 rounded-xl outline-none focus:border-red-600 dark:focus:border-yellow-400 font-medium"
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold mb-1 text-stone-800 dark:text-stone-200">New Password *</label>
-                  <input
-                    type="password"
-                    required
-                    placeholder="New password (min 6 chars)"
-                    value={resetPassword}
-                    onChange={(e) => setResetPassword(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 text-stone-900 dark:text-stone-100 rounded-xl outline-none focus:border-red-600 dark:focus:border-yellow-400 font-medium"
-                  />
-                </div>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-yellow-300 font-bold shadow-xs cursor-pointer flex items-center justify-center gap-1.5"
-                >
-                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-                  <span>Reset Password</span>
-                </button>
-              </form>
+              <div className="space-y-3 text-xs">
+                {resetStep === 'request' ? (
+                  <form onSubmit={handleRequestResetOtp} className="space-y-3">
+                    <p className="text-stone-600 dark:text-stone-300 text-xs">
+                      Enter your registered Email or Mobile number. A 6-digit verification code will be sent to your registered email address.
+                    </p>
+                    <div>
+                      <label className="block font-bold mb-1 text-stone-800 dark:text-stone-200">Registered Email or Mobile *</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Enter email or 10-digit mobile"
+                        value={resetQuery}
+                        onChange={(e) => setResetQuery(e.target.value)}
+                        className="w-full px-3.5 py-2.5 bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 text-stone-900 dark:text-stone-100 rounded-xl outline-none focus:border-red-600 dark:focus:border-yellow-400 font-medium"
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={loading || !resetQuery.trim()}
+                      className="w-full py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-yellow-300 font-bold shadow-xs cursor-pointer flex items-center justify-center gap-1.5"
+                    >
+                      {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
+                      <span>Send Code to Email</span>
+                    </button>
+                  </form>
+                ) : (
+                  <form onSubmit={handleResetSubmit} className="space-y-3">
+                    <div className="p-3 bg-amber-50 dark:bg-stone-800 border border-amber-300 dark:border-stone-700 rounded-xl text-stone-900 dark:text-stone-100 text-xs space-y-1">
+                      <span className="font-bold block">✓ Verification Code Dispatched!</span>
+                      <p className="text-[11px] leading-relaxed">
+                        A 6-digit verification code has been dispatched to <strong>{maskedTargetEmail}</strong>. Please check your email inbox or spam folder and enter the code below.
+                      </p>
+                    </div>
+                    <div>
+                      <label className="block font-bold mb-1 text-stone-800 dark:text-stone-200">6-Digit Code Received on Email *</label>
+                      <input
+                        type="text"
+                        required
+                        maxLength={6}
+                        placeholder="e.g. 123456"
+                        value={resetOtp}
+                        onChange={(e) => setResetOtp(e.target.value.replace(/\D/g, ''))}
+                        className="w-full px-3.5 py-2.5 bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 text-stone-900 dark:text-stone-100 rounded-xl outline-none text-center font-mono font-black text-lg tracking-[4px]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-bold mb-1 text-stone-800 dark:text-stone-200">New Password *</label>
+                      <input
+                        type="password"
+                        required
+                        placeholder="New password (min 6 chars)"
+                        value={resetPassword}
+                        onChange={(e) => setResetPassword(e.target.value)}
+                        className="w-full px-3.5 py-2.5 bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 text-stone-900 dark:text-stone-100 rounded-xl outline-none focus:border-red-600 dark:focus:border-yellow-400 font-medium"
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={loading || resetOtp.length !== 6 || !resetPassword}
+                      className="w-full py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-yellow-300 font-bold shadow-xs cursor-pointer flex items-center justify-center gap-1.5"
+                    >
+                      {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
+                      <span>Verify Code &amp; Save Password</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setResetStep('request');
+                        setResetOtp('');
+                        setError(null);
+                        setSuccessMsg(null);
+                      }}
+                      className="w-full py-1 text-stone-500 hover:text-stone-800 dark:hover:text-stone-200 text-xs font-semibold underline text-center cursor-pointer"
+                    >
+                      Resend Code / Change Query
+                    </button>
+                  </form>
+                )}
+              </div>
             )}
           </div>
         )}

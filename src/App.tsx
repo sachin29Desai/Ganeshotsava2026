@@ -340,13 +340,24 @@ export function App() {
   const [isMemberFinancialsReadOnly, setIsMemberFinancialsReadOnly] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
     const params = new URLSearchParams(window.location.search);
-    return (
+    const hasParamAccess = (
       params.get('access') === 'member_financials' ||
       params.get('view') === 'member_financials' ||
       params.has('financial_token') ||
       params.has('financials_token') ||
       params.has('financials')
     );
+    if (hasParamAccess) {
+      try {
+        sessionStorage.setItem('kb_member_financials_mode', 'true');
+      } catch (e) {}
+      return true;
+    }
+    try {
+      return sessionStorage.getItem('kb_member_financials_mode') === 'true';
+    } catch (e) {
+      return false;
+    }
   });
 
   const [copiedMemberFinancialsToast, setCopiedMemberFinancialsToast] = useState(false);

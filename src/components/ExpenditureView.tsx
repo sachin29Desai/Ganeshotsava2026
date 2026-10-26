@@ -629,7 +629,10 @@ export const ExpenditureView: React.FC<ExpenditureViewProps> = ({
                           )}
                         </div>
                         {e.notes && (
-                          <div className="text-[11px] text-stone-500 italic mt-0.5 line-clamp-1">{e.notes}</div>
+                          <div className="text-[11px] text-stone-700 mt-1 p-1.5 bg-stone-50/90 border border-stone-200/80 rounded whitespace-pre-wrap leading-relaxed font-normal">
+                            <strong className="text-[10px] uppercase font-bold text-stone-500 tracking-wider block mb-0.5">Notes &amp; Details:</strong>
+                            {e.notes}
+                          </div>
                         )}
                       </td>
                       <td className="py-3 px-4 font-mono text-right text-stone-700">₹ {fmt(e.est)}</td>

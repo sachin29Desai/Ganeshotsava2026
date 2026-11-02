@@ -21,7 +21,10 @@ import {
   Clock,
   Flag,
   Search,
-  ExternalLink
+  ExternalLink,
+  UploadCloud,
+  Loader2,
+  Database
 } from 'lucide-react';
 import { CommunityEvent, CommitteeMember, GalleryPhoto, AnnouncementItem } from '../data/communityData';
 import { getStoredEvents, saveStoredEvents } from '../utils/eventUtils';
@@ -34,9 +37,21 @@ import {
   saveStoredAnnouncements,
   getStoredFormLinks,
   saveStoredFormLinks,
-  FormLinksConfig
+  FormLinksConfig,
+  compressImageFile
 } from '../utils/dataUtils';
-import { auth, googleProvider, signInWithPopup, firebaseSignOut, type User } from '../lib/firebase';
+import {
+  auth,
+  googleProvider,
+  signInWithPopup,
+  firebaseSignOut,
+  type User,
+  cloudSaveCommunityEvents,
+  cloudSaveCommunityTeam,
+  cloudSaveCommunityPhotos,
+  cloudSaveCommunityAnnouncements,
+  cloudSaveCommunityFormLinks
+} from '../lib/firebase';
 
 interface AdminPortalViewProps {
   currentUser: User | null;
@@ -65,6 +80,51 @@ export const AdminPortalView: React.FC<AdminPortalViewProps> = ({
   const [teamMembers, setTeamMembers] = useState<CommitteeMember[]>(() => getStoredTeamMembers());
   const [announcements, setAnnouncements] = useState<AnnouncementItem[]>(() => getStoredAnnouncements());
   const [formLinks, setFormLinks] = useState<FormLinksConfig>(() => getStoredFormLinks());
+
+  // Global Save & Loading State
+  const [isSavingAll, setIsSavingAll] = useState(false);
+
+  // Device File Upload Handler
+  const handleFileUpload = async (
+    file: File,
+    onSuccess: (dataUrl: string) => void
+  ) => {
+    try {
+      const dataUrl = await compressImageFile(file, 1200, 1200, 0.82);
+      onSuccess(dataUrl);
+      showToast('Image uploaded and optimized from device!');
+    } catch (err) {
+      console.error('Image upload failed:', err);
+      alert('Failed to read image file. Please pick a valid JPEG or PNG image.');
+    }
+  };
+
+  // Global Save All to Cloud Database Handler
+  const handleSaveAllToCloud = async () => {
+    setIsSavingAll(true);
+    try {
+      await Promise.all([
+        cloudSaveCommunityEvents(events),
+        cloudSaveCommunityTeam(teamMembers),
+        cloudSaveCommunityPhotos(photos),
+        cloudSaveCommunityAnnouncements(announcements),
+        cloudSaveCommunityFormLinks(formLinks)
+      ]);
+      saveStoredEvents(events);
+      saveStoredTeamMembers(teamMembers);
+      saveStoredPhotos(photos);
+      saveStoredAnnouncements(announcements);
+      saveStoredFormLinks(formLinks);
+      onRefreshData();
+      showToast('⚡ All website data, uploaded photos & settings saved to Cloud Database!');
+    } catch (err: any) {
+      console.error('Error saving all data to Firestore:', err);
+      showToast('Save failed: ' + (err?.message || 'Database error'));
+    } finally {
+      setIsSavingAll(false);
+    }
+  };
+
 
   // Sign in loading / error state
   const [loadingGoogle, setLoadingGoogle] = useState(false);
@@ -623,10 +683,24 @@ export const AdminPortalView: React.FC<AdminPortalViewProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
+            <button
+              onClick={handleSaveAllToCloud}
+              disabled={isSavingAll}
+              className="px-4 py-2 rounded-xl bg-gradient-to-r from-red-600 via-red-600 to-amber-600 hover:from-red-700 hover:to-amber-700 text-yellow-300 font-extrabold text-xs shadow-md transition-all cursor-pointer flex items-center gap-2 border border-yellow-400 disabled:opacity-50 active:scale-95"
+              title="Save all events, team members, photos, announcements, and links to Cloud Database"
+            >
+              {isSavingAll ? (
+                <Loader2 className="w-4 h-4 animate-spin text-yellow-300" />
+              ) : (
+                <UploadCloud className="w-4 h-4 text-yellow-300" />
+              )}
+              <span>{isSavingAll ? 'Saving to Database...' : 'Save All Changes to Database'}</span>
+            </button>
+
             <button
               onClick={onNavigateHome}
-              className="px-3.5 py-1.5 rounded-xl border text-xs font-bold hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors cursor-pointer inline-flex items-center gap-1.5"
+              className="px-3.5 py-2 rounded-xl border text-xs font-bold hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors cursor-pointer inline-flex items-center gap-1.5"
             >
               <ArrowLeft className="w-3.5 h-3.5 text-red-600" />
               <span>View Website</span>
@@ -634,7 +708,7 @@ export const AdminPortalView: React.FC<AdminPortalViewProps> = ({
 
             <button
               onClick={handleSignOut}
-              className="px-3.5 py-1.5 rounded-xl bg-stone-200 dark:bg-stone-800 hover:bg-stone-300 dark:hover:bg-stone-700 text-stone-800 dark:text-stone-200 font-bold text-xs transition-colors cursor-pointer inline-flex items-center gap-1.5"
+              className="px-3.5 py-2 rounded-xl bg-stone-200 dark:bg-stone-800 hover:bg-stone-300 dark:hover:bg-stone-700 text-stone-800 dark:text-stone-200 font-bold text-xs transition-colors cursor-pointer inline-flex items-center gap-1.5"
             >
               <LogOut className="w-3.5 h-3.5" />
               <span>Sign Out</span>
@@ -658,13 +732,14 @@ export const AdminPortalView: React.FC<AdminPortalViewProps> = ({
         {/* Dashboard Title & Tabs */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b pb-4 border-stone-200 dark:border-stone-800">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-serif font-black text-stone-900 dark:text-stone-100">
-              Data Management Portal
+            <h1 className="text-2xl sm:text-3xl font-serif font-black text-stone-900 dark:text-stone-100 flex items-center gap-3">
+              <span>Data Management Portal</span>
             </h1>
-            <p className="text-xs text-stone-500">
-              Create and modify celebrations, photos, and team members across the site.
+            <p className="text-xs text-stone-500 mt-1">
+              Upload photos from your device, edit celebrations &amp; schedules, and save all changes directly to Firebase Cloud Database.
             </p>
           </div>
+
 
           <div className="flex flex-wrap items-center gap-2">
             {[
@@ -1259,14 +1334,52 @@ export const AdminPortalView: React.FC<AdminPortalViewProps> = ({
               </div>
 
               <div>
-                <label className="block font-bold mb-1 uppercase">Poster Image URL</label>
-                <input
-                  type="url"
-                  placeholder="https://images.unsplash.com/..."
-                  value={eventForm.posterImage || ''}
-                  onChange={(e) => setEventForm({ ...eventForm, posterImage: e.target.value })}
-                  className="w-full p-2.5 rounded-xl border bg-transparent"
-                />
+                <label className="block font-bold mb-1 uppercase">Poster Image (Upload from Device or paste URL)</label>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="url"
+                      placeholder="https://images.unsplash.com/... or upload from device"
+                      value={eventForm.posterImage || ''}
+                      onChange={(e) => setEventForm({ ...eventForm, posterImage: e.target.value })}
+                      className="flex-1 p-2.5 rounded-xl border bg-transparent font-mono text-xs"
+                    />
+                    <label className="px-3 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold text-xs shadow-xs cursor-pointer flex items-center gap-1.5 shrink-0">
+                      <UploadCloud className="w-4 h-4" />
+                      <span>Upload Photo</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            handleFileUpload(file, (url) =>
+                              setEventForm((prev) => ({ ...prev, posterImage: url }))
+                            );
+                          }
+                        }}
+                      />
+                    </label>
+                  </div>
+                  {eventForm.posterImage && (
+                    <div className="relative w-36 h-24 rounded-xl overflow-hidden border border-amber-400/50 bg-stone-950">
+                      <img
+                        src={eventForm.posterImage}
+                        alt="Poster Preview"
+                        className="w-full h-full object-cover"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setEventForm({ ...eventForm, posterImage: '' })}
+                        className="absolute top-1 right-1 bg-black/80 text-white p-1 rounded-full text-[10px] hover:bg-red-600 cursor-pointer"
+                        title="Remove poster photo"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="flex justify-end gap-3 pt-2">
@@ -1339,14 +1452,52 @@ export const AdminPortalView: React.FC<AdminPortalViewProps> = ({
               </div>
 
               <div>
-                <label className="block font-bold mb-1 uppercase">Photo Image URL</label>
-                <input
-                  type="url"
-                  placeholder="https://images.unsplash.com/photo-..."
-                  value={teamForm.photoUrl}
-                  onChange={(e) => setTeamForm({ ...teamForm, photoUrl: e.target.value })}
-                  className="w-full p-2.5 rounded-xl border bg-transparent"
-                />
+                <label className="block font-bold mb-1 uppercase">Member Photo (Upload from Device or paste URL)</label>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="url"
+                      placeholder="https://images.unsplash.com/... or upload from device"
+                      value={teamForm.photoUrl}
+                      onChange={(e) => setTeamForm({ ...teamForm, photoUrl: e.target.value })}
+                      className="flex-1 p-2.5 rounded-xl border bg-transparent font-mono text-xs"
+                    />
+                    <label className="px-3 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold text-xs shadow-xs cursor-pointer flex items-center gap-1.5 shrink-0">
+                      <UploadCloud className="w-4 h-4" />
+                      <span>Upload Photo</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            handleFileUpload(file, (url) =>
+                              setTeamForm((prev) => ({ ...prev, photoUrl: url }))
+                            );
+                          }
+                        }}
+                      />
+                    </label>
+                  </div>
+                  {teamForm.photoUrl && (
+                    <div className="relative w-24 h-28 rounded-xl overflow-hidden border border-amber-400/50 bg-stone-950">
+                      <img
+                        src={teamForm.photoUrl}
+                        alt="Member Preview"
+                        className="w-full h-full object-cover"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setTeamForm({ ...teamForm, photoUrl: '' })}
+                        className="absolute top-1 right-1 bg-black/80 text-white p-1 rounded-full text-[10px] hover:bg-red-600 cursor-pointer"
+                        title="Remove member photo"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="flex justify-end gap-3 pt-2">
@@ -1418,16 +1569,55 @@ export const AdminPortalView: React.FC<AdminPortalViewProps> = ({
               </div>
 
               <div>
-                <label className="block font-bold mb-1 uppercase">Image URL *</label>
-                <input
-                  type="url"
-                  required
-                  placeholder="https://images.unsplash.com/..."
-                  value={photoForm.imageUrl}
-                  onChange={(e) => setPhotoForm({ ...photoForm, imageUrl: e.target.value })}
-                  className="w-full p-2.5 rounded-xl border bg-transparent"
-                />
+                <label className="block font-bold mb-1 uppercase">Gallery Photo (Upload from Device or paste URL) *</label>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="url"
+                      required
+                      placeholder="https://images.unsplash.com/... or upload from device"
+                      value={photoForm.imageUrl || ''}
+                      onChange={(e) => setPhotoForm({ ...photoForm, imageUrl: e.target.value })}
+                      className="flex-1 p-2.5 rounded-xl border bg-transparent font-mono text-xs"
+                    />
+                    <label className="px-3 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold text-xs shadow-xs cursor-pointer flex items-center gap-1.5 shrink-0">
+                      <UploadCloud className="w-4 h-4" />
+                      <span>Upload Photo</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            handleFileUpload(file, (url) =>
+                              setPhotoForm((prev) => ({ ...prev, imageUrl: url }))
+                            );
+                          }
+                        }}
+                      />
+                    </label>
+                  </div>
+                  {photoForm.imageUrl && (
+                    <div className="relative w-36 h-28 rounded-xl overflow-hidden border border-amber-400/50 bg-stone-950">
+                      <img
+                        src={photoForm.imageUrl}
+                        alt="Photo Preview"
+                        className="w-full h-full object-cover"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setPhotoForm({ ...photoForm, imageUrl: '' })}
+                        className="absolute top-1 right-1 bg-black/80 text-white p-1 rounded-full text-[10px] hover:bg-red-600 cursor-pointer"
+                        title="Remove gallery photo"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
+
 
               <div>
                 <label className="block font-bold mb-1 uppercase">Caption (Optional)</label>

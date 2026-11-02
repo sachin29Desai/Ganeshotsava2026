@@ -431,7 +431,7 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
         <div className="h-2.5 bg-[#FBBF24] w-full" />
       </div>
 
-      {/* 1. TOP NAVIGATION HEADER (Matching the exact 7 Sharavati Reference Pages) */}
+      {/* 1. TOP NAVIGATION HEADER */}
       <header
         className={`sticky top-0 z-40 border-b-2 border-red-600 shadow-xs backdrop-blur-md transition-colors ${
           isDark ? 'bg-stone-900/95 text-stone-100' : 'bg-white/95 text-stone-900'
@@ -467,27 +467,6 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
             </div>
           </div>
 
-          {/* Desktop 7-Page Reference Navigation Links */}
-          <nav className="hidden lg:flex items-center gap-1 text-sm font-semibold">
-            {navLinks.map((link) => (
-              <button
-                key={link.id}
-                onClick={() => handleNavigateTab(link.id)}
-                className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer relative inline-flex items-center gap-1.5 ${
-                  activeTab === link.id
-                    ? isDark
-                      ? 'bg-red-950/60 text-yellow-300 font-bold border-b-2 border-red-600'
-                      : 'bg-red-50 text-red-700 font-bold border-b-2 border-red-600'
-                    : isDark
-                    ? 'text-stone-300 hover:text-white hover:bg-stone-800'
-                    : 'text-stone-700 hover:text-red-700 hover:bg-stone-50'
-                }`}
-              >
-                <span>{link.label}</span>
-              </button>
-            ))}
-          </nav>
-
           {/* Header Controls */}
           <div className="flex items-center gap-2.5 shrink-0">
             <button
@@ -501,81 +480,8 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
             >
               {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </button>
-
-            {/* Admin Portal Entry Point */}
-            <button
-              onClick={() => handleNavigateTab('admin')}
-              className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition-colors cursor-pointer inline-flex items-center gap-1.5 ${
-                isDark
-                  ? 'bg-stone-800 border-stone-700 text-stone-200 hover:bg-stone-700'
-                  : 'bg-stone-50 border-stone-200 text-stone-700 hover:bg-stone-100'
-              }`}
-              title="Committee Admin Portal"
-            >
-              <Lock className="w-3.5 h-3.5 text-red-600" />
-              <span className="hidden sm:inline">Admin Portal</span>
-            </button>
-
-            <button
-              onClick={() => handleNavigateTab('membership')}
-              className="px-3.5 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-yellow-300 font-bold text-xs shadow-xs transition-colors cursor-pointer inline-flex items-center gap-1.5 border border-yellow-400"
-            >
-              <UserCheck className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Become a Member</span>
-              <span className="sm:hidden">Join</span>
-            </button>
-
-            <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className={`lg:hidden p-2 rounded-xl border transition-colors cursor-pointer ${
-                isDark
-                  ? 'bg-stone-800 border-stone-700 text-white'
-                  : 'bg-stone-50 border-stone-200 text-stone-700'
-              }`}
-            >
-              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-            </button>
           </div>
         </div>
-
-        {/* Mobile Navigation Drawer */}
-        {mobileMenuOpen && (
-          <div
-            className={`lg:hidden border-t px-4 py-4 space-y-2 animate-in slide-in-from-top duration-200 ${
-              isDark ? 'bg-stone-900 border-stone-800 text-white' : 'bg-white border-stone-200 text-stone-800'
-            }`}
-          >
-            {navLinks.map((link) => (
-              <button
-                key={link.id}
-                onClick={() => handleNavigateTab(link.id)}
-                className={`w-full text-left px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-colors cursor-pointer flex items-center justify-between ${
-                  activeTab === link.id
-                    ? isDark
-                      ? 'bg-red-950/60 text-yellow-300 font-bold'
-                      : 'bg-red-50 text-red-700 font-bold'
-                    : isDark
-                    ? 'text-stone-300 hover:bg-stone-800'
-                    : 'text-stone-700 hover:bg-stone-50'
-                }`}
-              >
-                <span>{link.label}</span>
-                <ChevronRight className="w-4 h-4 text-stone-400" />
-              </button>
-            ))}
-
-            <button
-              onClick={() => handleNavigateTab('admin')}
-              className="w-full text-left px-3.5 py-2.5 rounded-xl text-sm font-bold text-red-600 flex items-center justify-between border border-red-200 dark:border-red-900"
-            >
-              <div className="flex items-center gap-2">
-                <Lock className="w-4 h-4" />
-                <span>Admin Portal</span>
-              </div>
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-        )}
       </header>
 
       {/* 2. MAIN BODY PAGES */}
@@ -1335,31 +1241,82 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
                 </div>
               </div>
 
-              {/* Why Become a Member */}
-              <div className="space-y-3 pt-2 border-t border-stone-100 dark:border-stone-800">
-                <h4 className="font-serif font-bold text-base text-stone-900 dark:text-stone-100 flex items-center gap-2">
-                  <Heart className="w-5 h-5 text-red-600 fill-red-600" />
-                  <span>❤️ Why Become a Member?</span>
-                </h4>
-                <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs sm:text-sm text-stone-700 dark:text-stone-300">
-                  <li className="flex items-start gap-2">
-                    <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                    <span>Celebrate Kannada festivals and cultural events together.</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                    <span>Encourage children's cultural and extracurricular activities.</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                    <span>Participate in sports and community initiatives.</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                    <span>Build stronger connections among Kannada families.</span>
-                  </li>
-                </ul>
+              {/* Why Join Eldorado Kannadigara Balaga */}
+              <div className="space-y-4 pt-4 border-t border-stone-100 dark:border-stone-800">
+                <div className="space-y-1">
+                  <h4 className="font-serif font-black text-lg sm:text-xl text-stone-900 dark:text-stone-100 flex items-center gap-2">
+                    <Heart className="w-5 h-5 text-red-600 fill-red-600" />
+                    <span>Why Join Eldorado Kannadigara Balaga?</span>
+                  </h4>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="p-4 rounded-2xl border bg-stone-50 dark:bg-stone-800/60 border-stone-200 dark:border-stone-700/60 space-y-1">
+                    <div className="flex items-center gap-2 text-sm font-bold text-red-600 dark:text-yellow-300">
+                      <Users className="w-4 h-4 text-red-600 shrink-0" />
+                      <span>Connect &amp; Grow Together</span>
+                    </div>
+                    <p className="text-xs text-stone-600 dark:text-stone-300 leading-relaxed font-medium">
+                      Meet neighbours, build friendships and create a stronger community.
+                    </p>
+                  </div>
+
+                  <div className="p-4 rounded-2xl border bg-stone-50 dark:bg-stone-800/60 border-stone-200 dark:border-stone-700/60 space-y-1">
+                    <div className="flex items-center gap-2 text-sm font-bold text-red-600 dark:text-yellow-300">
+                      <Sparkles className="w-4 h-4 text-red-600 shrink-0" />
+                      <span>Celebrate Karnataka</span>
+                    </div>
+                    <p className="text-xs text-stone-600 dark:text-stone-300 leading-relaxed font-medium">
+                      Celebrate our festivals, language, food, art, traditions and culture together.
+                    </p>
+                  </div>
+
+                  <div className="p-4 rounded-2xl border bg-stone-50 dark:bg-stone-800/60 border-stone-200 dark:border-stone-700/60 space-y-1">
+                    <div className="flex items-center gap-2 text-sm font-bold text-red-600 dark:text-yellow-300">
+                      <CheckCircle className="w-4 h-4 text-red-600 shrink-0" />
+                      <span>Engage Kids &amp; Families</span>
+                    </div>
+                    <p className="text-xs text-stone-600 dark:text-stone-300 leading-relaxed font-medium">
+                      Organize cultural programs, Kannada learning, sports, games and fun family activities.
+                    </p>
+                  </div>
+
+                  <div className="p-4 rounded-2xl border bg-stone-50 dark:bg-stone-800/60 border-stone-200 dark:border-stone-700/60 space-y-1">
+                    <div className="flex items-center gap-2 text-sm font-bold text-red-600 dark:text-yellow-300">
+                      <Heart className="w-4 h-4 text-red-600 shrink-0" />
+                      <span>Give Back to Society</span>
+                    </div>
+                    <p className="text-xs text-stone-600 dark:text-stone-300 leading-relaxed font-medium">
+                      Support government schools, orphanages and people in need through volunteering and contributions.
+                    </p>
+                  </div>
+
+                  <div className="p-4 rounded-2xl border bg-stone-50 dark:bg-stone-800/60 border-stone-200 dark:border-stone-700/60 space-y-1">
+                    <div className="flex items-center gap-2 text-sm font-bold text-red-600 dark:text-yellow-300">
+                      <ShieldCheck className="w-4 h-4 text-red-600 shrink-0" />
+                      <span>Serve Our Community</span>
+                    </div>
+                    <p className="text-xs text-stone-600 dark:text-stone-300 leading-relaxed font-medium">
+                      Organize blood donation, health camps, cleanliness drives, plantation and other social initiatives.
+                    </p>
+                  </div>
+
+                  <div className="p-4 rounded-2xl border bg-stone-50 dark:bg-stone-800/60 border-stone-200 dark:border-stone-700/60 space-y-1">
+                    <div className="flex items-center gap-2 text-sm font-bold text-red-600 dark:text-yellow-300">
+                      <UserCheck className="w-4 h-4 text-red-600 shrink-0" />
+                      <span>Participate &amp; Contribute</span>
+                    </div>
+                    <p className="text-xs text-stone-600 dark:text-stone-300 leading-relaxed font-medium">
+                      Share your ideas, skills and time, volunteer for initiatives and make a positive difference together.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-amber-400/20 border border-amber-400/40 text-center font-serif font-black text-xs sm:text-sm text-red-700 dark:text-yellow-300 shadow-xs tracking-wide">
+                  Connect • Celebrate • Contribute • Serve • Grow Together
+                </div>
               </div>
+
 
               {/* Closing Signoff */}
               <div className="pt-4 border-t border-stone-100 dark:border-stone-800 text-center space-y-2">

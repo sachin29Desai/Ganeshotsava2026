@@ -46,14 +46,14 @@ export function getStoredPhotos(): GalleryPhoto[] {
     const raw = localStorage.getItem(GALLERY_PHOTOS_KEY);
     if (raw !== null) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
+      if (Array.isArray(parsed)) {
         return parsed;
       }
     }
   } catch (err) {
     console.warn('Failed to parse gallery photos from storage:', err);
   }
-  return GALLERY_PHOTOS;
+  return [];
 }
 
 export function saveStoredPhotos(photos: GalleryPhoto[]): void {
@@ -70,14 +70,14 @@ export function getStoredAnnouncements(): AnnouncementItem[] {
     const raw = localStorage.getItem(ANNOUNCEMENTS_KEY);
     if (raw !== null) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
+      if (Array.isArray(parsed)) {
         return parsed;
       }
     }
   } catch (err) {
     console.warn('Failed to parse announcements from storage:', err);
   }
-  return ANNOUNCEMENTS;
+  return [];
 }
 
 export function saveStoredAnnouncements(announcements: AnnouncementItem[]): void {

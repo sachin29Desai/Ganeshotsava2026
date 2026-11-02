@@ -867,41 +867,53 @@ export const AdminPortalView: React.FC<AdminPortalViewProps> = ({
               </button>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6">
-              {photos.map((photo) => (
-                <div
-                  key={photo.id}
-                  className={`rounded-3xl border-2 overflow-hidden shadow-xs flex flex-col justify-between ${
-                    isDark ? 'bg-stone-900 border-stone-800' : 'bg-white border-stone-200'
-                  }`}
-                >
-                  <div className="aspect-[4/3] bg-stone-900 relative">
-                    <img
-                      src={photo.imageUrl}
-                      alt={photo.title}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-
-                  <div className="p-4 space-y-2">
-                    <div>
-                      <span className="text-[10px] font-bold text-yellow-500 uppercase block">
-                        {photo.celebration}
-                      </span>
-                      <h4 className="font-bold text-xs truncate">{photo.title}</h4>
+            {photos.length === 0 ? (
+              <div className="p-10 text-center rounded-3xl border-2 border-dashed border-stone-300 dark:border-stone-800 space-y-3">
+                <ImageIcon className="w-8 h-8 text-stone-400 mx-auto" />
+                <p className="text-sm font-bold text-stone-700 dark:text-stone-300">
+                  No photos saved in database yet.
+                </p>
+                <p className="text-xs text-stone-500 max-w-md mx-auto">
+                  Click "Upload Event Photo" above to select image files from your device, then click the top "Save All Changes to Database" button to sync them to the live site.
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6">
+                {photos.map((photo) => (
+                  <div
+                    key={photo.id}
+                    className={`rounded-3xl border-2 overflow-hidden shadow-xs flex flex-col justify-between ${
+                      isDark ? 'bg-stone-900 border-stone-800' : 'bg-white border-stone-200'
+                    }`}
+                  >
+                    <div className="aspect-[4/3] bg-stone-900 relative">
+                      <img
+                        src={photo.imageUrl}
+                        alt={photo.title}
+                        className="w-full h-full object-cover"
+                      />
                     </div>
 
-                    <button
-                      onClick={() => requestDeletePhoto(photo)}
-                      className="w-full py-1.5 rounded-lg bg-red-50 dark:bg-red-950/60 hover:bg-red-100 text-red-600 font-bold text-xs transition-colors cursor-pointer inline-flex items-center justify-center gap-1"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                      <span>Remove Photo</span>
-                    </button>
+                    <div className="p-4 space-y-2">
+                      <div>
+                        <span className="text-[10px] font-bold text-yellow-500 uppercase block">
+                          {photo.celebration}
+                        </span>
+                        <h4 className="font-bold text-xs truncate">{photo.title}</h4>
+                      </div>
+
+                      <button
+                        onClick={() => requestDeletePhoto(photo)}
+                        className="w-full py-1.5 rounded-lg bg-red-50 dark:bg-red-950/60 hover:bg-red-100 text-red-600 font-bold text-xs transition-colors cursor-pointer inline-flex items-center justify-center gap-1"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Remove Photo</span>
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -993,8 +1005,19 @@ export const AdminPortalView: React.FC<AdminPortalViewProps> = ({
               </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {announcements.map((ann) => (
+            {announcements.length === 0 ? (
+              <div className="p-10 text-center rounded-3xl border-2 border-dashed border-stone-300 dark:border-stone-800 space-y-3">
+                <Megaphone className="w-8 h-8 text-stone-400 mx-auto" />
+                <p className="text-sm font-bold text-stone-700 dark:text-stone-300">
+                  No announcements in database.
+                </p>
+                <p className="text-xs text-stone-500 max-w-md mx-auto">
+                  Click "Push New Announcement" above to add an official notice, then click "Save All Changes to Database" to publish it live to the website.
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {announcements.map((ann) => (
                 <div
                   key={ann.id}
                   className={`p-6 rounded-3xl border-2 space-y-4 shadow-xs flex flex-col justify-between ${
@@ -1053,8 +1076,9 @@ export const AdminPortalView: React.FC<AdminPortalViewProps> = ({
                 </div>
               ))}
             </div>
-          </div>
-        )}
+          )}
+        </div>
+      )}
 
         {/* TAB 5: MANAGE GOOGLE FORM LINKS */}
         {activeTab === 'form-links' && (

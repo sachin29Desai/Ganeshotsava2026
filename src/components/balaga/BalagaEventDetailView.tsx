@@ -79,8 +79,8 @@ export const BalagaEventDetailView: React.FC<BalagaEventDetailViewProps> = ({
     loadFirestoreHighlights();
   }, []);
 
-  // Filter gallery photos for this event
-  const eventPhotos = [...customPhotos, ...GALLERY_PHOTOS].filter(
+  // Filter gallery photos for this event (strictly saved database photos)
+  const eventPhotos = customPhotos.filter(
     (p) =>
       (p.celebration || '').toLowerCase().includes((event.festival || '').toLowerCase()) ||
       (p.celebration || '').toLowerCase().includes((event.title || '').toLowerCase()) ||

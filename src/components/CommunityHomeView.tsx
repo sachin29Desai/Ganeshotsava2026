@@ -133,10 +133,10 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
         if (cloudTeam && cloudTeam.length > 0) {
           setTeamMembersList(cloudTeam);
         }
-        if (cloudPhotos && cloudPhotos.length > 0) {
+        if (cloudPhotos) {
           setPhotosList(cloudPhotos);
         }
-        if (cloudAnnouncements && cloudAnnouncements.length > 0) {
+        if (cloudAnnouncements !== null) {
           setAnnouncementsList(cloudAnnouncements);
         }
         if (cloudLinks) {
@@ -468,7 +468,8 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
           </div>
 
           {/* Header Controls */}
-          <div className="flex items-center gap-2.5 shrink-0">
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Theme Toggle */}
             <button
               onClick={toggleTheme}
               className={`p-2 rounded-xl border transition-colors cursor-pointer ${
@@ -480,8 +481,61 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
             >
               {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </button>
+
+            {/* Menu Toggle Button */}
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className={`px-3.5 py-2 rounded-xl border transition-all cursor-pointer font-bold text-xs flex items-center gap-2 shadow-xs ${
+                mobileMenuOpen
+                  ? 'bg-red-600 text-yellow-300 border-yellow-400'
+                  : isDark
+                  ? 'bg-stone-800 border-stone-700 text-stone-100 hover:bg-stone-700 hover:text-yellow-300'
+                  : 'bg-red-600 text-yellow-300 border-yellow-400 hover:bg-red-700'
+              }`}
+              aria-label="Toggle navigation menu"
+            >
+              {mobileMenuOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
+              <span>Menu</span>
+            </button>
           </div>
         </div>
+
+        {/* Simple List Navigation Dropdown */}
+        {mobileMenuOpen && (
+          <div className="border-t border-stone-200 dark:border-stone-800 p-4 sm:p-6 bg-white/98 dark:bg-stone-900/98 backdrop-blur-md shadow-2xl animate-in slide-in-from-top duration-200">
+            <div className="max-w-md mx-auto space-y-2">
+              <div className="flex items-center justify-between px-2 pb-2 border-b border-stone-100 dark:border-stone-800 text-[11px] font-bold text-stone-400 uppercase tracking-wider">
+                <span>Navigation Menu</span>
+                <span>ಕನ್ನಡಿಗರ ಬಳಗ</span>
+              </div>
+              <ul className="divide-y divide-stone-100 dark:divide-stone-800/80">
+                {navLinks.map((link) => {
+                  const isActive = activeTab === link.id;
+                  return (
+                    <li key={link.id}>
+                      <button
+                        onClick={() => handleNavigateTab(link.id)}
+                        className={`w-full py-3 px-4 rounded-2xl text-left text-sm font-bold transition-all cursor-pointer flex items-center justify-between ${
+                          isActive
+                            ? 'bg-red-600 text-yellow-300 shadow-md border border-yellow-400 my-1'
+                            : isDark
+                            ? 'text-stone-200 hover:bg-stone-800 hover:text-yellow-300'
+                            : 'text-stone-800 hover:bg-amber-50 hover:text-red-700'
+                        }`}
+                      >
+                        <span className="flex items-center gap-2.5">
+                          <span className={`w-2 h-2 rounded-full ${isActive ? 'bg-yellow-300' : 'bg-red-600'}`} />
+                          {link.label}
+                        </span>
+                        <ChevronRight className={`w-4 h-4 ${isActive ? 'text-yellow-300' : 'text-stone-400'}`} />
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          </div>
+        )}
       </header>
 
       {/* 2. MAIN BODY PAGES */}
@@ -660,7 +714,7 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
 
               {announcementsList.length === 0 ? (
                 <div className="p-8 text-center rounded-3xl border border-dashed border-stone-300 dark:border-stone-800 text-stone-500 text-xs">
-                  No official announcements posted yet. Check back soon for updates from Balaga Committee.
+                  No official announcements posted yet. Official notices added in the Admin Portal will appear here.
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -983,25 +1037,31 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                {photosList.map((photo) => (
-                  <div
-                    key={photo.id}
-                    onClick={() => setLightboxPhoto(photo)}
-                    className="group rounded-2xl border overflow-hidden cursor-pointer aspect-[4/3] relative bg-stone-950"
-                  >
-                    <img
-                      src={photo.imageUrl}
-                      alt={photo.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity p-3 flex flex-col justify-end">
-                      <span className="text-white font-bold text-xs truncate">{photo.title}</span>
-                      <span className="text-yellow-300 text-[10px]">{photo.celebration}</span>
+              {photosList.length === 0 ? (
+                <div className="p-8 text-center rounded-2xl border border-dashed border-stone-300 dark:border-stone-800 text-stone-500 text-xs">
+                  No photos saved in database yet. Admins can upload photos in the Admin Data Management Portal.
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {photosList.map((photo) => (
+                    <div
+                      key={photo.id}
+                      onClick={() => setLightboxPhoto(photo)}
+                      className="group rounded-2xl border overflow-hidden cursor-pointer aspect-[4/3] relative bg-stone-950"
+                    >
+                      <img
+                        src={photo.imageUrl}
+                        alt={photo.title}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity p-3 flex flex-col justify-end">
+                        <span className="text-white font-bold text-xs truncate">{photo.title}</span>
+                        <span className="text-yellow-300 text-[10px]">{photo.celebration}</span>
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}

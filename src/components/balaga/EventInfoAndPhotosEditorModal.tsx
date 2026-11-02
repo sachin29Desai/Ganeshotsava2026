@@ -72,12 +72,9 @@ export const EventInfoAndPhotosEditorModal: React.FC<EventInfoAndPhotosEditorMod
   const [pendingReceivables, setPendingReceivables] = useState(existingCustom.pendingReceivables || '₹ 35,000');
   const [auditNote, setAuditNote] = useState(existingCustom.auditNote || 'Formal expense audit completed and accounts published.');
 
-  // Photos List
-  const defaultEventPhotos = GALLERY_PHOTOS.filter(
-    (p) => p.celebration.toLowerCase().includes(currentEvent?.festival?.toLowerCase() || '') || p.year === currentEvent?.year
-  );
+  // Photos List (strictly saved database photos)
   const [photos, setPhotos] = useState<GalleryPhoto[]>(
-    existingCustom.photos || (defaultEventPhotos.length > 0 ? defaultEventPhotos : GALLERY_PHOTOS.slice(0, 4))
+    existingCustom.photos || []
   );
 
   // New Photo State
@@ -105,10 +102,7 @@ export const EventInfoAndPhotosEditorModal: React.FC<EventInfoAndPhotosEditorMod
     setPendingReceivables(custom.pendingReceivables || (ev?.festival === 'Ganesha Chaturthi' ? '₹ 35,000' : '₹ 0'));
     setAuditNote(custom.auditNote || 'Formal expense audit completed and accounts published.');
 
-    const defaultPhotos = GALLERY_PHOTOS.filter(
-      (p) => p.celebration.toLowerCase().includes(ev?.festival?.toLowerCase() || '') || p.year === ev?.year
-    );
-    setPhotos(custom.photos || (defaultPhotos.length > 0 ? defaultPhotos : GALLERY_PHOTOS.slice(0, 4)));
+    setPhotos(custom.photos || []);
   };
 
   const handleAddPhoto = (e: React.FormEvent) => {

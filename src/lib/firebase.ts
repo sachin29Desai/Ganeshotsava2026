@@ -1306,7 +1306,7 @@ export async function cloudSaveCommunityAnnouncements(announcements: any[]): Pro
 export async function cloudGetCommunityAnnouncements(): Promise<any[] | null> {
   try {
     const snap = await getDocs(collection(db, 'community_announcements'));
-    if (snap.empty) return null;
+    if (snap.empty) return [];
     const items: any[] = [];
     snap.forEach((d) => items.push({ id: d.id, ...d.data() }));
     return items;

@@ -5,68 +5,57 @@ import {
   Users,
   CheckCircle2,
   ArrowRight,
-  FileText,
-  ShieldCheck,
-  HeartHandshake,
   Sparkles,
-  Lock,
   Flag,
   Flame,
   X,
   Send,
-  ChevronDown,
   ChevronRight,
-  ChevronLeft,
-  Share2,
-  Copy,
   Mail,
   Clock,
-  Play,
-  Filter,
-  Search,
-  Check,
-  PhoneCall,
   Menu,
   Info,
-  HelpCircle,
-  ExternalLink,
   Award,
-  Video,
-  Receipt,
   User as UserIcon,
-  LogOut,
-  Image as ImageIcon,
   Sun,
   Moon,
-  Cookie,
-  Layers,
-  Compass
+  CheckCircle,
+  UserCheck,
+  FileCheck,
+  Heart,
+  BadgeIndianRupee,
+  Lock,
+  ShieldCheck,
+  Settings,
+  Megaphone,
+  Bell,
+  ExternalLink
 } from 'lucide-react';
-import { AppSettings, Contribution } from '../types';
-import { fmt } from '../utils/helpers';
+import { AppSettings, Contribution, UserRole, UserProfile } from '../types';
 import {
   COMMUNITY_EVENTS,
-  COMMITTEE_MEMBERS,
   ANNOUNCEMENTS,
-  GALLERY_PHOTOS,
-  ARCHIVE_RECORDS,
-  GANESHA_FAQS,
   CommunityEvent,
-  AnnouncementItem,
-  GalleryPhoto
+  GalleryPhoto,
+  CommitteeMember,
+  AnnouncementItem
 } from '../data/communityData';
+import { getStoredEvents, classifyEvents } from '../utils/eventUtils';
+import {
+  getStoredTeamMembers,
+  getStoredPhotos,
+  getStoredAnnouncements,
+  getStoredFormLinks,
+  FormLinksConfig
+} from '../utils/dataUtils';
 import { BalagaAuthModal } from './balaga/BalagaAuthModal';
 import { BalagaVolunteerModal } from './balaga/BalagaVolunteerModal';
 import { BalagaNominateModal } from './balaga/BalagaNominateModal';
 import { BalagaPolicyModals } from './balaga/BalagaPolicyModals';
 import { BalagaLoginView } from './balaga/BalagaLoginView';
 import { BalagaEventDetailView } from './balaga/BalagaEventDetailView';
-import { UpcomingEventView } from './balaga/UpcomingEventView';
-import { PastEventView } from './balaga/PastEventView';
-import { EventInfoAndPhotosEditorModal, EventCustomInfo } from './balaga/EventInfoAndPhotosEditorModal';
-import { GaneshaFestivalVideoShowcase } from './GaneshaFestivalVideoShowcase';
-import { AdminControlHubView } from './AdminControlHubView';
-import { auth, onAuthStateChanged, firebaseSignOut, type User } from '../lib/firebase';
+import { AdminPortalView } from './AdminPortalView';
+import { auth, onAuthStateChanged, type User } from '../lib/firebase';
 
 interface CommunityHomeViewProps {
   settings: AppSettings;
@@ -74,20 +63,22 @@ interface CommunityHomeViewProps {
   onNavigateToGaneshotsava: () => void;
   onNavigateToReceipts: () => void;
   isAdmin?: boolean;
+  userRole?: UserRole | null;
+  userProfile?: UserProfile | null;
   onUpdateSettings?: (cfg: AppSettings) => void;
 }
 
 export type CommunityPageTab =
   | 'home'
-  | 'events'
-  | 'event-detail'
-  | 'gallery'
-  | 'announcements'
-  | 'archive'
   | 'about'
+  | 'our-team'
+  | 'past-events'
+  | 'upcoming-events'
+  | 'membership'
   | 'contact'
+  | 'event-detail'
   | 'login'
-  | 'admin-hub';
+  | 'admin';
 
 export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
   settings,
@@ -95,8 +86,31 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
   onNavigateToGaneshotsava,
   onNavigateToReceipts,
   isAdmin = false,
+  userRole,
+  userProfile,
   onUpdateSettings
 }) => {
+  // All events list and auto-classified events
+  const [allEvents, setAllEvents] = useState<CommunityEvent[]>(() => getStoredEvents());
+  const [teamMembersList, setTeamMembersList] = useState<CommitteeMember[]>(() => getStoredTeamMembers());
+  const [photosList, setPhotosList] = useState<GalleryPhoto[]>(() => getStoredPhotos());
+  const [announcementsList, setAnnouncementsList] = useState<AnnouncementItem[]>(() => getStoredAnnouncements());
+  const [selectedAnnouncement, setSelectedAnnouncement] = useState<AnnouncementItem | null>(null);
+  const [formLinks, setFormLinks] = useState<FormLinksConfig>(() => getStoredFormLinks());
+
+  const refreshAllData = () => {
+    setAllEvents(getStoredEvents());
+    setTeamMembersList(getStoredTeamMembers());
+    setPhotosList(getStoredPhotos());
+    setAnnouncementsList(getStoredAnnouncements());
+    setFormLinks(getStoredFormLinks());
+  };
+
+  const { currentEvents, upcomingEvents, pastEvents } = classifyEvents(allEvents);
+
+  // Target event for home page timer (next upcoming event or active event)
+  const targetUpcomingEvent = upcomingEvents[0] || currentEvents[0] || allEvents[0];
+
   // Theme state synced with localStorage
   const [isDark, setIsDark] = useState<boolean>(() => {
     try {
@@ -116,38 +130,46 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
     });
   };
 
-  // Route initial detection
+  useEffect(() => {
+    if (isDark) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [isDark]);
+
+  // Route initial detection matching the 7 Sharavati reference pages + Admin Portal
   const getInitialTabFromLocation = (): { tab: CommunityPageTab; eventId?: string } => {
     const path = window.location.pathname.toLowerCase();
     const hash = window.location.hash.toLowerCase();
 
     if (path.includes('/admin') || hash.includes('admin')) {
-      return { tab: 'admin-hub' };
+      return { tab: 'admin' };
     }
     if (path.includes('/login') || hash.includes('login')) {
       return { tab: 'login' };
     }
     if (path.includes('/events/') || hash.includes('/events/')) {
       const parts = path.split('/events/');
-      const slug = parts[1] || 'ganesh-chaturthi-2026';
+      const slug = parts[1] || 'rajyotsava-2026';
       return { tab: 'event-detail', eventId: slug.replace(/\/$/, '') };
     }
-    if (path.includes('/events') || hash.includes('events')) {
-      return { tab: 'events' };
-    }
-    if (path.includes('/gallery') || hash.includes('gallery')) {
-      return { tab: 'gallery' };
-    }
-    if (path.includes('/announcements') || hash.includes('announcements')) {
-      return { tab: 'announcements' };
-    }
-    if (path.includes('/archive') || hash.includes('archive')) {
-      return { tab: 'archive' };
-    }
-    if (path.includes('/about') || hash.includes('about')) {
+    if (path.includes('/about-us') || path.includes('/about') || hash.includes('about')) {
       return { tab: 'about' };
     }
-    if (path.includes('/contact') || hash.includes('contact')) {
+    if (path.includes('/our-team') || path.includes('/team') || hash.includes('team')) {
+      return { tab: 'our-team' };
+    }
+    if (path.includes('/past-events') || path.includes('/past') || hash.includes('past')) {
+      return { tab: 'past-events' };
+    }
+    if (path.includes('/upcoming-events') || path.includes('/upcoming') || hash.includes('upcoming')) {
+      return { tab: 'upcoming-events' };
+    }
+    if (path.includes('/membership') || hash.includes('membership')) {
+      return { tab: 'membership' };
+    }
+    if (path.includes('/contact-us') || path.includes('/contact') || hash.includes('contact')) {
       return { tab: 'contact' };
     }
     return { tab: 'home' };
@@ -156,7 +178,7 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
   const initialRouteInfo = getInitialTabFromLocation();
   const [activeTab, setActiveTab] = useState<CommunityPageTab>(initialRouteInfo.tab);
   const [selectedEventId, setSelectedEventId] = useState<string>(
-    initialRouteInfo.eventId || 'ganesh-chaturthi-2026'
+    initialRouteInfo.eventId || upcomingEvents[0]?.id || 'rajyotsava-2026'
   );
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -191,44 +213,13 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
     }
   }, []);
 
-  // Filter states
-  const [eventFilterStatus, setEventFilterStatus] = useState<string>('all');
-  const [eventFilterFestival, setEventFilterFestival] = useState<string>('all');
-  const [galleryYear, setGalleryYear] = useState<string>('all');
-  const [galleryCelebration, setGalleryCelebration] = useState<string>('all');
-  const [announcementCategory, setAnnouncementCategory] = useState<string>('all');
-  const [announcementSearch, setAnnouncementSearch] = useState('');
+  // Lightbox Photo
+  const [lightboxPhoto, setLightboxPhoto] = useState<GalleryPhoto | null>(null);
 
-  // Modals & Event Custom Info state
+  // Modals state
   const [volunteerModalOpen, setVolunteerModalOpen] = useState(false);
   const [nominateModalOpen, setNominateModalOpen] = useState(false);
-  const [contributeModalOpen, setContributeModalOpen] = useState(false);
-  const [editorModalOpen, setEditorModalOpen] = useState(false);
-  const [lightboxPhoto, setLightboxPhoto] = useState<GalleryPhoto | null>(null);
   const [policyModal, setPolicyModal] = useState<'privacy' | 'terms' | 'refund' | 'cookies' | null>(null);
-
-  // Custom Event Information Override State
-  const [customInfos, setCustomInfos] = useState<Record<string, EventCustomInfo>>(() => {
-    try {
-      const saved = localStorage.getItem('kb_custom_event_infos');
-      if (saved) return JSON.parse(saved);
-    } catch {}
-    return {};
-  });
-
-  const handleSaveCustomInfo = (eventId: string, info: EventCustomInfo) => {
-    setCustomInfos((prev) => {
-      const next = { ...prev, [eventId]: info };
-      try {
-        localStorage.setItem('kb_custom_event_infos', JSON.stringify(next));
-      } catch {}
-      return next;
-    });
-  };
-
-  // Past Event Slider state
-  const pastEvents = COMMUNITY_EVENTS.filter((e) => e.status === 'archived');
-  const [activePastEventIndex, setActivePastEventIndex] = useState(0);
 
   // Contact form state
   const [contactForm, setContactForm] = useState({
@@ -236,28 +227,39 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
     email: '',
     towerFlat: '',
     subject: 'General enquiry',
-    message: '',
-    dpdpConsent: true
+    message: ''
   });
   const [contactSubmitted, setContactSubmitted] = useState(false);
-  const [dpdpNoticeDrawerOpen, setDpdpNoticeDrawerOpen] = useState(false);
 
-  const [copiedId, setCopiedId] = useState<string | null>(null);
+  // Membership modal state
+  const [membershipModalOpen, setMembershipModalOpen] = useState(false);
+  const [selectedMembershipType, setSelectedMembershipType] = useState<'primary' | 'additional'>('primary');
+  const [membershipForm, setMembershipForm] = useState({
+    fullName: '',
+    email: '',
+    phone: '',
+    towerFlat: '',
+    additionalMembersCount: '0',
+    notes: ''
+  });
+  const [membershipSubmitted, setMembershipSubmitted] = useState(false);
 
-  // Countdown state: Targeted at Karnataka Rajyotsava 2026 on Nov 1, with toggle for Ganesha Chaturthi
-  const [countdownTarget, setCountdownTarget] = useState<'rajyotsava' | 'ganesha'>('rajyotsava');
+  // Countdown state dynamically synchronized with upcoming event date
   const [countdown, setCountdown] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
 
   useEffect(() => {
-    const targetDateStr =
-      countdownTarget === 'rajyotsava'
-        ? '2026-11-21T08:30:00+05:30'
-        : '2026-08-23T09:00:00+05:30';
-    const target = new Date(targetDateStr).getTime();
+    let targetTime: number;
+    if (targetUpcomingEvent && targetUpcomingEvent.startDate) {
+      // Parse YYYY-MM-DD e.g. "2026-11-21" -> timestamp
+      const parsed = new Date(`${targetUpcomingEvent.startDate}T09:00:00`).getTime();
+      targetTime = isNaN(parsed) ? new Date('2026-11-21T09:00:00+05:30').getTime() : parsed;
+    } else {
+      targetTime = new Date('2026-11-21T09:00:00+05:30').getTime();
+    }
 
     const updateTimer = () => {
       const now = new Date().getTime();
-      const diff = Math.max(0, target - now);
+      const diff = Math.max(0, targetTime - now);
       const days = Math.floor(diff / (1000 * 60 * 60 * 24));
       const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
       const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
@@ -268,7 +270,7 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
     updateTimer();
     const timer = setInterval(updateTimer, 1000);
     return () => clearInterval(timer);
-  }, [countdownTarget]);
+  }, [targetUpcomingEvent?.startDate]);
 
   // Tab navigation & URL syncing
   const handleNavigateTab = (tab: CommunityPageTab, eventId?: string) => {
@@ -279,17 +281,17 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
     setMobileMenuOpen(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
 
-    let newPath = '/homepageindevelop';
-    if (tab === 'home') newPath = '/homepageindevelop';
-    else if (tab === 'events') newPath = '/events';
-    else if (tab === 'event-detail') newPath = `/events/${eventId || selectedEventId || 'ganesh-chaturthi-2026'}`;
-    else if (tab === 'gallery') newPath = '/gallery';
-    else if (tab === 'announcements') newPath = '/announcements';
-    else if (tab === 'archive') newPath = '/archive';
-    else if (tab === 'about') newPath = '/about';
-    else if (tab === 'contact') newPath = '/contact';
+    let newPath = '/';
+    if (tab === 'home') newPath = '/';
+    else if (tab === 'about') newPath = '/about-us';
+    else if (tab === 'our-team') newPath = '/our-team';
+    else if (tab === 'past-events') newPath = '/past-events';
+    else if (tab === 'upcoming-events') newPath = '/upcoming-events';
+    else if (tab === 'membership') newPath = '/membership';
+    else if (tab === 'contact') newPath = '/contact-us';
+    else if (tab === 'event-detail') newPath = `/events/${eventId || selectedEventId || 'rajyotsava-2026'}`;
     else if (tab === 'login') newPath = '/login';
-    else if (tab === 'admin-hub') newPath = '/admin-hub';
+    else if (tab === 'admin') newPath = '/admin';
 
     try {
       window.history.pushState({}, '', newPath);
@@ -306,59 +308,42 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  const handleCopyText = (text: string, id: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2000);
-  };
-
-  const handleShareWhatsApp = (title: string, summary: string) => {
-    const text = encodeURIComponent(
-      `*${title}*\n${summary}\n\n🚩 ಸಿರಿಗನ್ನಡಂ ಗೆಲ್ಗೆ! ಸಿರಿಗನ್ನಡಂ ಬಾಳ್ಗೆ! 💛\nಎಲ್ ಡೊರಾಡೊ ಕನ್ನಡಿಗರ ಬಳಗ • Eldorado`
-    );
-    window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
-  };
-
   const selectedEvent =
-    COMMUNITY_EVENTS.find((e) => e.id === selectedEventId || e.slug === selectedEventId) ||
-    COMMUNITY_EVENTS[0];
-
-  // Gallery filtered
-  const filteredPhotos = GALLERY_PHOTOS.filter((p) => {
-    if (galleryYear !== 'all' && p.year.toString() !== galleryYear) return false;
-    if (galleryCelebration !== 'all' && p.celebration !== galleryCelebration && p.tag !== galleryCelebration)
-      return false;
-    return true;
-  });
-
-  // Announcements filtered
-  const filteredAnnouncements = ANNOUNCEMENTS.filter((a) => {
-    if (announcementCategory !== 'all' && a.category !== announcementCategory) return false;
-    if (
-      announcementSearch.trim() &&
-      !a.title.toLowerCase().includes(announcementSearch.toLowerCase()) &&
-      !a.content.toLowerCase().includes(announcementSearch.toLowerCase())
-    ) {
-      return false;
-    }
-    return true;
-  });
-
-  // Events filtered
-  const filteredEvents = COMMUNITY_EVENTS.filter((e) => {
-    if (eventFilterStatus !== 'all' && e.status !== eventFilterStatus) return false;
-    if (eventFilterFestival !== 'all' && e.festival !== eventFilterFestival) return false;
-    return true;
-  });
+    allEvents.find((e) => e.id === selectedEventId || e.slug === selectedEventId) ||
+    allEvents[0];
 
   const isCurrentAdmin =
     isAdmin ||
     (!!currentUser?.email &&
-      (currentUser.email.toLowerCase() === 'desaisachin95@gmail.com' ||
-        allowedEmails.map((e) => e.toLowerCase()).includes(currentUser.email.toLowerCase())));
+      allowedEmails.map((e) => e.toLowerCase()).includes(currentUser.email.toLowerCase()));
 
-  // If viewing standalone Authentication Route ('/login' or tab === 'login')
-  // Bypasses global header/footer wrappers as required!
+  // Contact submit handler
+  const handleContactSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!contactForm.fullName || !contactForm.email || !contactForm.message) return;
+    setContactSubmitted(true);
+  };
+
+  // Membership submit handler
+  const handleMembershipSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!membershipForm.fullName || !membershipForm.email) return;
+    setMembershipSubmitted(true);
+  };
+
+  // If viewing Admin Management Portal ('/admin' or tab === 'admin')
+  if (activeTab === 'admin') {
+    return (
+      <AdminPortalView
+        currentUser={currentUser}
+        onNavigateHome={() => handleNavigateTab('home')}
+        onRefreshData={refreshAllData}
+        isDark={isDark}
+      />
+    );
+  }
+
+  // If viewing standalone Login Route ('/login' or tab === 'login')
   if (activeTab === 'login') {
     return (
       <BalagaLoginView
@@ -371,12 +356,23 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
         }}
         onNavigateHome={() => handleNavigateTab('home')}
         onAdminPasscodeSuccess={() => {
-          handleNavigateTab('home');
+          handleNavigateTab('admin');
         }}
         isDark={isDark}
       />
     );
   }
+
+  // The 7 Reference Navbar Links matching sharavationline.org
+  const navLinks: { id: CommunityPageTab; label: string }[] = [
+    { id: 'home', label: 'Home' },
+    { id: 'about', label: 'About Us' },
+    { id: 'our-team', label: 'Our Team' },
+    { id: 'past-events', label: 'Past Events' },
+    { id: 'upcoming-events', label: 'Upcoming Events' },
+    { id: 'membership', label: 'Membership' },
+    { id: 'contact', label: 'Contact Us' }
+  ];
 
   return (
     <div
@@ -390,9 +386,7 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
         <div className="h-2.5 bg-[#FBBF24] w-full" />
       </div>
 
-
-
-      {/* 1. TOP KANNADIGARA BALAGA NAVIGATION HEADER */}
+      {/* 1. TOP NAVIGATION HEADER (Matching the exact 7 Sharavati Reference Pages) */}
       <header
         className={`sticky top-0 z-40 border-b-2 border-red-600 shadow-xs backdrop-blur-md transition-colors ${
           isDark ? 'bg-stone-900/95 text-stone-100' : 'bg-white/95 text-stone-900'
@@ -402,12 +396,12 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
           {/* Brand Logo & Name */}
           <div
             onClick={() => handleNavigateTab('home')}
-            className="flex items-center gap-3 cursor-pointer group select-none"
+            className="flex items-center gap-3 cursor-pointer group select-none shrink-0"
           >
-            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-red-600 via-red-600 to-amber-500 p-0.5 flex items-center justify-center shadow-xs border-2 border-yellow-400 group-hover:scale-105 transition-transform overflow-hidden">
+            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-red-600 via-red-600 to-amber-500 p-1 flex items-center justify-center shadow-xs border-2 border-yellow-400 group-hover:scale-105 transition-transform overflow-hidden">
               <img
-                src="/assets/aistudio/image_8b234ce0.png"
-                alt="Goddess Bhuvaneshwari Devi & Kannada Flag"
+                src="/bhuvaneshwari_kannada_flag.jpg"
+                alt="Goddess Bhuvaneshwari Devi with Kannada Flag"
                 className="w-full h-full object-cover rounded-lg"
                 referrerPolicy="no-referrer"
               />
@@ -417,32 +411,23 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
                 <span className="font-serif font-black text-lg sm:text-xl text-red-600 tracking-tight">
                   ಕನ್ನಡಿಗರ ಬಳಗ
                 </span>
-                <span className="text-xs text-stone-400">|</span>
-                <span className="text-xs font-bold text-amber-600 dark:text-yellow-400 uppercase tracking-wider hidden sm:inline">
+                <span className="text-xs text-stone-400 hidden sm:inline">|</span>
+                <span className="text-xs font-bold text-amber-600 dark:text-yellow-400 uppercase tracking-wider hidden md:inline">
                   Kannadigara Balaga
                 </span>
               </div>
-              <p className={`text-[11px] font-medium ${isDark ? 'text-stone-400' : 'text-stone-500'}`}>
-                Eldorado • ಸಿರಿಗನ್ನಡಂ ಗೆಲ್ಗೆ, ಸಿರಿಗನ್ನಡಂ ಬಾಳ್ಗೆ!
+              <p className={`text-[11px] font-medium hidden sm:block ${isDark ? 'text-stone-400' : 'text-stone-500'}`}>
+                Eldorado • ಸಿರಿಗನ್ನಡಂ ಗೆಲ್ಗೆ!
               </p>
             </div>
           </div>
 
-          {/* Desktop Navigation Links */}
+          {/* Desktop 7-Page Reference Navigation Links */}
           <nav className="hidden lg:flex items-center gap-1 text-sm font-semibold">
-            {[
-              { id: 'home', label: 'Home' },
-              { id: 'events', label: 'Events', badge: 'Live' },
-              { id: 'gallery', label: 'Gallery' },
-              { id: 'announcements', label: 'Announcements' },
-              { id: 'archive', label: 'Archive' },
-              { id: 'about', label: 'About' },
-              { id: 'contact', label: 'Contact' },
-              ...(isCurrentAdmin ? [{ id: 'admin-hub', label: '👑 Admin Hub' }] : [])
-            ].map((link) => (
+            {navLinks.map((link) => (
               <button
                 key={link.id}
-                onClick={() => handleNavigateTab(link.id as CommunityPageTab)}
+                onClick={() => handleNavigateTab(link.id)}
                 className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer relative inline-flex items-center gap-1.5 ${
                   activeTab === link.id
                     ? isDark
@@ -454,16 +439,12 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
                 }`}
               >
                 <span>{link.label}</span>
-                {link.badge && (
-                  <span className="w-2 h-2 rounded-full bg-red-600 animate-ping inline-block" />
-                )}
               </button>
             ))}
           </nav>
 
-          {/* Header Controls: Theme Switcher, Account, Volunteer Button, Mobile Hamburger */}
-          <div className="flex items-center gap-2.5">
-            {/* Theme Toggle Button */}
+          {/* Header Controls */}
+          <div className="flex items-center gap-2.5 shrink-0">
             <button
               onClick={toggleTheme}
               className={`p-2 rounded-xl border transition-colors cursor-pointer ${
@@ -472,72 +453,33 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
                   : 'bg-stone-50 border-stone-200 text-stone-600 hover:bg-stone-100 hover:text-red-700'
               }`}
               title={isDark ? 'Switch to Light Theme' : 'Switch to Dark Theme'}
-              aria-label="Toggle Theme"
             >
               {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </button>
 
-            {/* Authentication Button / User profile */}
-            {currentUser ? (
-              <div className="relative group flex items-center gap-2">
-                {isCurrentAdmin && (
-                  <button
-                    onClick={() => handleNavigateTab('admin-hub')}
-                    className="px-2.5 py-1 rounded-xl bg-amber-500 hover:bg-amber-600 text-stone-950 font-bold text-xs inline-flex items-center gap-1 cursor-pointer shadow-xs border border-yellow-300"
-                    title="Open Admin & User Management Control Hub"
-                  >
-                    <ShieldCheck className="w-3.5 h-3.5" />
-                    <span className="hidden xl:inline">Admin Hub</span>
-                  </button>
-                )}
-                <button
-                  onClick={() => setAuthModalOpen(true)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold cursor-pointer ${
-                    isDark
-                      ? 'bg-stone-800 border-stone-700 text-stone-200 hover:bg-stone-700'
-                      : 'bg-stone-50 border-stone-200 text-stone-700 hover:bg-stone-100'
-                  }`}
-                >
-                  <UserIcon className="w-3.5 h-3.5 text-red-600" />
-                  <span className="max-w-[100px] truncate">{currentUser.email?.split('@')[0]}</span>
-                  {isCurrentAdmin && (
-                    <span className="text-[9px] bg-red-600 text-yellow-300 px-1.5 py-0.2 rounded font-black uppercase">
-                      Admin
-                    </span>
-                  )}
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={() => handleNavigateTab('login')}
-                className={`hidden sm:inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl border transition-colors cursor-pointer ${
-                  isDark
-                    ? 'bg-stone-800 border-stone-700 text-stone-200 hover:bg-stone-700'
-                    : 'bg-stone-50 border-stone-200 text-stone-700 hover:bg-stone-100'
-                }`}
-              >
-                <Mail className="w-3.5 h-3.5 text-red-600" />
-                <span>Sign in</span>
-              </button>
-            )}
-
-            {/* Primary Action Button: Volunteer */}
+            {/* Admin Portal Entry Point */}
             <button
-              onClick={() => {
-                if (!currentUser) {
-                  setAuthModalOpen(true);
-                } else {
-                  setVolunteerModalOpen(true);
-                }
-              }}
+              onClick={() => handleNavigateTab('admin')}
+              className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition-colors cursor-pointer inline-flex items-center gap-1.5 ${
+                isDark
+                  ? 'bg-stone-800 border-stone-700 text-stone-200 hover:bg-stone-700'
+                  : 'bg-stone-50 border-stone-200 text-stone-700 hover:bg-stone-100'
+              }`}
+              title="Committee Admin Portal"
+            >
+              <Lock className="w-3.5 h-3.5 text-red-600" />
+              <span className="hidden sm:inline">Admin Portal</span>
+            </button>
+
+            <button
+              onClick={() => handleNavigateTab('membership')}
               className="px-3.5 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-yellow-300 font-bold text-xs shadow-xs transition-colors cursor-pointer inline-flex items-center gap-1.5 border border-yellow-400"
             >
-              <Users className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Volunteer</span>
+              <UserCheck className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Become a Member</span>
               <span className="sm:hidden">Join</span>
             </button>
 
-            {/* Mobile Hamburger Toggle */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className={`lg:hidden p-2 rounded-xl border transition-colors cursor-pointer ${
@@ -545,7 +487,6 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
                   ? 'bg-stone-800 border-stone-700 text-white'
                   : 'bg-stone-50 border-stone-200 text-stone-700'
               }`}
-              aria-label="Toggle navigation menu"
             >
               {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
@@ -559,21 +500,11 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
               isDark ? 'bg-stone-900 border-stone-800 text-white' : 'bg-white border-stone-200 text-stone-800'
             }`}
           >
-            {[
-              { id: 'home', label: 'Home' },
-              { id: 'events', label: 'Celebrations & Events' },
-              { id: 'gallery', label: 'Vaibhava Gallery' },
-              { id: 'announcements', label: 'Announcements & Notices' },
-              { id: 'archive', label: 'Past 2-Year Archive' },
-              { id: 'about', label: 'About Balaga' },
-              { id: 'contact', label: 'Contact Committee' },
-              ...(isCurrentAdmin ? [{ id: 'admin-hub', label: '👑 Admin Hub & User Management' }] : []),
-              { id: 'login', label: 'Sign in / Account' }
-            ].map((link) => (
+            {navLinks.map((link) => (
               <button
                 key={link.id}
-                onClick={() => handleNavigateTab(link.id as CommunityPageTab)}
-                className={`w-full text-left px-3 py-2 rounded-lg text-sm font-semibold transition-colors cursor-pointer flex items-center justify-between ${
+                onClick={() => handleNavigateTab(link.id)}
+                className={`w-full text-left px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-colors cursor-pointer flex items-center justify-between ${
                   activeTab === link.id
                     ? isDark
                       ? 'bg-red-950/60 text-yellow-300 font-bold'
@@ -588,24 +519,24 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
               </button>
             ))}
 
-            <div className="pt-2 border-t border-stone-200 dark:border-stone-800 flex items-center justify-between">
-              <span className="text-xs font-medium text-stone-400">Appearance Theme</span>
-              <button
-                onClick={toggleTheme}
-                className="text-xs font-bold px-3 py-1 rounded-lg border flex items-center gap-1.5 cursor-pointer"
-              >
-                {isDark ? <Sun className="w-3.5 h-3.5 text-yellow-400" /> : <Moon className="w-3.5 h-3.5 text-stone-700" />}
-                <span>{isDark ? 'Dark Mode' : 'Light Mode'}</span>
-              </button>
-            </div>
+            <button
+              onClick={() => handleNavigateTab('admin')}
+              className="w-full text-left px-3.5 py-2.5 rounded-xl text-sm font-bold text-red-600 flex items-center justify-between border border-red-200 dark:border-red-900"
+            >
+              <div className="flex items-center gap-2">
+                <Lock className="w-4 h-4" />
+                <span>Admin Portal</span>
+              </div>
+              <ChevronRight className="w-4 h-4" />
+            </button>
           </div>
         )}
       </header>
 
-      {/* 2. MAIN BODY CONTENT */}
+      {/* 2. MAIN BODY PAGES */}
       <main className="flex-1">
         {/* ========================================================
-            PAGE 1: HOME VIEW
+            PAGE 1: HOME PAGE ('home')
            ======================================================== */}
         {activeTab === 'home' && (
           <div className="space-y-12 sm:space-y-16 py-8 sm:py-12">
@@ -618,1426 +549,951 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
                     : 'bg-gradient-to-br from-white via-[#FFFDF7] to-amber-50/60 border-stone-200'
                 }`}
               >
-                {/* Background decorative watermark */}
-                <div className="absolute right-0 top-0 bottom-0 opacity-5 pointer-events-none select-none flex items-center justify-end pr-6">
-                  <img src="/lord_ganesha.svg" alt="" className="h-96 w-auto object-contain filter invert" />
+                <div className="absolute right-0 top-0 bottom-0 opacity-10 pointer-events-none select-none flex items-center justify-end pr-6">
+                  <img
+                    src="/bhuvaneshwari_kannada_flag.jpg"
+                    alt="Goddess Bhuvaneshwari Devi &amp; Kannada Flag"
+                    className="h-96 w-auto object-contain rounded-2xl opacity-25"
+                  />
                 </div>
 
                 <div className="relative z-10 max-w-3xl space-y-5">
-                  {/* Badge */}
                   <div className="inline-flex items-center gap-2 bg-red-600 text-yellow-300 text-[11px] font-bold uppercase tracking-wider px-3.5 py-1 rounded-full shadow-xs border border-yellow-400">
                     <Flag className="w-3.5 h-3.5" />
                     <span>ಸಿರಿಗನ್ನಡಂ ಗೆಲ್ಗೆ! ಸಿರಿಗನ್ನಡಂ ಬಾಳ್ಗೆ!</span>
                   </div>
 
-                  {/* Main Large H1 */}
                   <div>
-                    <h1 className="text-3xl sm:text-5xl lg:text-6xl font-serif font-black tracking-tight text-stone-900 dark:text-stone-100 leading-tight">
+                    <h1 className="text-3xl sm:text-5xl lg:text-6xl font-serif font-black tracking-tight text-stone-950 dark:text-stone-100 leading-tight">
                       Kannadigara Balaga: Celebrating Our Heritage.
                     </h1>
-                    <span className="text-base sm:text-xl font-serif font-bold text-red-600 dark:text-red-400 block mt-2">
+                    <span className="text-base sm:text-xl font-serif font-bold text-red-700 dark:text-red-400 block mt-2">
                       ಎಲ್ ಡೊರಾಡೊ ಕನ್ನಡಿಗರ ಬಳಗ: ನಮ್ಮ ಸಂಸ್ಕೃತಿ, ನಮ್ಮ ಹೆಮ್ಮೆ
                     </span>
                   </div>
 
-                  {/* Sub-headline */}
-                  <p className={`text-sm sm:text-base leading-relaxed ${isDark ? 'text-stone-300' : 'text-stone-600'}`}>
-                    A volunteer-driven community forum of Eldorado residents dedicated to
-                    preserving and celebrating Kannada language, folk traditions, Vedic poojas, and grand
-                    annual festivals in our neighborhood.
+                  <p className={`text-sm sm:text-base leading-relaxed font-medium ${isDark ? 'text-stone-200' : 'text-stone-800'}`}>
+                    A resident-driven community forum of Eldorado dedicated to preserving and celebrating
+                    Kannada language, folk traditions, Vedic poojas, and grand annual festivals in our neighborhood.
                   </p>
 
-                  {/* Primary CTAs */}
                   <div className="pt-2 flex flex-wrap items-center gap-3 justify-center sm:justify-start">
                     <button
-                      onClick={() => setContributeModalOpen(true)}
+                      onClick={() => handleNavigateTab('upcoming-events')}
                       className="px-5 py-3 rounded-xl bg-red-600 hover:bg-red-700 text-yellow-300 font-bold text-xs sm:text-sm shadow-md transition-all cursor-pointer inline-flex items-center gap-2 border border-yellow-400 active:scale-95"
                     >
-                      <HeartHandshake className="w-4 h-4" />
-                      <span>Contribute</span>
+                      <Calendar className="w-4 h-4" />
+                      <span>Explore Upcoming Events</span>
                     </button>
 
                     <button
-                      onClick={() => handleNavigateTab('events')}
+                      onClick={() => handleNavigateTab('membership')}
+                      className="px-5 py-3 rounded-xl bg-yellow-400 hover:bg-yellow-300 text-stone-950 font-bold text-xs sm:text-sm shadow-sm transition-all cursor-pointer inline-flex items-center gap-2"
+                    >
+                      <UserCheck className="w-4 h-4" />
+                      <span>Become a Member</span>
+                    </button>
+
+                    <button
+                      onClick={() => handleNavigateTab('about')}
                       className={`px-5 py-3 rounded-xl font-bold text-xs sm:text-sm transition-all cursor-pointer inline-flex items-center gap-2 border ${
                         isDark
                           ? 'bg-stone-800 hover:bg-stone-700 border-stone-700 text-white'
                           : 'bg-white hover:bg-stone-50 border-stone-300 text-stone-800'
                       }`}
                     >
-                      <Compass className="w-4 h-4 text-red-600" />
-                      <span>Explore Events</span>
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        if (!currentUser) setAuthModalOpen(true);
-                        else setVolunteerModalOpen(true);
-                      }}
-                      className="px-5 py-3 rounded-xl bg-yellow-400 hover:bg-yellow-300 text-stone-950 font-bold text-xs sm:text-sm shadow-sm transition-all cursor-pointer inline-flex items-center gap-2"
-                    >
-                      <Users className="w-4 h-4" />
-                      <span>Volunteer</span>
+                      <Info className="w-4 h-4 text-red-600" />
+                      <span>About Us</span>
                     </button>
                   </div>
                 </div>
               </div>
             </section>
 
-            {/* SRI GANESHOTSAVA FESTIVAL DARSHAN VIDEO */}
-            <section className="max-w-6xl mx-auto px-4 sm:px-6">
-              <div className="space-y-3">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <div>
-                    <div className="inline-flex items-center gap-1.5 bg-red-600 text-yellow-300 text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full border border-yellow-400">
-                      <Sparkles className="w-3 h-3" />
-                      <span>ಶ್ರೀ ಗಣೇಶ ಮಹಾದರ್ಶನ • Live Darshan Video</span>
-                    </div>
-                    <h2 className="text-xl sm:text-2xl font-serif font-black tracking-tight text-stone-900 dark:text-stone-100 mt-1">
-                      Sri Ganeshotsava Festival Darshan &amp; Alankara
-                    </h2>
-                    <p className={`text-xs ${isDark ? 'text-stone-400' : 'text-stone-600'}`}>
-                      Watch the divine celebration video of Sri Vighnaharta Ganesha in the grand royal pandal decorated with peacock, sacred cow, and fresh marigold garlands.
-                    </p>
-                  </div>
-                </div>
-                <GaneshaFestivalVideoShowcase
-                  settings={settings}
-                  isAdmin={isAdmin}
-                  onUpdateSettings={onUpdateSettings}
-                />
-              </div>
-            </section>
-
-            {/* LIVE INTERACTIVE COUNTDOWN COMPONENT (Targeting Karnataka Rajyotsava Nov 1st) */}
-            <section className="max-w-6xl mx-auto px-4 sm:px-6">
-              <div
-                className={`p-6 sm:p-8 rounded-3xl border-2 shadow-xs transition-all ${
-                  isDark ? 'bg-stone-900 border-stone-800 text-stone-100' : 'bg-white border-stone-200 text-stone-900'
-                }`}
-              >
-                <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-                  {/* Countdown Header */}
-                  <div className="space-y-1.5 text-center md:text-left">
-                    <div className="inline-flex items-center gap-1.5 bg-yellow-400/20 text-red-600 dark:text-yellow-400 text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full">
-                      <Clock className="w-3.5 h-3.5" />
-                      <span>
-                        {countdownTarget === 'rajyotsava'
-                          ? 'Upcoming Festival Countdown'
-                          : 'Live Festival Countdown'}
-                      </span>
-                    </div>
-
-                    <h3 className="text-xl sm:text-2xl font-serif font-black">
-                      {countdownTarget === 'rajyotsava'
-                        ? 'Karnataka Rajyotsava 2026'
-                        : 'Sri Ganesha Chaturthi 2026'}
-                    </h3>
-                    <p className={`text-xs ${isDark ? 'text-stone-400' : 'text-stone-500'}`}>
-                      {countdownTarget === 'rajyotsava'
-                        ? '21st & 22nd November 2026 • Grand Flag Hoisting, Naadageethe & Cultural Stage Shows'
-                        : 'Concluded Event (23 Aug – 20 Sep 2026) • Financial Ledger & Audit Uploaded'}
-                    </p>
-
-                    {/* Switch target toggle */}
-                    <div className="pt-2 flex items-center gap-2 justify-center md:justify-start">
-                      <span className="text-[11px] text-stone-400">Switch target:</span>
-                      <button
-                        onClick={() => setCountdownTarget('rajyotsava')}
-                        className={`text-[11px] px-2.5 py-0.5 rounded-md font-bold transition-colors cursor-pointer ${
-                          countdownTarget === 'rajyotsava'
-                            ? 'bg-red-600 text-yellow-300'
-                            : 'bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-400'
-                        }`}
-                      >
-                        Rajyotsava (Nov 21 &amp; 22)
-                      </button>
-                      <button
-                        onClick={() => setCountdownTarget('ganesha')}
-                        className={`text-[11px] px-2.5 py-0.5 rounded-md font-bold transition-colors cursor-pointer ${
-                          countdownTarget === 'ganesha'
-                            ? 'bg-red-600 text-yellow-300'
-                            : 'bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-400'
-                        }`}
-                      >
-                        Ganesha Chaturthi (Concluded)
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Dynamic Metric Tickers */}
-                  <div className="grid grid-cols-4 gap-3 text-center shrink-0">
-                    {[
-                      { label: 'Days', val: countdown.days },
-                      { label: 'Hours', val: countdown.hours },
-                      { label: 'Minutes', val: countdown.minutes },
-                      { label: 'Seconds', val: countdown.seconds }
-                    ].map((item, i) => (
-                      <div
-                        key={i}
-                        className={`p-3 sm:p-4 rounded-2xl border min-w-[64px] sm:min-w-[80px] shadow-xs ${
-                          isDark ? 'bg-stone-800/80 border-stone-700' : 'bg-stone-50 border-stone-200'
-                        }`}
-                      >
-                        <span className="text-2xl sm:text-3xl font-serif font-black text-red-600 block leading-none mb-1">
-                          {String(item.val).padStart(2, '0')}
-                        </span>
-                        <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-stone-500">
-                          {item.label}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </section>
-
-            {/* BANNER SECTION: "Sri Ganeshotsava 2026 Concluded — Income & Expenditure Statement" */}
-            <section className="max-w-6xl mx-auto px-4 sm:px-6">
-              <div className="relative rounded-3xl p-6 sm:p-8 border-2 border-red-600 bg-gradient-to-r from-red-800 via-red-900 to-amber-900 text-white shadow-lg overflow-hidden flex flex-col md:flex-row items-center justify-between gap-6">
-                <div className="space-y-2 max-w-xl text-center md:text-left">
-                  <div className="inline-flex items-center gap-1.5 bg-yellow-400 text-stone-950 text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full tracking-wider shadow-xs">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700" />
-                    <span>Concluded Past Event</span>
-                  </div>
-                  <h3 className="text-2xl sm:text-3xl font-serif font-black text-yellow-300">
-                    Sri Ganeshotsava 2026 — Income &amp; Expenditure Statement
-                  </h3>
-                  <p className="text-xs sm:text-sm text-yellow-100 leading-relaxed">
-                    Total Collections: <strong>₹ 7,34,333</strong> | Total Expenses Incurred: <strong>₹ 6,19,706.96</strong> | Net Closing Surplus: <strong>₹ 1,14,626.04</strong> deposited in FD for Ganeshotsava 2027.
-                  </p>
-                </div>
-
-                <div className="shrink-0 flex items-center gap-3">
-                  <button
-                    onClick={() => handleNavigateTab('event-detail', 'ganesh-chaturthi-2026')}
-                    className="px-6 py-3 rounded-xl bg-yellow-400 hover:bg-yellow-300 text-stone-950 font-black text-xs sm:text-sm shadow-md transition-all cursor-pointer inline-flex items-center gap-2 active:scale-95"
-                  >
-                    <FileText className="w-4 h-4 text-red-800" />
-                    <span>View Financial Statement &amp; Recap</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            </section>
-
-            {/* STATISTICS COUNTER GRID (3-Year Momentum Track Record) */}
-            <section className="max-w-6xl mx-auto px-4 sm:px-6">
-              <div className="text-center max-w-2xl mx-auto mb-8 space-y-2">
-                <span className="text-xs font-bold text-red-600 uppercase tracking-wider">
-                  3 Years of Community Momentum
-                </span>
-                <h3 className="text-2xl sm:text-3xl font-serif font-black">
-                  Built on Devotion, Culture &amp; Resident Unity
-                </h3>
-                <p className={`text-xs sm:text-sm ${isDark ? 'text-stone-400' : 'text-stone-600'}`}>
-                  Celebrating together since our inaugural year 2024 with 100% voluntary participation and
-                  transparent accounting.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {/* UPCOMING EVENT HIGHLIGHT BANNER (DYNAMICALLY SYNCED WITH ADMIN DATES) */}
+            {targetUpcomingEvent && (
+              <section className="max-w-6xl mx-auto px-4 sm:px-6">
                 <div
-                  className={`p-5 rounded-2xl border-2 text-center shadow-xs ${
-                    isDark ? 'bg-stone-900 border-red-600' : 'bg-white border-red-600'
-                  }`}
-                >
-                  <span className="text-3xl sm:text-4xl font-black font-serif text-red-600 block mb-1">
-                    3
-                  </span>
-                  <span className="text-xs font-semibold block">Years of Togetherness</span>
-                  <span className="text-[11px] text-stone-500">Celebrating since 2024</span>
-                </div>
-
-                <div
-                  className={`p-5 rounded-2xl border-2 text-center shadow-xs ${
-                    isDark ? 'bg-stone-900 border-yellow-400' : 'bg-white border-yellow-400'
-                  }`}
-                >
-                  <span className="text-3xl sm:text-4xl font-black font-serif text-amber-500 block mb-1">
-                    1
-                  </span>
-                  <span className="text-xs font-semibold block">Upcoming Mega Event</span>
-                  <span className="text-[11px] text-stone-500">Rajyotsava 2026 (Nov 1)</span>
-                </div>
-
-                <div
-                  className={`p-5 rounded-2xl border-2 text-center shadow-xs ${
-                    isDark ? 'bg-stone-900 border-red-600' : 'bg-white border-red-600'
-                  }`}
-                >
-                  <span className="text-3xl sm:text-4xl font-black font-serif text-red-600 block mb-1">
-                    50+
-                  </span>
-                  <span className="text-xs font-semibold block">Active Volunteers</span>
-                  <span className="text-[11px] text-stone-500">Residents giving seva</span>
-                </div>
-
-                <div
-                  className={`p-5 rounded-2xl border-2 text-center shadow-xs ${
-                    isDark ? 'bg-stone-900 border-yellow-400' : 'bg-white border-yellow-400'
-                  }`}
-                >
-                  <span className="text-3xl sm:text-4xl font-black font-serif text-emerald-600 block mb-1">
-                    100%
-                  </span>
-                  <span className="text-xs font-semibold block">Transparent Receipts</span>
-                  <span className="text-[11px] text-stone-500">Every rupee accounted</span>
-                </div>
-              </div>
-            </section>
-
-            {/* PAST EVENTS OVERVIEW SLIDER WIDGET */}
-            <section className="max-w-6xl mx-auto px-4 sm:px-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-                <div>
-                  <div className="inline-flex items-center gap-1.5 bg-amber-500/20 text-amber-800 dark:text-yellow-300 text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full border border-amber-500/30">
-                    <Sparkles className="w-3 h-3 text-amber-600" />
-                    <span>Past Events Highlights &amp; Financial Overview Showcase</span>
-                  </div>
-                  <h3 className="text-2xl sm:text-3xl font-serif font-black mt-1">Concluded Past Celebrations</h3>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setActivePastEventIndex((prev) => (prev > 0 ? prev - 1 : pastEvents.length - 1))}
-                    className="p-2.5 rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors cursor-pointer"
-                    aria-label="Previous past event"
-                  >
-                    <ChevronLeft className="w-4 h-4 text-stone-700 dark:text-stone-300" />
-                  </button>
-                  <span className="text-xs font-bold text-stone-500">
-                    {activePastEventIndex + 1} / {pastEvents.length}
-                  </span>
-                  <button
-                    onClick={() => setActivePastEventIndex((prev) => (prev < pastEvents.length - 1 ? prev + 1 : 0))}
-                    className="p-2.5 rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors cursor-pointer"
-                    aria-label="Next past event"
-                  >
-                    <ChevronRight className="w-4 h-4 text-stone-700 dark:text-stone-300" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Sliding Widget Card */}
-              {pastEvents[activePastEventIndex] && (
-                <div
-                  key={pastEvents[activePastEventIndex].id}
-                  className={`rounded-3xl border-2 overflow-hidden shadow-md transition-all duration-300 ${
+                  className={`rounded-3xl border-2 p-6 sm:p-8 shadow-sm transition-all ${
                     isDark ? 'bg-stone-900 border-stone-800' : 'bg-white border-stone-200'
                   }`}
                 >
-                  <div className="p-6 sm:p-8 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-8">
-                    <div className="space-y-4 max-w-2xl">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-[10px] font-bold uppercase tracking-wider bg-emerald-600 text-white px-2.5 py-0.5 rounded shadow-xs flex items-center gap-1">
-                          <CheckCircle2 className="w-3 h-3" />
-                          <span>PAST EVENT — CONCLUDED</span>
-                        </span>
-                        <span className="text-xs font-bold text-amber-700 dark:text-yellow-400 bg-amber-500/10 px-2.5 py-0.5 rounded border border-amber-500/30">
-                          {customInfos[pastEvents[activePastEventIndex].id]?.dateDisplay || pastEvents[activePastEventIndex].dateDisplay}
-                        </span>
+                  <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+                    <div className="space-y-3 max-w-2xl">
+                      <div className="inline-flex items-center gap-2 bg-red-600 text-yellow-300 text-[11px] font-bold uppercase px-3 py-1 rounded-full border border-yellow-400">
+                        <Clock className="w-3.5 h-3.5" />
+                        <span>Next Major Celebration</span>
                       </div>
 
                       <div>
-                        <h4 className="text-2xl sm:text-3xl font-serif font-black text-stone-900 dark:text-stone-100">
-                          {customInfos[pastEvents[activePastEventIndex].id]?.title || pastEvents[activePastEventIndex].title}
-                        </h4>
-                        <span className="text-sm sm:text-base font-serif font-bold text-amber-800 dark:text-yellow-400 block mt-0.5">
-                          {customInfos[pastEvents[activePastEventIndex].id]?.kannadaTitle || pastEvents[activePastEventIndex].kannadaTitle}
-                        </span>
+                        <h3 className="text-2xl sm:text-3xl font-serif font-black text-red-700 dark:text-red-400">
+                          {targetUpcomingEvent.title}
+                        </h3>
+                        {targetUpcomingEvent.kannadaTitle && (
+                          <span className="text-sm font-serif font-bold text-amber-800 dark:text-yellow-400 block mt-0.5">
+                            {targetUpcomingEvent.kannadaTitle} — {targetUpcomingEvent.dateDisplay || targetUpcomingEvent.startDate}
+                          </span>
+                        )}
                       </div>
 
-                      <p className={`text-xs sm:text-sm leading-relaxed ${isDark ? 'text-stone-300' : 'text-stone-600'}`}>
-                        {customInfos[pastEvents[activePastEventIndex].id]?.detailsOverview || pastEvents[activePastEventIndex].detailsOverview || pastEvents[activePastEventIndex].description}
+                      <p className={`text-xs sm:text-sm leading-relaxed font-medium ${isDark ? 'text-stone-200' : 'text-stone-800'}`}>
+                        {targetUpcomingEvent.description}
                       </p>
 
-                      {/* Photo thumbnails preview */}
-                      <div className="pt-2 flex items-center gap-3 overflow-x-auto no-scrollbar">
-                        {GALLERY_PHOTOS.slice(0, 4).map((ph) => (
-                          <img
-                            key={ph.id}
-                            src={ph.imageUrl}
-                            alt={ph.title}
-                            className="w-20 h-14 object-cover rounded-xl border border-stone-300 dark:border-stone-700 shrink-0"
-                          />
-                        ))}
+                      <div className="flex flex-wrap items-center gap-4 text-xs text-stone-500 pt-1">
+                        <div className="flex items-center gap-1.5">
+                          <Calendar className="w-3.5 h-3.5 text-red-600 shrink-0" />
+                          <span>{targetUpcomingEvent.dateDisplay || targetUpcomingEvent.startDate}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <MapPin className="w-3.5 h-3.5 text-red-600 shrink-0" />
+                          <span>{targetUpcomingEvent.venue}</span>
+                        </div>
                       </div>
                     </div>
 
-                    {/* Financial & CTA Panel */}
-                    <div className="w-full lg:w-72 shrink-0 p-5 rounded-2xl bg-amber-500/10 border-2 border-amber-500/30 space-y-4">
-                      <div className="space-y-1">
-                        <span className="text-[10px] uppercase font-extrabold text-amber-800 dark:text-amber-300 tracking-wider block">
-                          Financial Overview
+                    <div className="shrink-0 space-y-3 text-center md:text-right w-full md:w-auto">
+                      <div className="p-3.5 rounded-2xl bg-amber-50 dark:bg-stone-800 border border-amber-200 dark:border-stone-700">
+                        <span className="text-[10px] font-bold text-amber-800 dark:text-yellow-300 uppercase block mb-1">
+                          Countdown to Event
                         </span>
-                        <div className="text-xl font-black text-amber-900 dark:text-yellow-300">
-                          {customInfos[pastEvents[activePastEventIndex].id]?.totalIncome || '₹ 7,34,333 Collected'}
+                        <div className="flex items-center gap-2 text-red-600 font-serif font-black text-xl justify-center">
+                          <span>{countdown.days}d</span>
+                          <span>:</span>
+                          <span>{countdown.hours}h</span>
+                          <span>:</span>
+                          <span>{countdown.minutes}m</span>
+                          <span>:</span>
+                          <span>{countdown.seconds}s</span>
                         </div>
-                        <p className="text-[11px] text-amber-800/80 dark:text-amber-200/80 font-medium">
-                          Closing Surplus: {customInfos[pastEvents[activePastEventIndex].id]?.netSurplus || '₹ 1,14,626.04'} in FD
-                        </p>
                       </div>
 
                       <button
-                        onClick={() => handleNavigateTab('event-detail', pastEvents[activePastEventIndex].slug || pastEvents[activePastEventIndex].id)}
-                        className="w-full py-3 rounded-xl bg-red-600 hover:bg-red-700 text-yellow-300 font-bold text-xs shadow-sm transition-all cursor-pointer flex items-center justify-center gap-2 border border-yellow-400"
+                        onClick={() => handleNavigateTab('upcoming-events')}
+                        className="px-5 py-3 rounded-xl bg-red-600 hover:bg-red-700 text-yellow-300 font-bold text-xs shadow-xs transition-colors cursor-pointer inline-flex items-center gap-2 w-full justify-center"
                       >
-                        <span>View Past Event Highlights &amp; Financials</span>
-                        <ArrowRight className="w-3.5 h-3.5" />
+                        <span>View Event Details</span>
+                        <ArrowRight className="w-4 h-4" />
                       </button>
                     </div>
                   </div>
+                </div>
+              </section>
+            )}
 
-                  {/* Slide Indicators */}
-                  <div className="px-6 py-3 bg-stone-50 dark:bg-stone-950 border-t border-stone-200 dark:border-stone-800 flex items-center justify-center gap-2">
-                    {pastEvents.map((ev, idx) => (
-                      <button
-                        key={ev.id}
-                        onClick={() => setActivePastEventIndex(idx)}
-                        className={`h-2 rounded-full transition-all cursor-pointer ${
-                          activePastEventIndex === idx ? 'w-6 bg-red-600' : 'w-2 bg-stone-300 dark:bg-stone-700'
-                        }`}
-                        title={ev.title}
-                      />
-                    ))}
+            {/* LATEST ANNOUNCEMENTS SECTION (PUSHED LIVE BY ADMIN) */}
+            <section className="max-w-6xl mx-auto px-4 sm:px-6 space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-stone-200 dark:border-stone-800 pb-4">
+                <div className="space-y-1">
+                  <div className="inline-flex items-center gap-2 bg-red-600 text-yellow-300 text-[11px] font-bold uppercase tracking-wider px-3 py-0.5 rounded-full border border-yellow-400">
+                    <Megaphone className="w-3.5 h-3.5" />
+                    <span>ಇತ್ತೀಚಿನ ಪ್ರಕಟಣೆಗಳು</span>
                   </div>
-                </div>
-              )}
-            </section>
-
-            {/* LATEST ANNOUNCEMENT SNAPSHOT: "Grand Ganesha Visarjana & Cultural Night Planning" */}
-            <section className="max-w-6xl mx-auto px-4 sm:px-6">
-              <div className="flex items-center justify-between gap-4 mb-6">
-                <div>
-                  <span className="text-xs font-bold text-red-600 uppercase tracking-wider">
-                    Official Bulletin
-                  </span>
-                  <h3 className="text-2xl font-serif font-black">Latest Announcement</h3>
-                </div>
-                <button
-                  onClick={() => handleNavigateTab('announcements')}
-                  className="text-xs font-bold text-red-600 hover:underline inline-flex items-center gap-1 cursor-pointer"
-                >
-                  <span>View All Bulletins</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
-
-              <div
-                className={`rounded-3xl border-2 p-6 sm:p-8 space-y-4 shadow-xs ${
-                  isDark ? 'bg-stone-900 border-stone-800' : 'bg-white border-stone-200'
-                }`}
-              >
-                <div className="flex items-center justify-between gap-2 border-b pb-3 border-stone-100 dark:border-stone-800">
-                  <span className="text-[10px] font-bold uppercase tracking-wider bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-yellow-300 px-2.5 py-0.5 rounded">
-                    Cultural &amp; Event Notice
-                  </span>
-                  <span className="text-xs text-stone-400">10 Sep 2026</span>
+                  <h2 className="text-2xl sm:text-3xl font-serif font-black text-stone-900 dark:text-stone-100">
+                    Latest Official Announcements
+                  </h2>
                 </div>
 
-                <div>
-                  <h4 className="text-xl font-serif font-black text-red-700 dark:text-red-400">
-                    Grand Ganesha Visarjana &amp; Cultural Night Planning
-                  </h4>
-                  <span className="text-xs font-serif font-bold text-amber-800 dark:text-yellow-400 block mt-0.5">
-                    ಮಹಾ ಗಣೇಶ ವಿಸರ್ಜನೆ ಹಾಗೂ ಸಾಂಸ್ಕೃತಿಕ ಸಂಜೆ ಸಿದ್ಧತೆಗಳು
-                  </span>
-                </div>
-
-                <div
-                  className={`text-xs sm:text-sm leading-relaxed p-4 rounded-2xl border font-sans whitespace-pre-line ${
-                    isDark
-                      ? 'bg-stone-800/60 border-stone-700 text-stone-200'
-                      : 'bg-amber-50/60 border-amber-200 text-stone-800'
-                  }`}
-                >
-                  The grand immersion procession (Visarjana Shobhayatre) for Sri Ganeshotsava 2026 will
-                  commence on the final evening. Special Chende drums, floral decoration squad, and eco-pond
-                  immersion are arranged within the premises. Residents are invited to join the farewell
-                  bhajans and maha mangalarathi.
-                </div>
-
-                <div className="flex items-center justify-between pt-2">
-                  <span className="text-xs text-stone-400">— Kannadigara Balaga Committee</span>
+                {isCurrentAdmin && (
                   <button
-                    onClick={() => handleNavigateTab('announcements')}
-                    className="text-xs font-bold text-red-600 hover:underline inline-flex items-center gap-1 cursor-pointer"
+                    onClick={() => handleNavigateTab('admin')}
+                    className="px-3.5 py-1.5 rounded-xl bg-stone-900 text-yellow-300 dark:bg-stone-800 font-bold text-xs hover:bg-stone-800 cursor-pointer inline-flex items-center gap-1.5 self-start sm:self-auto"
                   >
-                    <span>Read complete notice</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
+                    <Megaphone className="w-3.5 h-3.5" />
+                    <span>Manage Announcements</span>
                   </button>
-                </div>
-              </div>
-            </section>
-
-            {/* PAST CELEBRATIONS GRID (Visual Archiving Links) */}
-            <section className="max-w-6xl mx-auto px-4 sm:px-6">
-              <div className="flex items-center justify-between gap-4 mb-6">
-                <div>
-                  <span className="text-xs font-bold text-red-600 uppercase tracking-wider">
-                    Our 2-Year Heritage
-                  </span>
-                  <h3 className="text-2xl font-serif font-black">
-                    Past Celebrations (2025 &amp; 2024)
-                  </h3>
-                  <p className={`text-xs ${isDark ? 'text-stone-400' : 'text-stone-500'}`}>
-                    Sri Ganesha Chaturthi and Karnataka Rajyotsava across our inaugural two seasons.
-                  </p>
-                </div>
-                <button
-                  onClick={() => handleNavigateTab('archive')}
-                  className="text-xs font-bold text-red-600 hover:underline inline-flex items-center gap-1 cursor-pointer"
-                >
-                  <span>Full Archive</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
+                )}
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div
-                  onClick={() => handleNavigateTab('archive')}
-                  className={`p-4 rounded-2xl border-2 hover:border-red-600 transition-colors cursor-pointer shadow-xs space-y-2 ${
-                    isDark ? 'bg-stone-900 border-stone-800' : 'bg-white border-stone-200'
-                  }`}
-                >
-                  <div className="flex items-center justify-between text-[10px] font-bold">
-                    <span className="bg-red-50 dark:bg-red-950/60 text-red-800 dark:text-red-300 px-1.5 py-0.5 rounded">
-                      2025
-                    </span>
-                    <span className="text-stone-400">01 Nov</span>
-                  </div>
-                  <h5 className="text-sm font-serif font-bold">Karnataka Rajyotsava 2025</h5>
-                  <p className="text-xs text-stone-500">Amphitheatre • Flag Hoisting &amp; 16 acts</p>
+              {announcementsList.length === 0 ? (
+                <div className="p-8 text-center rounded-3xl border border-dashed border-stone-300 dark:border-stone-800 text-stone-500 text-xs">
+                  No official announcements posted yet. Check back soon for updates from Balaga Committee.
                 </div>
-
-                <div
-                  onClick={() => handleNavigateTab('archive')}
-                  className={`p-4 rounded-2xl border-2 hover:border-red-600 transition-colors cursor-pointer shadow-xs space-y-2 ${
-                    isDark ? 'bg-stone-900 border-stone-800' : 'bg-white border-stone-200'
-                  }`}
-                >
-                  <div className="flex items-center justify-between text-[10px] font-bold">
-                    <span className="bg-yellow-100 dark:bg-yellow-950/60 text-yellow-900 dark:text-yellow-300 px-1.5 py-0.5 rounded">
-                      2025
-                    </span>
-                    <span className="text-stone-400">27-31 Aug</span>
-                  </div>
-                  <h5 className="text-sm font-serif font-bold">Ganesha Chaturthi 2025</h5>
-                  <p className="text-xs text-stone-500">5 Days • 45 volunteers • 310 contributors</p>
-                </div>
-
-                <div
-                  onClick={() => handleNavigateTab('archive')}
-                  className={`p-4 rounded-2xl border-2 hover:border-red-600 transition-colors cursor-pointer shadow-xs space-y-2 ${
-                    isDark ? 'bg-stone-900 border-stone-800' : 'bg-white border-stone-200'
-                  }`}
-                >
-                  <div className="flex items-center justify-between text-[10px] font-bold">
-                    <span className="bg-red-50 dark:bg-red-950/60 text-red-800 dark:text-red-300 px-1.5 py-0.5 rounded">
-                      2024
-                    </span>
-                    <span className="text-stone-400">01 Nov</span>
-                  </div>
-                  <h5 className="text-sm font-serif font-bold">Karnataka Rajyotsava 2024</h5>
-                  <p className="text-xs text-stone-500">Inaugural Rajyotsava • Folk songs &amp; quiz</p>
-                </div>
-
-                <div
-                  onClick={() => handleNavigateTab('archive')}
-                  className={`p-4 rounded-2xl border-2 hover:border-red-600 transition-colors cursor-pointer shadow-xs space-y-2 ${
-                    isDark ? 'bg-stone-900 border-stone-800' : 'bg-white border-stone-200'
-                  }`}
-                >
-                  <div className="flex items-center justify-between text-[10px] font-bold">
-                    <span className="bg-yellow-100 dark:bg-yellow-950/60 text-yellow-900 dark:text-yellow-300 px-1.5 py-0.5 rounded">
-                      2024
-                    </span>
-                    <span className="text-stone-400">07-11 Sep</span>
-                  </div>
-                  <h5 className="text-sm font-serif font-bold">Ganesha Chaturthi 2024</h5>
-                  <p className="text-xs text-stone-500">First historic celebration • Foundation year</p>
-                </div>
-              </div>
-            </section>
-          </div>
-        )}
-
-        {/* ========================================================
-            PAGE 2: EVENTS HUB VIEW ('/events')
-           ======================================================== */}
-        {activeTab === 'events' && (
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-10 space-y-8">
-            <div className="space-y-2">
-              <span className="text-xs font-bold text-red-600 uppercase tracking-wider">
-                ಕನ್ನಡಿಗರ ಬಳಗ ಉತ್ಸವಗಳು
-              </span>
-              <h2 className="text-3xl sm:text-4xl font-serif font-black">
-                Our Celebrations
-              </h2>
-              <p className={`text-sm max-w-2xl ${isDark ? 'text-stone-400' : 'text-stone-600'}`}>
-                Our annual celebrations of Sri Ganesha Chaturthi and Karnataka Rajyotsava, along with our
-                2-year past celebrations archive.
-              </p>
-            </div>
-
-            {/* Status Counter Tabs */}
-            <div className="flex flex-wrap items-center gap-2 border-b pb-4 border-stone-200 dark:border-stone-800 text-xs font-bold">
-              {[
-                { id: 'all', label: 'All', count: COMMUNITY_EVENTS.length },
-                {
-                  id: 'ongoing',
-                  label: 'Ongoing / Live: 1',
-                  count: COMMUNITY_EVENTS.filter((e) => e.status === 'ongoing').length
-                },
-                {
-                  id: 'upcoming',
-                  label: 'Upcoming: 1',
-                  count: COMMUNITY_EVENTS.filter((e) => e.status === 'upcoming').length
-                },
-                {
-                  id: 'archived',
-                  label: 'Archived: 4',
-                  count: COMMUNITY_EVENTS.filter((e) => e.status === 'archived').length
-                }
-              ].map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setEventFilterStatus(tab.id)}
-                  className={`px-3.5 py-1.5 rounded-xl transition-colors cursor-pointer inline-flex items-center gap-2 ${
-                    eventFilterStatus === tab.id
-                      ? 'bg-red-600 text-yellow-300 shadow-xs'
-                      : isDark
-                      ? 'bg-stone-900 text-stone-300 border border-stone-800 hover:bg-stone-800'
-                      : 'bg-white text-stone-600 border border-stone-200 hover:bg-stone-50'
-                  }`}
-                >
-                  <span>{tab.label}</span>
-                </button>
-              ))}
-            </div>
-
-            {/* Tag Filters */}
-            <div className="flex items-center gap-2 flex-wrap text-xs">
-              <span className="text-stone-400 font-semibold">Filter by Festival:</span>
-              {['all', 'Ganesha Chaturthi', 'Karnataka Rajyotsava'].map((fest) => (
-                <button
-                  key={fest}
-                  onClick={() => setEventFilterFestival(fest)}
-                  className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors cursor-pointer ${
-                    eventFilterFestival === fest
-                      ? 'bg-yellow-400 text-stone-950 font-bold'
-                      : isDark
-                      ? 'bg-stone-900 text-stone-400 border border-stone-800 hover:text-white'
-                      : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
-                  }`}
-                >
-                  {fest === 'all' ? 'All Festivals' : fest}
-                </button>
-              ))}
-            </div>
-
-            {/* Events Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredEvents.map((evt) => (
-                <div
-                  key={evt.id}
-                  className={`rounded-3xl border-2 hover:border-red-600 overflow-hidden shadow-xs hover:shadow-md transition-all flex flex-col justify-between ${
-                    isDark ? 'bg-stone-900 border-stone-800' : 'bg-white border-stone-200'
-                  }`}
-                >
-                  <div className="p-6 space-y-3.5">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-[10px] font-bold uppercase tracking-wider bg-red-600 text-yellow-300 px-2.5 py-0.5 rounded">
-                        {evt.festival}
-                      </span>
-                      <span
-                        className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${
-                          evt.status === 'ongoing'
-                            ? 'bg-red-500/20 text-red-600 dark:text-red-400 border border-red-500/40 animate-pulse'
-                            : evt.status === 'upcoming'
-                            ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400'
-                            : 'bg-stone-500/20 text-stone-500'
-                        }`}
-                      >
-                        {evt.status === 'ongoing'
-                          ? 'Live / Ongoing'
-                          : evt.status === 'upcoming'
-                          ? 'Upcoming'
-                          : 'Archived'}
-                      </span>
-                    </div>
-
-                    <div>
-                      <h3 className="text-xl font-serif font-black text-stone-900 dark:text-stone-100">
-                        {evt.title}
-                      </h3>
-                      <span className="text-xs font-serif font-bold text-amber-800 dark:text-yellow-400 block mt-0.5">
-                        {evt.kannadaTitle}
-                      </span>
-                      <p className="text-xs text-amber-900 dark:text-stone-400 font-medium italic mt-1">
-                        {evt.theme}
-                      </p>
-                    </div>
-
-                    <p className={`text-xs leading-relaxed ${isDark ? 'text-stone-300' : 'text-stone-600'}`}>
-                      {evt.description}
-                    </p>
-
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {announcementsList.map((ann) => (
                     <div
-                      className={`pt-2 space-y-2 text-xs border-t ${
-                        isDark ? 'border-stone-800 text-stone-400' : 'border-stone-100 text-stone-500'
+                      key={ann.id}
+                      onClick={() => setSelectedAnnouncement(ann)}
+                      className={`p-6 rounded-3xl border-2 space-y-4 shadow-xs transition-all cursor-pointer hover:border-red-600 flex flex-col justify-between ${
+                        isDark
+                          ? 'bg-stone-900 border-stone-800 hover:bg-stone-850'
+                          : 'bg-white border-stone-200 hover:bg-amber-50/30'
                       }`}
                     >
-                      <div className="flex items-center gap-2">
-                        <Calendar className="w-3.5 h-3.5 text-red-600 shrink-0" />
-                        <span>{evt.dateDisplay}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <MapPin className="w-3.5 h-3.5 text-red-600 shrink-0" />
-                        <span>{evt.venue}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div
-                    className={`px-6 py-4 border-t flex items-center justify-between gap-2 ${
-                      isDark ? 'bg-stone-950 border-stone-800' : 'bg-stone-50 border-stone-100'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 text-xs text-stone-500">
-                      <span>
-                        <strong className="text-stone-800 dark:text-stone-200">{evt.volunteersCount}</strong> vols
-                      </span>
-                      <span>•</span>
-                      <span>
-                        <strong className="text-stone-800 dark:text-stone-200">{evt.actsCount}</strong> acts
-                      </span>
-                    </div>
-
-                    <button
-                      onClick={() => handleNavigateTab('event-detail', evt.slug || evt.id)}
-                      className="px-3.5 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-yellow-300 font-bold text-xs transition-colors cursor-pointer inline-flex items-center gap-1 shadow-xs"
-                    >
-                      <span>View Details</span>
-                      <ArrowRight className="w-3 h-3" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* ========================================================
-            PAGE 3: GALLERY GRID VIEW ('/gallery')
-           ======================================================== */}
-        {activeTab === 'gallery' && (
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-10 space-y-8">
-            <div className="space-y-2">
-              <span className="text-xs font-bold text-red-600 uppercase tracking-wider">
-                ನೆನಪುಗಳು • Memories
-              </span>
-              <h2 className="text-3xl sm:text-4xl font-serif font-black">
-                Vaibhava Gallery
-              </h2>
-              <p className={`text-sm max-w-2xl ${isDark ? 'text-stone-400' : 'text-stone-600'}`}>
-                Capturing moments of Kannada pride, traditional attire, and festival rituals through the
-                years.
-              </p>
-            </div>
-
-            {/* Multi-dimensional Filter Bar */}
-            <div
-              className={`flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4 ${
-                isDark ? 'border-stone-800' : 'border-stone-200'
-              }`}
-            >
-              {/* Chronological filter row */}
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-stone-400">Year:</span>
-                {['all', '2026', '2025', '2024'].map((yr) => (
-                  <button
-                    key={yr}
-                    onClick={() => setGalleryYear(yr)}
-                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
-                      galleryYear === yr
-                        ? 'bg-red-600 text-yellow-300 shadow-xs'
-                        : isDark
-                        ? 'bg-stone-900 border border-stone-800 text-stone-300 hover:bg-stone-800'
-                        : 'bg-white border border-stone-200 text-stone-600 hover:bg-stone-50'
-                    }`}
-                  >
-                    {yr === 'all' ? 'All years' : yr}
-                  </button>
-                ))}
-              </div>
-
-              {/* Festival dropdown / select element */}
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-stone-400">Celebration:</span>
-                <select
-                  value={galleryCelebration}
-                  onChange={(e) => setGalleryCelebration(e.target.value)}
-                  className={`text-xs px-3 py-1.5 rounded-xl border outline-none font-semibold ${
-                    isDark
-                      ? 'bg-stone-900 border-stone-700 text-stone-200 focus:border-red-500'
-                      : 'bg-white border-stone-200 text-stone-800 focus:border-red-600'
-                  }`}
-                >
-                  <option value="all">All celebrations</option>
-                  <option value="Ganesha Chaturthi 2026">Ganesha Chaturthi 2026</option>
-                  <option value="Ganesha Chaturthi 2025">Ganesha Chaturthi 2025</option>
-                  <option value="Karnataka Rajyotsava 2025">Karnataka Rajyotsava 2025</option>
-                  <option value="Ganesha Chaturthi 2024">Ganesha Chaturthi 2024</option>
-                  <option value="Karnataka Rajyotsava 2024">Karnataka Rajyotsava 2024</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Photo Grid Layout */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-              {filteredPhotos.map((photo) => (
-                <div
-                  key={photo.id}
-                  onClick={() => setLightboxPhoto(photo)}
-                  className={`group rounded-3xl border-2 hover:border-red-600 overflow-hidden shadow-xs hover:shadow-md transition-all cursor-pointer flex flex-col ${
-                    isDark ? 'bg-stone-900 border-stone-800' : 'bg-white border-stone-200'
-                  }`}
-                >
-                  <div className="relative aspect-[4/3] bg-stone-950 overflow-hidden">
-                    <img
-                      src={photo.imageUrl}
-                      alt={photo.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      loading="lazy"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-3">
-                      <span className="text-[10px] font-bold text-yellow-300 uppercase tracking-wider">
-                        {photo.performanceType || photo.celebration}
-                      </span>
-                      <span className="text-white text-xs font-serif font-bold">{photo.title}</span>
-                    </div>
-                    <span className="absolute top-2 left-2 text-[10px] font-bold bg-black/70 text-white px-2 py-0.5 rounded backdrop-blur-xs">
-                      {photo.year}
-                    </span>
-                  </div>
-
-                  <div className="p-4 space-y-1">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-bold truncate text-stone-900 dark:text-stone-100">
-                        {photo.title}
-                      </span>
-                      <span className="text-stone-400 shrink-0 ml-1">{photo.celebration}</span>
-                    </div>
-                    {photo.caption && (
-                      <p className="text-[11px] text-stone-500 line-clamp-2 leading-relaxed">
-                        {photo.caption}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Lightbox Modal */}
-            {lightboxPhoto && (
-              <div
-                className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm"
-                onClick={() => setLightboxPhoto(null)}
-              >
-                <div
-                  className="max-w-3xl w-full bg-stone-900 rounded-3xl overflow-hidden border-2 border-red-600 shadow-2xl relative animate-in fade-in"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <button
-                    onClick={() => setLightboxPhoto(null)}
-                    className="absolute top-3 right-3 p-2 bg-black/60 text-white rounded-full hover:bg-red-600 transition-colors cursor-pointer z-10"
-                    aria-label="Close photo"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                  <img
-                    src={lightboxPhoto.imageUrl}
-                    alt={lightboxPhoto.title}
-                    className="w-full max-h-[70vh] object-contain bg-black"
-                  />
-                  <div className="p-5 text-white space-y-1">
-                    <div className="flex items-center justify-between">
-                      <h4 className="font-serif font-bold text-base text-yellow-300">
-                        {lightboxPhoto.title}
-                      </h4>
-                      <span className="text-xs bg-red-600 px-2 py-0.5 rounded font-bold">
-                        {lightboxPhoto.celebration} ({lightboxPhoto.year})
-                      </span>
-                    </div>
-                    {lightboxPhoto.caption && (
-                      <p className="text-xs text-stone-300">{lightboxPhoto.caption}</p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ========================================================
-            PAGE 4: ANNOUNCEMENTS FEED VIEW ('/announcements')
-           ======================================================== */}
-        {activeTab === 'announcements' && (
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 py-10 space-y-8">
-            <div className="space-y-2">
-              <span className="text-xs font-bold text-red-600 uppercase tracking-wider">
-                ಸುದ್ದಿ ಮತ್ತು ಪ್ರಕಟಣೆಗಳು
-              </span>
-              <h2 className="text-3xl sm:text-4xl font-serif font-black">
-                Balaga Updates
-              </h2>
-              <p className={`text-sm ${isDark ? 'text-stone-400' : 'text-stone-600'}`}>
-                Latest notes from the cultural committee for Sri Ganesha Chaturthi, Karnataka Rajyotsava,
-                volunteer rosters, and audited receipts.
-              </p>
-            </div>
-
-            {/* Filter Pills & Search */}
-            <div
-              className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-4 ${
-                isDark ? 'border-stone-800' : 'border-stone-200'
-              }`}
-            >
-              <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 text-xs">
-                {['all', 'event', 'cultural', 'volunteer', 'finance'].map((cat) => (
-                  <button
-                    key={cat}
-                    onClick={() => setAnnouncementCategory(cat)}
-                    className={`px-3.5 py-1.5 rounded-xl font-bold capitalize transition-colors cursor-pointer ${
-                      announcementCategory === cat
-                        ? 'bg-red-600 text-yellow-300 shadow-xs'
-                        : isDark
-                        ? 'bg-stone-900 border border-stone-800 text-stone-300 hover:bg-stone-800'
-                        : 'bg-white border border-stone-200 text-stone-600 hover:bg-stone-50'
-                    }`}
-                  >
-                    {cat === 'all' ? 'All Updates' : cat}
-                  </button>
-                ))}
-              </div>
-
-              <div className="relative w-full sm:w-64">
-                <Search className="w-3.5 h-3.5 text-stone-400 absolute left-3 top-2.5" />
-                <input
-                  type="text"
-                  placeholder="Search notices..."
-                  value={announcementSearch}
-                  onChange={(e) => setAnnouncementSearch(e.target.value)}
-                  className={`w-full text-xs pl-8 pr-3 py-1.5 rounded-xl border outline-none ${
-                    isDark
-                      ? 'bg-stone-900 border-stone-800 text-white focus:border-red-500'
-                      : 'bg-white border-stone-200 text-stone-900 focus:border-red-600'
-                  }`}
-                />
-              </div>
-            </div>
-
-            {/* Stream Feed List */}
-            <div className="space-y-6">
-              {filteredAnnouncements.map((ann) => (
-                <article
-                  key={ann.id}
-                  className={`rounded-3xl border-2 hover:border-red-600 p-6 sm:p-8 shadow-xs space-y-4 ${
-                    isDark ? 'bg-stone-900 border-stone-800' : 'bg-white border-stone-200'
-                  }`}
-                >
-                  <div
-                    className={`flex flex-wrap items-center justify-between gap-2 border-b pb-3 ${
-                      isDark ? 'border-stone-800' : 'border-stone-100'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-bold uppercase tracking-wider bg-red-600 text-yellow-300 px-2.5 py-0.5 rounded">
-                        {ann.category}
-                      </span>
-                      {ann.important && (
-                        <span className="text-[10px] font-bold uppercase bg-amber-400 text-stone-950 px-2 py-0.5 rounded">
-                          Priority
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1.5 text-xs text-stone-400">
-                      <Clock className="w-3.5 h-3.5" />
-                      <span>{ann.date}</span>
-                    </div>
-                  </div>
-
-                  <div>
-                    <h3 className="text-xl sm:text-2xl font-serif font-black text-red-700 dark:text-red-400">
-                      {ann.title}
-                    </h3>
-                    {ann.kannadaTitle && (
-                      <span className="text-sm font-serif font-bold text-amber-800 dark:text-yellow-400 block mt-1">
-                        {ann.kannadaTitle}
-                      </span>
-                    )}
-                  </div>
-
-                  <div
-                    className={`text-xs sm:text-sm leading-relaxed whitespace-pre-line p-4 rounded-2xl border font-sans ${
-                      isDark
-                        ? 'bg-stone-800/60 border-stone-700 text-stone-200'
-                        : 'bg-amber-50/60 border-amber-200 text-stone-800'
-                    }`}
-                  >
-                    {ann.content}
-                  </div>
-
-                  <div className="pt-2 flex items-center justify-between flex-wrap gap-2 text-xs">
-                    <span className="text-stone-400 italic">
-                      {ann.closingSignature || '— Kannadigara Balaga Committee'}
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => handleCopyText(ann.content, ann.id)}
-                        className={`px-3 py-1.5 rounded-xl border text-xs font-semibold inline-flex items-center gap-1 transition-colors cursor-pointer ${
-                          isDark
-                            ? 'border-stone-700 text-stone-300 hover:bg-stone-800'
-                            : 'border-stone-200 text-stone-700 hover:bg-stone-50'
-                        }`}
-                      >
-                        {copiedId === ann.id ? (
-                          <>
-                            <Check className="w-3.5 h-3.5 text-emerald-600" />
-                            <span className="text-emerald-600">Copied</span>
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="w-3.5 h-3.5 text-stone-400" />
-                            <span>Copy</span>
-                          </>
-                        )}
-                      </button>
-
-                      <button
-                        onClick={() => handleShareWhatsApp(ann.title, ann.summary)}
-                        className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold inline-flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
-                      >
-                        <PhoneCall className="w-3.5 h-3.5" />
-                        <span>Share on WhatsApp</span>
-                      </button>
-                    </div>
-                  </div>
-                </article>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* ========================================================
-            PAGE 5: CELEBRATION ARCHIVE VIEW ('/archive')
-           ======================================================== */}
-        {activeTab === 'archive' && (
-          <div className="max-w-5xl mx-auto px-4 sm:px-6 py-10 space-y-10">
-            <div className="space-y-2">
-              <span className="text-xs font-bold text-red-600 uppercase tracking-wider">
-                ಕಳೆದ ೨ ವರ್ಷಗಳ ಇತಿಹಾಸ
-              </span>
-              <h2 className="text-3xl sm:text-4xl font-serif font-black">
-                Our Journey &amp; Transparency Ledger
-              </h2>
-              <p className={`text-sm max-w-2xl leading-relaxed ${isDark ? 'text-stone-400' : 'text-stone-600'}`}>
-                Detailed history of our community gatherings over 2026, 2025, and 2024 alongside an audited,
-                transparent asset map.
-              </p>
-            </div>
-
-            <div className="space-y-10">
-              {ARCHIVE_RECORDS.map((yrRecord) => (
-                <div key={yrRecord.year} className="space-y-4">
-                  <div className="flex items-center justify-between border-b-2 border-red-600 pb-2">
-                    <div className="flex items-center gap-3">
-                      <h3 className="text-2xl font-serif font-black">{yrRecord.year}</h3>
-                      {yrRecord.milestoneTag && (
-                        <span className="text-xs font-bold text-red-600 dark:text-yellow-300 bg-red-50 dark:bg-red-950/60 px-2.5 py-0.5 rounded-full border border-red-200 dark:border-red-800">
-                          {yrRecord.milestoneTag}
-                        </span>
-                      )}
-                    </div>
-                    <span className="text-xs text-stone-500 font-semibold">
-                      {yrRecord.celebrationsCount} Major Celebrations
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    {yrRecord.celebrations.map((cel, idx) => (
-                      <div
-                        key={idx}
-                        className={`rounded-3xl border-2 p-6 shadow-xs space-y-3 ${
-                          isDark ? 'bg-stone-900 border-stone-800' : 'bg-white border-stone-200'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="font-bold text-red-600 uppercase tracking-wider">
-                            {cel.festival}
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[10px] font-bold uppercase tracking-wider bg-red-600 text-yellow-300 px-2.5 py-0.5 rounded">
+                            {ann.category}
                           </span>
-                          <span className="text-stone-400 font-medium">{cel.dates}</span>
-                        </div>
-
-                        <div>
-                          <h4 className="text-lg font-serif font-black text-stone-900 dark:text-stone-100">
-                            {cel.name}
-                          </h4>
-                          {cel.kannadaName && (
-                            <span className="text-xs font-serif font-bold text-amber-700 dark:text-yellow-400 block">
-                              {cel.kannadaName}
+                          {ann.important && (
+                            <span className="text-[10px] font-bold uppercase bg-amber-500/20 text-amber-700 dark:text-yellow-400 px-2.5 py-0.5 rounded inline-flex items-center gap-1">
+                              <Bell className="w-3 h-3" />
+                              <span>Important Notice</span>
                             </span>
                           )}
                         </div>
 
-                        <p className={`text-xs leading-relaxed ${isDark ? 'text-stone-300' : 'text-stone-600'}`}>
-                          {cel.description}
-                        </p>
-
-                        <div
-                          className={`pt-3 border-t grid grid-cols-2 gap-2 text-xs ${
-                            isDark ? 'border-stone-800 text-stone-400' : 'border-stone-100 text-stone-500'
-                          }`}
-                        >
-                          <div>
-                            <span className="block font-bold text-stone-800 dark:text-stone-200">
-                              {cel.volunteersCount} Volunteers
+                        <div>
+                          <h3 className="font-serif font-black text-lg text-stone-900 dark:text-stone-100 group-hover:text-red-600">
+                            {ann.title}
+                          </h3>
+                          {ann.kannadaTitle && (
+                            <span className="text-xs font-serif font-bold text-amber-700 dark:text-yellow-400 block mt-0.5">
+                              {ann.kannadaTitle}
                             </span>
-                            <span className="text-[11px]">Seva &amp; organizing team</span>
-                          </div>
-                          <div>
-                            <span className="block font-bold text-stone-800 dark:text-stone-200">
-                              {cel.contributorsCount}+ Devotees
-                            </span>
-                            <span className="text-[11px]">{cel.amountAccounted || '100% Accounted'}</span>
-                          </div>
+                          )}
                         </div>
+
+                        <p className="text-xs text-stone-500 leading-relaxed line-clamp-3">
+                          {ann.summary || ann.content}
+                        </p>
                       </div>
-                    ))}
+
+                      <div className="pt-3 border-t border-stone-100 dark:border-stone-800 flex items-center justify-between text-xs text-stone-400">
+                        <span className="flex items-center gap-1">
+                          <Calendar className="w-3.5 h-3.5 text-red-600" />
+                          {ann.date}
+                        </span>
+                        <span className="font-bold text-red-600 dark:text-yellow-400 inline-flex items-center gap-1">
+                          Read Notice <ChevronRight className="w-3.5 h-3.5" />
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          </div>
+        )}
+
+        {/* ========================================================
+            PAGE 2: ABOUT US PAGE ('about')
+           ======================================================== */}
+        {activeTab === 'about' && (
+          <div className="max-w-5xl mx-auto px-4 sm:px-6 py-10 space-y-12">
+            <div className="text-center max-w-3xl mx-auto space-y-3">
+              <div className="inline-flex items-center gap-2 bg-red-600 text-yellow-300 text-[11px] font-bold uppercase tracking-wider px-3.5 py-1 rounded-full border border-yellow-400">
+                <Flag className="w-3.5 h-3.5" />
+                <span>ನಮ್ಮ ಬಳಗದ ಪರಿಚಯ • About Us</span>
+              </div>
+              <h2 className="text-3xl sm:text-5xl font-serif font-black tracking-tight text-stone-900 dark:text-stone-100">
+                Eldorado Kannadigara Balaga
+              </h2>
+              <p className={`text-base leading-relaxed ${isDark ? 'text-stone-300' : 'text-stone-600'}`}>
+                Of the Residents, By the Residents, For the Celebration of Kannada Culture in Brigade El Dorado.
+              </p>
+            </div>
+
+            {/* Origins & History */}
+            <div
+              className={`p-6 sm:p-10 rounded-3xl border-2 space-y-6 ${
+                isDark ? 'bg-stone-900 border-stone-800' : 'bg-white border-stone-200'
+              }`}
+            >
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-red-600 to-amber-500 p-1 flex items-center justify-center shadow-md border-2 border-yellow-400 shrink-0">
+                  <img
+                    src="/bhuvaneshwari_kannada_flag.jpg"
+                    alt="Bhuvaneshwari Devi"
+                    className="w-full h-full object-cover rounded-xl"
+                  />
+                </div>
+                <div>
+                  <h3 className="text-2xl font-serif font-black text-red-700 dark:text-red-400">
+                    Our Foundation &amp; Journey
+                  </h3>
+                  <span className="text-xs font-serif font-bold text-amber-700 dark:text-yellow-400 block">
+                    ಸ್ಥಾಪನೆ ಮತ್ತು ಬೆಳೆದು ಬಂದ ಹಾದಿ (2024 - 2026)
+                  </span>
+                </div>
+              </div>
+
+              <div className={`space-y-4 text-sm leading-relaxed font-medium ${isDark ? 'text-stone-200' : 'text-stone-800'}`}>
+                <p>
+                  Founded in 2024 by resident families residing at Brigade El Dorado, Eldorado Kannadigara Balaga was created as a voluntary, non-profit community forum to bring together Kannada-speaking residents and enthusiasts across all towers.
+                </p>
+                <p>
+                  Over the past 3 years, our Balaga has grown from a modest gathering of founding volunteers into a vibrant community hosting major annual milestones: 5-day Sri Ganesha Chaturthi Mahotsava, Karnataka Rajyotsava statehood days, Kannada literature symposia, and eco-friendly tree planting drives.
+                </p>
+              </div>
+            </div>
+
+            {/* Vision & Mission Pillars */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {[
+                {
+                  title: 'Cultural Heritage',
+                  kannada: 'ಸಾಂಸ್ಕೃತಿಕ ಪರಂಪರೆ',
+                  desc: 'Promoting Kannada literature, classical music, folk arts (Dollu Kunitha, Yakshagana), and festive attire among children and youth.',
+                  icon: Sparkles
+                },
+                {
+                  title: 'Devotional Seva',
+                  kannada: 'ಭಕ್ತಿ ಮತ್ತು ಸೇವೆ',
+                  desc: 'Conducting traditional Vedic poojas, Atharvashirsha parayana, and daily Anna Santharpane Mahaprasada for all devotees.',
+                  icon: Flame
+                },
+                {
+                  title: 'Community Harmony',
+                  kannada: 'ಸೌಹಾರ್ದತೆ',
+                  desc: 'Fostering unity, mutual cooperation, and resident fellowship across all towers.',
+                  icon: Users
+                }
+              ].map((pillar, idx) => (
+                <div
+                  key={idx}
+                  className={`p-6 rounded-3xl border-2 space-y-3 ${
+                    isDark ? 'bg-stone-900 border-stone-800' : 'bg-white border-stone-200'
+                  }`}
+                >
+                  <div className="w-10 h-10 rounded-2xl bg-red-600 text-yellow-300 flex items-center justify-center border border-yellow-400">
+                    <pillar.icon className="w-5 h-5" />
                   </div>
+                  <div>
+                    <h4 className="text-lg font-serif font-black">{pillar.title}</h4>
+                    <span className="text-xs font-serif font-bold text-amber-700 dark:text-yellow-400 block">
+                      {pillar.kannada}
+                    </span>
+                  </div>
+                  <p className={`text-xs leading-relaxed font-medium ${isDark ? 'text-stone-200' : 'text-stone-700'}`}>
+                    {pillar.desc}
+                  </p>
                 </div>
               ))}
+            </div>
+
+            {/* Symbolism: Red & Yellow Kannada Flag */}
+            <div className="p-6 sm:p-8 rounded-3xl border-2 border-red-600 bg-gradient-to-r from-red-950 via-stone-900 to-amber-950 text-white space-y-4">
+              <div className="flex items-center gap-3">
+                <Flag className="w-6 h-6 text-yellow-400" />
+                <h3 className="text-2xl font-serif font-black text-yellow-300">
+                  Symbolism of the Red &amp; Yellow Flag
+                </h3>
+              </div>
+              <p className="text-xs sm:text-sm text-stone-200 leading-relaxed">
+                The bi-color Kannada flag represents the colors of Arishina (Turmeric - Yellow) and Kumpuma (Vermilion - Red), symbolizing health, prosperity, peace, and auspicious beginnings in Karnataka's ancient culture. Goddess Bhuvaneshwari Devi stands as our mother guardian.
+              </p>
             </div>
           </div>
         )}
 
         {/* ========================================================
-            PAGE 6: ABOUT STRUCTURE VIEW ('/about')
+            PAGE 3: OUR TEAM PAGE ('our-team')
            ======================================================== */}
-        {activeTab === 'about' && (
-          <div className="max-w-5xl mx-auto px-4 sm:px-6 py-10 space-y-12">
-            <div className="space-y-2">
-              <span className="text-xs font-bold text-red-600 uppercase tracking-wider">
-                ನಮ್ಮ ಬಳಗದ ಪರಿಚಯ
-              </span>
-              <h2 className="text-3xl sm:text-4xl font-serif font-black">
-                Kannadigara Balaga: Of the Residents, By the Residents, For the Residents
+        {activeTab === 'our-team' && (
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-10 space-y-10">
+            <div className="text-center max-w-3xl mx-auto space-y-3">
+              <div className="inline-flex items-center gap-2 bg-red-600 text-yellow-300 text-[11px] font-bold uppercase tracking-wider px-3.5 py-1 rounded-full border border-yellow-400">
+                <Users className="w-3.5 h-3.5" />
+                <span>ಕಾರ್ಯಕಾರಿಣಿ ಸಮಿತಿ • Our Team</span>
+              </div>
+              <h2 className="text-3xl sm:text-5xl font-serif font-black tracking-tight text-stone-900 dark:text-stone-100">
+                Meet Our Team
               </h2>
-              <p className={`text-sm max-w-2xl leading-relaxed ${isDark ? 'text-stone-400' : 'text-stone-600'}`}>
-                A resident initiative within Eldorado dedicated to honoring Kannada heritage,
-                organizing community festival sevas, and creating lifelong memories for all apartment
-                families.
+              <p className={`text-base leading-relaxed font-medium ${isDark ? 'text-stone-200' : 'text-stone-700'}`}>
+                Dedicated resident volunteers guiding festival celebrations and community initiatives.
               </p>
             </div>
 
-            {/* Grid Callouts: Distinct mission panels */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-              <div
-                className={`p-6 rounded-3xl border-2 space-y-2.5 ${
-                  isDark ? 'bg-stone-900 border-red-600/40' : 'bg-white border-red-600/30'
-                }`}
-              >
-                <div className="w-10 h-10 rounded-xl bg-red-600 text-yellow-300 flex items-center justify-center font-bold">
-                  1
+            {/* Clean Committee Member Cards Grid (Member Photo, Name, Post/Role) */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6">
+              {teamMembersList.map((member, idx) => (
+                <div
+                  key={idx}
+                  className={`rounded-3xl border-2 overflow-hidden shadow-xs hover:shadow-md transition-all text-center ${
+                    isDark ? 'bg-stone-900 border-stone-800' : 'bg-white border-stone-200'
+                  }`}
+                >
+                  <div className="aspect-[4/5] bg-stone-900 relative overflow-hidden">
+                    {member.photoUrl ? (
+                      <img
+                        src={member.photoUrl}
+                        alt={member.name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-br from-red-600 to-amber-500 text-yellow-300 font-serif font-black text-2xl flex items-center justify-center">
+                        {member.initials || member.name.charAt(0)}
+                      </div>
+                    )}
+                  </div>
+                  <div className="p-4 space-y-1">
+                    <h4 className="font-serif font-bold text-sm sm:text-base text-stone-900 dark:text-stone-100">
+                      {member.name}
+                    </h4>
+                    <p className="text-xs font-bold text-red-600 dark:text-yellow-400">
+                      {member.role}
+                    </p>
+                  </div>
                 </div>
-                <h3 className="text-lg font-serif font-bold text-red-700 dark:text-red-400">
-                  Cultural Preservation
-                </h3>
-                <p className={`text-xs sm:text-sm leading-relaxed ${isDark ? 'text-stone-300' : 'text-stone-600'}`}>
-                  Nurturing Kannada language, traditional folk dances (Dollu Kunitha, Yakshagana), poetry,
-                  and classical music among the next generation living in our community towers.
-                </p>
-              </div>
-
-              <div
-                className={`p-6 rounded-3xl border-2 space-y-2.5 ${
-                  isDark ? 'bg-stone-900 border-yellow-400/40' : 'bg-white border-yellow-400/40'
-                }`}
-              >
-                <div className="w-10 h-10 rounded-xl bg-yellow-400 text-stone-950 flex items-center justify-center font-bold">
-                  2
-                </div>
-                <h3 className="text-lg font-serif font-bold text-amber-700 dark:text-yellow-400">
-                  Community Harmony
-                </h3>
-                <p className={`text-xs sm:text-sm leading-relaxed ${isDark ? 'text-stone-300' : 'text-stone-600'}`}>
-                  Fostering strong neighborly brotherhood, mutual assistance, and festive joy across all
-                  buildings and clusters in Eldorado through shared celebrations.
-                </p>
-              </div>
-
-              <div
-                className={`p-6 rounded-3xl border-2 space-y-2.5 ${
-                  isDark ? 'bg-stone-900 border-yellow-400/40' : 'bg-white border-yellow-400/40'
-                }`}
-              >
-                <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center font-bold">
-                  3
-                </div>
-                <h3 className="text-lg font-serif font-bold text-amber-700 dark:text-yellow-400">
-                  Inclusivity
-                </h3>
-                <p className={`text-xs sm:text-sm leading-relaxed ${isDark ? 'text-stone-300' : 'text-stone-600'}`}>
-                  Warmly welcoming all residents of any background, linguistic group, or region to immerse in
-                  Karnataka's rich hospitalities, festive Anna Santharpane, and cultural stage acts.
-                </p>
-              </div>
-
-              <div
-                className={`p-6 rounded-3xl border-2 space-y-2.5 ${
-                  isDark ? 'bg-stone-900 border-red-600/40' : 'bg-white border-red-600/30'
-                }`}
-              >
-                <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold">
-                  4
-                </div>
-                <h3 className="text-lg font-serif font-bold text-emerald-700 dark:text-emerald-400">
-                  Absolute Financial Accountability
-                </h3>
-                <p className={`text-xs sm:text-sm leading-relaxed ${isDark ? 'text-stone-300' : 'text-stone-600'}`}>
-                  Every single rupee contributed by a resident generates an instantaneous digital receipt
-                  with transparent live audit ledgers searchable by tower and flat number.
-                </p>
-              </div>
+              ))}
             </div>
 
-            {/* Transparency Pledge Panel */}
-            <div
-              className={`p-6 sm:p-8 rounded-3xl border-2 border-yellow-400 flex flex-col sm:flex-row items-center justify-between gap-6 ${
-                isDark ? 'bg-stone-900 text-stone-100' : 'bg-amber-50/80 text-stone-900'
-              }`}
-            >
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <ShieldCheck className="w-6 h-6 text-emerald-600" />
-                  <h3 className="text-xl font-serif font-bold">Our Transparency Pledge</h3>
-                </div>
-                <p className={`text-xs sm:text-sm max-w-xl ${isDark ? 'text-stone-300' : 'text-stone-600'}`}>
-                  We maintain complete accountability down to the last rupee. All voluntary contributions,
-                  sponsorships, stall revenues, and expense vouchers are audited and accessible to devotees.
+            {/* Call to Volunteer Squad */}
+            <div className="p-8 rounded-3xl bg-amber-400 text-stone-950 flex flex-col sm:flex-row items-center justify-between gap-6 shadow-md">
+              <div className="space-y-1 text-center sm:text-left">
+                <h3 className="text-2xl font-serif font-black">Want to join our Volunteer Squad?</h3>
+                <p className="text-xs sm:text-sm text-stone-800">
+                  Enrol in Pooja, Stage Setup, Cultural Coordination, Prasadam serving, or Hospitality teams.
                 </p>
               </div>
+
               <button
-                onClick={onNavigateToReceipts}
-                className="px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-yellow-300 font-bold text-xs shadow-xs transition-colors cursor-pointer shrink-0 inline-flex items-center gap-2"
+                onClick={() => {
+                  if (!currentUser) setAuthModalOpen(true);
+                  else setVolunteerModalOpen(true);
+                }}
+                className="px-6 py-3 rounded-xl bg-red-600 hover:bg-red-700 text-yellow-300 font-bold text-xs sm:text-sm shadow-md transition-all cursor-pointer border border-yellow-400 shrink-0"
               >
-                <FileText className="w-4 h-4" />
-                <span>View Financial Tracking Sheet</span>
+                Sign Up as Volunteer
               </button>
             </div>
           </div>
         )}
 
         {/* ========================================================
-            PAGE 7: INTERACTIVE CONTACT VIEW ('/contact')
+            PAGE 4: PAST EVENTS PAGE ('past-events')
            ======================================================== */}
-        {activeTab === 'contact' && (
-          <div className="max-w-5xl mx-auto px-4 sm:px-6 py-10 space-y-8">
-            <div className="space-y-2">
-              <span className="text-xs font-bold text-red-600 uppercase tracking-wider">
-                ಸಂಪರ್ಕಿಸಿ • Reach Us
-              </span>
-              <h2 className="text-3xl sm:text-4xl font-serif font-black">
-                Get in Touch with the Balaga
+        {activeTab === 'past-events' && (
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-10 space-y-12">
+            <div className="text-center max-w-3xl mx-auto space-y-3">
+              <div className="inline-flex items-center gap-2 bg-red-600 text-yellow-300 text-[11px] font-bold uppercase tracking-wider px-3.5 py-1 rounded-full border border-yellow-400">
+                <Award className="w-3.5 h-3.5" />
+                <span>ಕಳೆದ ಉತ್ಸವಗಳ ಇತಿಹಾಸ • Past Events Archive</span>
+              </div>
+              <h2 className="text-3xl sm:text-5xl font-serif font-black tracking-tight text-stone-900 dark:text-stone-100">
+                Concluded Celebrations
               </h2>
-              <p className={`text-sm ${isDark ? 'text-stone-400' : 'text-stone-600'}`}>
-                Have a suggestion, want to nominate a cultural act, volunteer for decoration, or have queries
-                on devotional sevas? We are here for you.
+              <p className={`text-base leading-relaxed font-medium ${isDark ? 'text-stone-200' : 'text-stone-700'}`}>
+                Browse our history of Sri Ganeshotsava and Rajyotsava celebrations from 2024 to 2026.
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              {/* Column A: Reactive Form */}
-              <div
-                className={`md:col-span-2 rounded-3xl border-2 p-6 sm:p-8 shadow-xs ${
-                  isDark ? 'bg-stone-900 border-stone-800' : 'bg-white border-stone-200'
-                }`}
-              >
-                {contactSubmitted ? (
-                  <div className="py-12 text-center space-y-3">
-                    <CheckCircle2 className="w-12 h-12 text-emerald-600 mx-auto" />
-                    <h3 className="text-xl font-serif font-black text-emerald-600">
-                      Dhanyavadagalu! Message Received
-                    </h3>
-                    <p className={`text-xs max-w-md mx-auto ${isDark ? 'text-stone-400' : 'text-stone-600'}`}>
-                      Our Balaga volunteer coordinator will review your note and respond within 24–48 hours.
-                    </p>
-                    <button
-                      onClick={() => setContactSubmitted(false)}
-                      className="px-4 py-2 rounded-xl bg-stone-100 dark:bg-stone-800 text-xs font-bold hover:bg-stone-200 transition-colors cursor-pointer"
-                    >
-                      Send another query
-                    </button>
-                  </div>
-                ) : (
-                  <form
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      if (!contactForm.dpdpConsent) {
-                        alert('Please accept the DPDP Act consent checkbox to proceed.');
-                        return;
-                      }
-                      setContactSubmitted(true);
-                    }}
-                    className="space-y-4"
-                  >
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-bold mb-1">Full Name *</label>
-                        <input
-                          type="text"
-                          required
-                          placeholder="Your Name"
-                          value={contactForm.fullName}
-                          onChange={(e) => setContactForm({ ...contactForm, fullName: e.target.value })}
-                          className={`w-full text-xs px-3.5 py-2.5 rounded-xl border outline-none ${
-                            isDark
-                              ? 'bg-stone-800 border-stone-700 text-white focus:border-red-500'
-                              : 'bg-stone-50 border-stone-200 text-stone-900 focus:bg-white focus:border-red-600'
-                          }`}
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold mb-1">Email *</label>
-                        <input
-                          type="email"
-                          required
-                          placeholder="your.email@gmail.com"
-                          value={contactForm.email}
-                          onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })}
-                          className={`w-full text-xs px-3.5 py-2.5 rounded-xl border outline-none ${
-                            isDark
-                              ? 'bg-stone-800 border-stone-700 text-white focus:border-red-500'
-                              : 'bg-stone-50 border-stone-200 text-stone-900 focus:bg-white focus:border-red-600'
-                          }`}
-                        />
-                      </div>
+            {/* Past Events Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {pastEvents.map((evt) => (
+                <div
+                  key={evt.id}
+                  className={`p-6 sm:p-8 rounded-3xl border-2 space-y-5 shadow-xs flex flex-col justify-between ${
+                    isDark ? 'bg-stone-900 border-stone-800' : 'bg-white border-stone-200'
+                  }`}
+                >
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[10px] font-bold uppercase tracking-wider bg-red-600 text-yellow-300 px-2.5 py-0.5 rounded">
+                        {evt.festival} • {evt.year}
+                      </span>
+                      <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-800 flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                        <span>Concluded</span>
+                      </span>
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold mb-1">Tower &amp; Flat (Optional)</label>
+                      <h3 className="text-2xl font-serif font-black text-stone-900 dark:text-stone-100">
+                        {evt.title}
+                      </h3>
+                      <span className="text-xs font-serif font-bold text-amber-700 dark:text-yellow-400 block mt-0.5">
+                        {evt.kannadaTitle}
+                      </span>
+                    </div>
+
+                    <p className={`text-xs leading-relaxed font-medium ${isDark ? 'text-stone-200' : 'text-stone-700'}`}>
+                      {evt.description}
+                    </p>
+                  </div>
+
+                  <div className="pt-4 border-t border-stone-100 dark:border-stone-800 flex items-center justify-between gap-4">
+                    <div className="text-xs text-stone-500">
+                      <span>{evt.dateDisplay}</span>
+                    </div>
+
+                    <button
+                      onClick={() => handleNavigateTab('event-detail', evt.id)}
+                      className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-yellow-300 font-bold text-xs transition-colors cursor-pointer inline-flex items-center gap-1.5 shadow-xs"
+                    >
+                      <span>View Highlights</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Gallery Lightbox Preview */}
+            <div className="space-y-6 pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-2xl font-serif font-black">Vaibhava Photo Gallery</h3>
+                  <p className="text-xs text-stone-500">Snapshots from past resident performances</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                {photosList.map((photo) => (
+                  <div
+                    key={photo.id}
+                    onClick={() => setLightboxPhoto(photo)}
+                    className="group rounded-2xl border overflow-hidden cursor-pointer aspect-[4/3] relative bg-stone-950"
+                  >
+                    <img
+                      src={photo.imageUrl}
+                      alt={photo.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity p-3 flex flex-col justify-end">
+                      <span className="text-white font-bold text-xs truncate">{photo.title}</span>
+                      <span className="text-yellow-300 text-[10px]">{photo.celebration}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================
+            PAGE 5: UPCOMING EVENTS PAGE ('upcoming-events')
+           ======================================================== */}
+        {activeTab === 'upcoming-events' && (
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-10 space-y-12">
+            <div className="text-center max-w-3xl mx-auto space-y-3">
+              <div className="inline-flex items-center gap-2 bg-red-600 text-yellow-300 text-[11px] font-bold uppercase tracking-wider px-3.5 py-1 rounded-full border border-yellow-400">
+                <Calendar className="w-3.5 h-3.5" />
+                <span>ಮುಂಬರುವ ಕಾರ್ಯಕ್ರಮಗಳು • Upcoming Events</span>
+              </div>
+              <h2 className="text-3xl sm:text-5xl font-serif font-black tracking-tight text-stone-900 dark:text-stone-100">
+                Upcoming Celebrations Calendar
+              </h2>
+              <p className={`text-base leading-relaxed font-medium ${isDark ? 'text-stone-200' : 'text-stone-700'}`}>
+                Mark your calendar, sign up as a volunteer, or nominate your children for cultural performances.
+              </p>
+            </div>
+
+            {/* Featured Mega Event: Rajyotsava 2026 */}
+            <div
+              className={`p-6 sm:p-10 rounded-3xl border-2 space-y-6 shadow-md ${
+                isDark ? 'bg-stone-900 border-red-600' : 'bg-white border-red-600'
+              }`}
+            >
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 border-b pb-6 border-stone-200 dark:border-stone-800">
+                <div className="space-y-2">
+                  <div className="inline-flex items-center gap-1.5 bg-red-600 text-yellow-300 text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full">
+                    <span>Featured Upcoming Event</span>
+                  </div>
+                  <h3 className="text-3xl font-serif font-black text-red-700 dark:text-red-400">
+                    Karnataka Rajyotsava 2026
+                  </h3>
+                  <span className="text-base font-serif font-bold text-amber-700 dark:text-yellow-400 block">
+                    ಕನ್ನಡ ರಾಜ್ಯೋತ್ಸವ ೨೦೨೬ — ಸಿರಿಗನ್ನಡಂ ಗೆಲ್ಗೆ!
+                  </span>
+                </div>
+
+                {/* Countdown */}
+                <div className="p-4 rounded-2xl bg-amber-50 dark:bg-stone-800 border border-amber-200 dark:border-stone-700 text-center shrink-0">
+                  <span className="text-[10px] font-bold text-amber-800 dark:text-yellow-300 uppercase block mb-1">
+                    Event Countdown
+                  </span>
+                  <div className="flex items-center gap-3 text-red-600 font-serif font-black text-2xl justify-center">
+                    <div>
+                      <span>{countdown.days}</span>
+                      <span className="text-[10px] text-stone-400 block font-sans">Days</span>
+                    </div>
+                    <span>:</span>
+                    <div>
+                      <span>{countdown.hours}</span>
+                      <span className="text-[10px] text-stone-400 block font-sans">Hours</span>
+                    </div>
+                    <span>:</span>
+                    <div>
+                      <span>{countdown.minutes}</span>
+                      <span className="text-[10px] text-stone-400 block font-sans">Min</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {targetUpcomingEvent.detailsOverview ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs sm:text-sm">
+                  {targetUpcomingEvent.detailsOverview.split(/\n\s*\n/).map((block, bIdx) => {
+                    const lines = block.split('\n').map((l) => l.trim()).filter((l) => l.length > 0);
+                    if (lines.length === 0) return null;
+                    const headerLine = lines[0];
+                    const itemLines = lines.slice(1);
+                    const isDay2 = headerLine.toLowerCase().includes('day 2') || bIdx % 2 === 1;
+
+                    return (
+                      <div
+                        key={bIdx}
+                        className={`space-y-3 p-4 sm:p-5 rounded-2xl border transition-all ${
+                          isDark
+                            ? 'bg-stone-900/80 border-stone-800'
+                            : 'bg-stone-50 border-stone-200/90 shadow-xs'
+                        }`}
+                      >
+                        <h4 className="font-bold text-stone-900 dark:text-stone-100 flex items-center gap-2 text-base">
+                          {isDay2 ? (
+                            <Sparkles className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                          ) : (
+                            <Flag className="w-4 h-4 text-red-600 shrink-0" />
+                          )}
+                          <span>{headerLine}</span>
+                        </h4>
+
+                        {itemLines.length > 0 ? (
+                          <ul className="space-y-2 text-stone-800 dark:text-stone-200">
+                            {itemLines.map((line, lIdx) => (
+                              <li key={lIdx} className="flex items-start gap-2 font-medium">
+                                <CheckCircle2
+                                  className={`w-4 h-4 shrink-0 mt-0.5 ${
+                                    isDay2 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600'
+                                  }`}
+                                />
+                                <span>{line}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="p-4 rounded-xl bg-stone-100 dark:bg-stone-800/50 text-stone-700 dark:text-stone-300 text-xs italic">
+                  Daily event schedule will be posted soon by the committee.
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="pt-4 flex flex-wrap items-center gap-3">
+                <button
+                  onClick={() => window.open(formLinks.volunteerFormUrl, '_blank', 'noopener,noreferrer')}
+                  className="px-5 py-3 rounded-xl bg-red-600 hover:bg-red-700 text-yellow-300 font-bold text-xs sm:text-sm shadow-xs transition-colors cursor-pointer inline-flex items-center gap-2 border border-yellow-400"
+                >
+                  <Users className="w-4 h-4" />
+                  <span>Volunteer for {targetUpcomingEvent.title || 'Rajyotsava'}</span>
+                  <ExternalLink className="w-3.5 h-3.5 ml-0.5" />
+                </button>
+
+                <button
+                  onClick={() => window.open(formLinks.nominationFormUrl, '_blank', 'noopener,noreferrer')}
+                  className="px-5 py-3 rounded-xl bg-yellow-400 hover:bg-yellow-300 text-stone-950 font-bold text-xs sm:text-sm shadow-xs transition-colors cursor-pointer inline-flex items-center gap-2"
+                >
+                  <Sparkles className="w-4 h-4 text-stone-950" />
+                  <span>Nominate Stage Performance</span>
+                  <ExternalLink className="w-3.5 h-3.5 ml-0.5 text-stone-950" />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================
+            PAGE 6: MEMBERSHIP PAGE ('membership')
+           ======================================================== */}
+        {activeTab === 'membership' && (
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 py-10 space-y-8">
+            <div className="text-center max-w-3xl mx-auto space-y-3">
+              <div className="inline-flex items-center gap-2 bg-red-600 text-yellow-300 text-[11px] font-bold uppercase tracking-wider px-3.5 py-1 rounded-full border border-yellow-400">
+                <UserCheck className="w-3.5 h-3.5" />
+                <span>ಸದಸ್ಯತ್ವ ನೋಂದಣಿ • Membership Registration</span>
+              </div>
+              <h2 className="text-3xl sm:text-5xl font-serif font-black tracking-tight text-stone-900 dark:text-stone-100">
+                Membership Registration Open
+              </h2>
+            </div>
+
+            {/* User Requested Announcement Card */}
+            <div
+              className={`p-6 sm:p-10 rounded-3xl border-2 space-y-8 shadow-md ${
+                isDark ? 'bg-stone-900 border-stone-800' : 'bg-white border-stone-200'
+              }`}
+            >
+              {/* Salutation & Welcome */}
+              <div className="space-y-3">
+                <h3 className="text-xl sm:text-2xl font-serif font-bold text-red-600 dark:text-yellow-400">
+                  Dear Bridge El Dorado Residents,
+                </h3>
+                <p className="text-sm sm:text-base font-semibold leading-relaxed">
+                  We are happy to announce that Membership Registration for El Dorado Kannadigara Balaga is now open!
+                </p>
+                <p className={`text-xs sm:text-sm leading-relaxed font-medium ${isDark ? 'text-stone-200' : 'text-stone-700'}`}>
+                  We warmly invite all Kannada-speaking families of Bridge El Dorado to become members and join hands in promoting our Kannada language, culture, traditions and community bonding.
+                </p>
+              </div>
+
+              {/* Membership Fees */}
+              <div className="p-5 rounded-2xl bg-amber-50 dark:bg-stone-800/80 border-2 border-amber-300 dark:border-stone-700 space-y-3">
+                <div className="flex items-center gap-2 text-base font-serif font-bold text-amber-900 dark:text-yellow-300">
+                  <BadgeIndianRupee className="w-5 h-5 text-red-600" />
+                  <h4>💰 Membership Fees</h4>
+                </div>
+                <ul className="space-y-2 text-xs sm:text-sm text-stone-800 dark:text-stone-200 font-semibold">
+                  <li className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-red-600 shrink-0" />
+                    <span>Primary Member: <strong className="text-red-600 dark:text-yellow-300">₹999</strong></span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-red-600 shrink-0" />
+                    <span>Additional Family Member (above 18 years): <strong className="text-red-600 dark:text-yellow-300">₹749</strong> per member.</span>
+                  </li>
+                </ul>
+              </div>
+
+              {/* How to Register & CTA Link */}
+              <div className="p-6 sm:p-8 rounded-2xl bg-red-50 dark:bg-red-950/40 border-2 border-red-600 text-center space-y-4">
+                <div className="space-y-1">
+                  <h4 className="font-serif font-bold text-base sm:text-lg text-red-700 dark:text-yellow-300 flex items-center justify-center gap-2">
+                    <span>📝 How to Register?</span>
+                  </h4>
+                  <p className="text-xs sm:text-sm text-stone-600 dark:text-stone-300 max-w-lg mx-auto">
+                    Click the button below to open and fill out the official online membership application Google Form:
+                  </p>
+                </div>
+
+                <div className="pt-2 flex justify-center">
+                  <a
+                    href={formLinks.membershipFormUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-8 py-4 rounded-2xl bg-red-600 hover:bg-red-700 text-yellow-300 font-black text-sm sm:text-base shadow-xl transition-all hover:scale-105 active:scale-95 cursor-pointer inline-flex items-center gap-2 border-2 border-yellow-400"
+                  >
+                    <UserCheck className="w-5 h-5" />
+                    <span>Register Now – Membership Application Form 📌</span>
+                    <ExternalLink className="w-4 h-4 ml-1" />
+                  </a>
+                </div>
+              </div>
+
+              {/* Documents Required */}
+              <div className="space-y-3 pt-2 border-t border-stone-100 dark:border-stone-800">
+                <h4 className="font-serif font-bold text-base text-stone-900 dark:text-stone-100 flex items-center gap-2">
+                  <FileCheck className="w-5 h-5 text-red-600" />
+                  <span>📌 Documents Required:</span>
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs sm:text-sm">
+                  <div className="p-4 rounded-2xl border bg-stone-50 dark:bg-stone-800/50 space-y-1">
+                    <span className="font-bold block text-red-600 dark:text-yellow-300">1. Address Proof (any one)</span>
+                    <p className="text-stone-600 dark:text-stone-300 text-xs">
+                      Aadhaar, Rental Agreement / Ownership Document, Electricity / Water Bill or Brigade Allotment Letter.
+                    </p>
+                  </div>
+                  <div className="p-4 rounded-2xl border bg-stone-50 dark:bg-stone-800/50 space-y-1">
+                    <span className="font-bold block text-red-600 dark:text-yellow-300">2. Identity Proof (any one)</span>
+                    <p className="text-stone-600 dark:text-stone-300 text-xs">
+                      Aadhaar, Voter ID, Driving Licence, Passport or PAN Card.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Why Become a Member */}
+              <div className="space-y-3 pt-2 border-t border-stone-100 dark:border-stone-800">
+                <h4 className="font-serif font-bold text-base text-stone-900 dark:text-stone-100 flex items-center gap-2">
+                  <Heart className="w-5 h-5 text-red-600 fill-red-600" />
+                  <span>❤️ Why Become a Member?</span>
+                </h4>
+                <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs sm:text-sm text-stone-700 dark:text-stone-300">
+                  <li className="flex items-start gap-2">
+                    <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                    <span>Celebrate Kannada festivals and cultural events together.</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                    <span>Encourage children's cultural and extracurricular activities.</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                    <span>Participate in sports and community initiatives.</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                    <span>Build stronger connections among Kannada families.</span>
+                  </li>
+                </ul>
+              </div>
+
+              {/* Closing Signoff */}
+              <div className="pt-4 border-t border-stone-100 dark:border-stone-800 text-center space-y-2">
+                <p className="text-xs sm:text-sm text-stone-600 dark:text-stone-300">
+                  Your participation and support will help us build a vibrant and united Kannada community at Bridge El Dorado.
+                </p>
+                <p className="text-base sm:text-lg font-serif font-black text-red-600 dark:text-yellow-300">
+                  Let's come together, celebrate our culture and strengthen our community! ❤️
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================
+            PAGE 7: CONTACT US PAGE ('contact')
+           ======================================================== */}
+        {activeTab === 'contact' && (
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-10 space-y-12">
+            <div className="text-center max-w-3xl mx-auto space-y-3">
+              <div className="inline-flex items-center gap-2 bg-red-600 text-yellow-300 text-[11px] font-bold uppercase tracking-wider px-3.5 py-1 rounded-full border border-yellow-400">
+                <Mail className="w-3.5 h-3.5" />
+                <span>ಸಂಪರ್ಕಿಸಿ • Reach Us</span>
+              </div>
+              <h2 className="text-3xl sm:text-5xl font-serif font-black tracking-tight text-stone-900 dark:text-stone-100">
+                Contact the Committee
+              </h2>
+              <p className={`text-base leading-relaxed font-medium ${isDark ? 'text-stone-200' : 'text-stone-700'}`}>
+                Have questions about celebrations or volunteering? Get in touch!
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {/* Contact Details Card */}
+              <div
+                className={`p-6 sm:p-8 rounded-3xl border-2 space-y-6 ${
+                  isDark ? 'bg-stone-900 border-stone-800' : 'bg-white border-stone-200'
+                }`}
+              >
+                <div className="space-y-2">
+                  <h3 className="text-2xl font-serif font-black text-red-700 dark:text-red-400">
+                    Community Contact Directory
+                  </h3>
+                  <p className="text-xs text-stone-500">
+                    Eldorado Kannadigara Balaga Working Group
+                  </p>
+                </div>
+
+                <div className="space-y-4 text-xs sm:text-sm">
+                  <div className="flex items-start gap-3">
+                    <MapPin className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-bold block">Venue &amp; Address</span>
+                      <p className="text-stone-500">
+                        Brigade El Dorado, Aerospace Park, Hunasamaranahalli, Bengaluru, Karnataka 562149
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-3">
+                    <Mail className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-bold block">Primary Email</span>
+                      <p className="text-stone-500">desaisachin95@gmail.com</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Reach Out Form */}
+              <div
+                className={`p-6 sm:p-8 rounded-3xl border-2 space-y-6 ${
+                  isDark ? 'bg-stone-900 border-stone-800' : 'bg-white border-stone-200'
+                }`}
+              >
+                <div className="space-y-2">
+                  <h3 className="text-2xl font-serif font-black text-stone-900 dark:text-stone-100">
+                    Send Us a Message
+                  </h3>
+                  <p className="text-xs text-stone-500">
+                    Fill out the form below and an executive committee member will reply shortly.
+                  </p>
+                </div>
+
+                {contactSubmitted ? (
+                  <div className="p-6 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 text-center space-y-3 animate-in fade-in">
+                    <CheckCircle className="w-10 h-10 text-emerald-600 mx-auto" />
+                    <h4 className="text-lg font-bold text-emerald-900 dark:text-emerald-100">
+                      Message Received!
+                    </h4>
+                    <p className="text-xs text-emerald-700 dark:text-emerald-300">
+                      Thank you for contacting Kannadigara Balaga. We have received your query and will respond to {contactForm.email} shortly.
+                    </p>
+                  </div>
+                ) : (
+                  <form onSubmit={handleContactSubmit} className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-bold uppercase mb-1 text-stone-700 dark:text-stone-300">
+                        Full Name *
+                      </label>
                       <input
                         type="text"
-                        placeholder="e.g. Feldspar-1402"
-                        value={contactForm.towerFlat}
-                        onChange={(e) => setContactForm({ ...contactForm, towerFlat: e.target.value })}
-                        className={`w-full text-xs px-3.5 py-2.5 rounded-xl border outline-none ${
-                          isDark
-                            ? 'bg-stone-800 border-stone-700 text-white focus:border-red-500'
-                            : 'bg-stone-50 border-stone-200 text-stone-900 focus:bg-white focus:border-red-600'
+                        required
+                        placeholder="e.g. Anand Rao"
+                        value={contactForm.fullName}
+                        onChange={(e) => setContactForm({ ...contactForm, fullName: e.target.value })}
+                        className={`w-full px-3.5 py-2.5 rounded-xl border text-xs ${
+                          isDark ? 'bg-stone-800 border-stone-700 text-white' : 'bg-stone-50 border-stone-300 text-stone-900'
                         }`}
                       />
                     </div>
 
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold uppercase mb-1 text-stone-700 dark:text-stone-300">
+                          Email Address *
+                        </label>
+                        <input
+                          type="email"
+                          required
+                          placeholder="anand@gmail.com"
+                          value={contactForm.email}
+                          onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })}
+                          className={`w-full px-3.5 py-2.5 rounded-xl border text-xs ${
+                            isDark ? 'bg-stone-800 border-stone-700 text-white' : 'bg-stone-50 border-stone-300 text-stone-900'
+                          }`}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold uppercase mb-1 text-stone-700 dark:text-stone-300">
+                          Tower &amp; Flat
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Jasper-502"
+                          value={contactForm.towerFlat}
+                          onChange={(e) => setContactForm({ ...contactForm, towerFlat: e.target.value })}
+                          className={`w-full px-3.5 py-2.5 rounded-xl border text-xs ${
+                            isDark ? 'bg-stone-800 border-stone-700 text-white' : 'bg-stone-50 border-stone-300 text-stone-900'
+                          }`}
+                        />
+                      </div>
+                    </div>
+
                     <div>
-                      <label className="block text-xs font-bold mb-1">Subject *</label>
+                      <label className="block text-xs font-bold uppercase mb-1 text-stone-700 dark:text-stone-300">
+                        Subject
+                      </label>
                       <select
                         value={contactForm.subject}
                         onChange={(e) => setContactForm({ ...contactForm, subject: e.target.value })}
-                        className={`w-full text-xs px-3.5 py-2.5 rounded-xl border outline-none font-semibold ${
-                          isDark
-                            ? 'bg-stone-800 border-stone-700 text-white focus:border-red-500'
-                            : 'bg-stone-50 border-stone-200 text-stone-900 focus:bg-white focus:border-red-600'
+                        className={`w-full px-3.5 py-2.5 rounded-xl border text-xs ${
+                          isDark ? 'bg-stone-800 border-stone-700 text-white' : 'bg-stone-50 border-stone-300 text-stone-900'
                         }`}
                       >
-                        <option>General enquiry</option>
-                        <option>Volunteering for Decoration</option>
-                        <option>Cultural Performance Nomination</option>
-                        <option>Contributions &amp; Sponsorships</option>
-                        <option>Feedback</option>
+                        <option value="General enquiry">General enquiry</option>
+                        <option value="Volunteering">Volunteering sign-up</option>
+                        <option value="Cultural performance">Cultural performance nomination</option>
                       </select>
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold mb-1">Message *</label>
+                      <label className="block text-xs font-bold uppercase mb-1 text-stone-700 dark:text-stone-300">
+                        Message *
+                      </label>
                       <textarea
                         required
                         rows={4}
-                        placeholder="How can the Balaga help?"
+                        placeholder="Write your message here..."
                         value={contactForm.message}
                         onChange={(e) => setContactForm({ ...contactForm, message: e.target.value })}
-                        className={`w-full text-xs px-3.5 py-2.5 rounded-xl border outline-none ${
-                          isDark
-                            ? 'bg-stone-800 border-stone-700 text-white focus:border-red-500'
-                            : 'bg-stone-50 border-stone-200 text-stone-900 focus:bg-white focus:border-red-600'
+                        className={`w-full px-3.5 py-2.5 rounded-xl border text-xs ${
+                          isDark ? 'bg-stone-800 border-stone-700 text-white' : 'bg-stone-50 border-stone-300 text-stone-900'
                         }`}
                       />
                     </div>
 
-                    {/* Notice Drawer: Nested toggle accordion for DPDP policy */}
-                    <div
-                      className={`p-3 rounded-2xl border text-xs ${
-                        isDark ? 'bg-stone-800/60 border-stone-700' : 'bg-stone-50 border-stone-200'
-                      }`}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => setDpdpNoticeDrawerOpen(!dpdpNoticeDrawerOpen)}
-                        className="w-full flex items-center justify-between font-semibold text-stone-500 cursor-pointer"
-                      >
-                        <span className="flex items-center gap-1.5">
-                          <ShieldCheck className="w-3.5 h-3.5 text-red-600" />
-                          <span>Data Handling Policy under DPDP Act 2023</span>
-                        </span>
-                        <ChevronDown
-                          className={`w-3.5 h-3.5 transition-transform ${
-                            dpdpNoticeDrawerOpen ? 'rotate-180' : ''
-                          }`}
-                        />
-                      </button>
-
-                      {dpdpNoticeDrawerOpen && (
-                        <p
-                          className={`mt-2 pt-2 border-t text-[11px] leading-relaxed ${
-                            isDark ? 'border-stone-700 text-stone-300' : 'border-stone-200 text-stone-600'
-                          }`}
-                        >
-                          We process your name and contact details strictly for community event updates and
-                          volunteer assignment. You may request data deletion at any time by contacting{' '}
-                          <a
-                            href="mailto:contact@kannadigarabalaga.org"
-                            className="text-red-600 underline"
-                          >
-                            contact@kannadigarabalaga.org
-                          </a>
-                          .
-                        </p>
-                      )}
-                    </div>
-
-                    {/* DPDP Consent Checkbox */}
-                    <label className="flex items-start gap-2.5 cursor-pointer pt-1">
-                      <input
-                        type="checkbox"
-                        checked={contactForm.dpdpConsent}
-                        onChange={(e) =>
-                          setContactForm({ ...contactForm, dpdpConsent: e.target.checked })
-                        }
-                        className="mt-0.5 rounded border-stone-300 text-red-600 focus:ring-red-500"
-                      />
-                      <span className={`text-[11px] leading-relaxed ${isDark ? 'text-stone-300' : 'text-stone-600'}`}>
-                        I consent to my information being collected for the purpose of getting loop updates
-                        regarding community events *
-                      </span>
-                    </label>
-
                     <button
                       type="submit"
-                      disabled={!contactForm.dpdpConsent}
-                      className="w-full py-3 rounded-xl bg-red-600 hover:bg-red-700 disabled:opacity-50 text-yellow-300 font-bold text-xs transition-colors cursor-pointer shadow-xs inline-flex items-center justify-center gap-1.5 border border-yellow-400"
+                      className="w-full py-3 rounded-xl bg-red-600 hover:bg-red-700 text-yellow-300 font-bold text-xs shadow-md transition-colors cursor-pointer border border-yellow-400 flex items-center justify-center gap-2"
                     >
                       <Send className="w-3.5 h-3.5" />
                       <span>Send Message</span>
@@ -2045,338 +1501,114 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
                   </form>
                 )}
               </div>
-
-              {/* Column B: Info Column */}
-              <div className="space-y-5">
-                <div
-                  className={`rounded-3xl border-2 p-6 shadow-xs space-y-4 ${
-                    isDark ? 'bg-stone-900 border-stone-800' : 'bg-white border-stone-200'
-                  }`}
-                >
-                  <h4 className="text-base font-serif font-black">Direct Communication Channels</h4>
-                  <div className="space-y-4 text-xs">
-                    <div className="flex items-start gap-3">
-                      <Mail className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
-                      <div>
-                        <span className="font-bold block">Balaga Official Email</span>
-                        <a
-                          href="mailto:contact@kannadigarabalaga.org"
-                          className="text-red-600 hover:underline break-all"
-                        >
-                          contact@kannadigarabalaga.org
-                        </a>
-                      </div>
-                    </div>
-
-                    <div
-                      className={`flex items-start gap-3 pt-3 border-t ${
-                        isDark ? 'border-stone-800' : 'border-stone-100'
-                      }`}
-                    >
-                      <Clock className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-                      <div>
-                        <span className="font-bold block">Response SLA</span>
-                        <span className="text-stone-500">24–48 hours response time</span>
-                      </div>
-                    </div>
-
-                    <div
-                      className={`flex items-start gap-3 pt-3 border-t ${
-                        isDark ? 'border-stone-800' : 'border-stone-100'
-                      }`}
-                    >
-                      <MapPin className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
-                      <div>
-                        <span className="font-bold block">Physical Address</span>
-                        <span className="text-stone-500 leading-relaxed block">
-                          Brigade El Dorado, KIADB, Aerospace Park, Bengaluru, Karnataka - 562149
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div
-                  className={`rounded-3xl border-2 p-6 shadow-xs space-y-2.5 ${
-                    isDark ? 'bg-stone-900 border-stone-800' : 'bg-white border-stone-200'
-                  }`}
-                >
-                  <h4 className="text-sm font-serif font-bold text-red-600">Volunteer Hotline</h4>
-                  <p className={`text-xs leading-relaxed ${isDark ? 'text-stone-400' : 'text-stone-600'}`}>
-                    Active volunteers can directly connect via WhatsApp group updates by signing in with
-                    Gmail.
-                  </p>
-                  <button
-                    onClick={() => {
-                      if (!currentUser) setAuthModalOpen(true);
-                      else setVolunteerModalOpen(true);
-                    }}
-                    className="w-full py-2 rounded-xl bg-yellow-400 hover:bg-yellow-300 text-stone-950 font-bold text-xs transition-colors cursor-pointer"
-                  >
-                    Open Volunteer Portal
-                  </button>
-                </div>
-              </div>
             </div>
           </div>
         )}
 
         {/* ========================================================
-            PAGE 8: DEEP EVENT DETAIL VIEW ('/events/:slug')
+            PAGE 8: COMMON UNIFIED EVENT DETAIL VIEW ('event-detail')
            ======================================================== */}
         {activeTab === 'event-detail' && (
-          selectedEvent.status === 'upcoming' ? (
-            <UpcomingEventView
-              event={selectedEvent}
-              customInfo={customInfos[selectedEvent.id]}
-              onBackToEvents={() => handleNavigateTab('events')}
-              onOpenVolunteer={() => {
-                if (!currentUser) setAuthModalOpen(true);
-                else setVolunteerModalOpen(true);
-              }}
-              onOpenNominate={() => setNominateModalOpen(true)}
-              onOpenInfoAndPhotosEditor={() => setEditorModalOpen(true)}
-              isAdmin={isAdmin || isCurrentAdmin}
-              isDark={isDark}
-            />
-          ) : (
-            <PastEventView
-              event={selectedEvent}
-              customInfo={customInfos[selectedEvent.id]}
-              onBackToEvents={() => handleNavigateTab('events')}
-              onNavigateToFinancialStatement={onNavigateToGaneshotsava}
-              onOpenInfoAndPhotosEditor={() => setEditorModalOpen(true)}
-              isAdmin={isAdmin || isCurrentAdmin}
-              isDark={isDark}
-            />
-          )
-        )}
-
-        {/* ========================================================
-            PAGE 9: ADMIN CONTROL HUB VIEW ('/admin-hub' or 'admin-hub')
-           ======================================================== */}
-        {activeTab === 'admin-hub' && (
-          <AdminControlHubView
-            settings={settings}
-            events={COMMUNITY_EVENTS}
-            customInfos={customInfos}
-            onSaveCustomInfo={handleSaveCustomInfo}
-            onSaveSettings={onUpdateSettings}
-            onNavigateToFinancials={onNavigateToGaneshotsava}
-            onNavigateToReceipts={onNavigateToReceipts}
-            currentAdminEmail={currentUser?.email || 'desaisachin95@gmail.com'}
+          <BalagaEventDetailView
+            event={selectedEvent}
+            userRole={userRole}
+            userProfile={userProfile}
+            isAdmin={isAdmin}
+            isMember={userRole === 'member' || userRole === 'admin' || userRole === 'read_only'}
+            onBackToEvents={() => handleNavigateTab('past-events')}
+            onOpenContribute={() => {}}
+            onOpenVolunteer={() => window.open(formLinks.volunteerFormUrl, '_blank', 'noopener,noreferrer')}
+            onOpenNominate={() => window.open(formLinks.nominationFormUrl, '_blank', 'noopener,noreferrer')}
+            onNavigateToFinancialStatement={onNavigateToGaneshotsava}
             isDark={isDark}
           />
         )}
       </main>
 
-      {/* 3. SHARED GLOBAL FOOTER NAVIGATION */}
+      {/* 3. SHARED GLOBAL FOOTER NAVIGATION (Matching Sharavati reference footer layout) */}
       <footer
         className={`border-t-2 border-red-600 transition-colors ${
           isDark ? 'bg-stone-950 text-stone-300' : 'bg-stone-100 text-stone-700'
         }`}
       >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8">
-          {/* Column 1: Brand Column */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-8">
           <div className="space-y-3">
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-red-600 p-0.5 flex items-center justify-center border border-yellow-400 shadow-xs overflow-hidden">
+              <div className="w-8 h-8 rounded-lg bg-red-600 p-0.5 border border-yellow-400 overflow-hidden">
                 <img
-                  src="/assets/aistudio/image_8b234ce0.png"
-                  alt="Goddess Bhuvaneshwari Devi & Kannada Flag"
-                  className="w-full h-full object-cover rounded-md"
-                  referrerPolicy="no-referrer"
+                  src="/bhuvaneshwari_kannada_flag.jpg"
+                  alt="Bhuvaneshwari Devi"
+                  className="w-full h-full object-cover"
                 />
               </div>
               <span className="font-serif font-black text-base text-red-600">ಕನ್ನಡಿಗರ ಬಳಗ</span>
             </div>
-
+            <p className="text-xs text-stone-500 leading-relaxed">
+              Eldorado Kannadigara Balaga is an independent resident community association in Brigade El Dorado celebrating Kannada culture and annual festivals.
+            </p>
             <p className="text-xs font-serif font-bold text-amber-700 dark:text-yellow-400 italic">
-              "Bringing the Spirit of Karnataka to Our Community."
+              "ಸಿರಿಗನ್ನಡಂ ಗೆಲ್ಗೆ, ಸಿರಿಗನ್ನಡಂ ಬಾಳ್ಗೆ!"
             </p>
-            <p className="text-xs font-serif font-bold text-stone-800 dark:text-stone-200">
-              ಸಿರಿಗನ್ನಡಂ ಗೆಲ್ಗೆ! ಸಿರಿಗನ್ನಡಂ ಬಾಳ್ಗೆ!
-            </p>
-
-            {/* Privacy Compliance Visual Badge */}
-            <div className="pt-2">
-              <div
-                className={`p-2.5 rounded-xl border text-[11px] leading-relaxed flex items-start gap-2 ${
-                  isDark
-                    ? 'bg-stone-900 border-stone-800 text-stone-400'
-                    : 'bg-white border-stone-200 text-stone-600'
-                }`}
-              >
-                <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                <span>
-                  Compliant with <strong>Digital Personal Data Protection (DPDP) Act, 2023</strong> —
-                  Privacy-first data handling with explicit consent.
-                </span>
-              </div>
-            </div>
           </div>
 
-          {/* Column 2: Explore Links */}
-          <div className="space-y-3">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-stone-900 dark:text-stone-100">
-              Explore Links
+          <div>
+            <h4 className="font-serif font-bold text-sm text-stone-900 dark:text-stone-100 mb-3">
+              Quick Navigation
             </h4>
-            <ul className="space-y-2 text-xs font-medium">
-              <li>
-                <button
-                  onClick={() => handleNavigateTab('home')}
-                  className="hover:text-red-600 cursor-pointer"
-                >
-                  Home
-                </button>
-              </li>
-              <li>
-                <button
-                  onClick={() => handleNavigateTab('events')}
-                  className="hover:text-red-600 cursor-pointer"
-                >
-                  Events &amp; Celebrations
-                </button>
-              </li>
-              <li>
-                <button
-                  onClick={() => handleNavigateTab('gallery')}
-                  className="hover:text-red-600 cursor-pointer"
-                >
-                  Vaibhava Gallery
-                </button>
-              </li>
-              <li>
-                <button
-                  onClick={() => handleNavigateTab('announcements')}
-                  className="hover:text-red-600 cursor-pointer"
-                >
-                  Announcements
-                </button>
-              </li>
-              <li>
-                <button
-                  onClick={() => handleNavigateTab('archive')}
-                  className="hover:text-red-600 cursor-pointer"
-                >
-                  Celebration Archive
-                </button>
-              </li>
-              <li>
-                <button
-                  onClick={() => handleNavigateTab('login')}
-                  className="hover:text-red-600 cursor-pointer"
-                >
-                  Sign in Portal
-                </button>
-              </li>
+            <ul className="space-y-2 text-xs">
+              {navLinks.map((link) => (
+                <li key={link.id}>
+                  <button
+                    onClick={() => handleNavigateTab(link.id)}
+                    className="hover:text-red-600 transition-colors cursor-pointer"
+                  >
+                    {link.label}
+                  </button>
+                </li>
+              ))}
             </ul>
           </div>
 
-          {/* Column 3: Legal Modals */}
-          <div className="space-y-3">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-stone-900 dark:text-stone-100">
-              Legal &amp; Compliance
+          <div>
+            <h4 className="font-serif font-bold text-sm text-stone-900 dark:text-stone-100 mb-3">
+              Major Celebrations
             </h4>
-            <ul className="space-y-2 text-xs font-medium">
+            <ul className="space-y-2 text-xs">
               <li>
                 <button
-                  onClick={() => setPolicyModal('privacy')}
-                  className="hover:text-red-600 cursor-pointer text-left"
+                  onClick={() => handleNavigateTab('upcoming-events')}
+                  className="hover:text-red-600 transition-colors cursor-pointer"
                 >
-                  Privacy Policy (DPDP Act)
+                  Karnataka Rajyotsava 2026
                 </button>
               </li>
               <li>
                 <button
-                  onClick={() => setPolicyModal('terms')}
-                  className="hover:text-red-600 cursor-pointer text-left"
+                  onClick={() => handleNavigateTab('past-events')}
+                  className="hover:text-red-600 transition-colors cursor-pointer"
                 >
-                  Terms of Use
+                  Sri Ganeshotsava 2026
                 </button>
               </li>
               <li>
                 <button
-                  onClick={() => setPolicyModal('refund')}
-                  className="hover:text-red-600 cursor-pointer text-left"
+                  onClick={() => handleNavigateTab('admin')}
+                  className="hover:text-red-600 font-bold transition-colors cursor-pointer inline-flex items-center gap-1 text-red-600 dark:text-yellow-400 mt-2"
                 >
-                  Refund &amp; Cancellation
-                </button>
-              </li>
-              <li>
-                <button
-                  onClick={() => setPolicyModal('cookies')}
-                  className="hover:text-red-600 cursor-pointer text-left"
-                >
-                  Cookie Preferences
-                </button>
-              </li>
-              <li>
-                <button
-                  onClick={onNavigateToReceipts}
-                  className="text-red-600 dark:text-yellow-400 font-bold hover:underline cursor-pointer text-left inline-flex items-center gap-1"
-                >
-                  <FileText className="w-3.5 h-3.5" />
-                  <span>Devotee Receipts &amp; Tokens</span>
+                  <Lock className="w-3 h-3" />
+                  <span>Committee Admin Portal</span>
                 </button>
               </li>
             </ul>
-          </div>
-
-          {/* Column 4: Contact Info */}
-          <div className="space-y-3 text-xs">
-            <h4 className="font-bold uppercase tracking-wider text-stone-900 dark:text-stone-100">
-              Contact Info
-            </h4>
-            <div className="space-y-2">
-              <div className="flex items-start gap-2">
-                <Mail className="w-3.5 h-3.5 text-red-600 shrink-0 mt-0.5" />
-                <a
-                  href="mailto:contact@kannadigarabalaga.org"
-                  className="hover:text-red-600 underline break-all"
-                >
-                  contact@kannadigarabalaga.org
-                </a>
-              </div>
-              <div className="flex items-start gap-2">
-                <MapPin className="w-3.5 h-3.5 text-red-600 shrink-0 mt-0.5" />
-                <span className="leading-relaxed">
-                  Brigade El Dorado, KIADB, Aerospace Park, Bengaluru, Karnataka - 562149
-                </span>
-              </div>
-            </div>
           </div>
         </div>
 
-        {/* Bottom Row */}
-        <div
-          className={`border-t py-4 px-4 sm:px-6 ${
-            isDark ? 'border-stone-800 text-stone-500' : 'border-stone-200 text-stone-500'
-          }`}
-        >
-          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px]">
-            <span>© 2024-2026 ಎಲ್ಡೊರಾಡೊ ಕನ್ನಡಿಗರ ಬಳಗ. ಎಲ್ಲ ಹಕ್ಕುಗಳನ್ನು ಕಾಯ್ದಿರಿಸಲಾಗಿದೆ (Eldorado Kannadigara Balaga. All rights reserved).</span>
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => setPolicyModal('cookies')}
-                className="hover:text-red-600 cursor-pointer"
-              >
-                Cookie Preferences
-              </button>
-              <span>•</span>
-              <button
-                onClick={() => setPolicyModal('privacy')}
-                className="hover:text-red-600 cursor-pointer"
-              >
-                DPDP Notice
-              </button>
-            </div>
-          </div>
+        <div className="border-t border-stone-200 dark:border-stone-800 px-4 py-4 text-center text-xs text-stone-500">
+          <p>© {new Date().getFullYear()} Eldorado Kannadigara Balaga. All rights reserved.</p>
         </div>
       </footer>
 
       {/* POPUP MODALS */}
-      {/* 1. Balaga Auth Modal */}
       <BalagaAuthModal
         isOpen={authModalOpen}
         onClose={() => setAuthModalOpen(false)}
@@ -2387,109 +1619,195 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
         isAdmin={isCurrentAdmin}
       />
 
-      {/* 2. Volunteer Roster Modal */}
       <BalagaVolunteerModal
         isOpen={volunteerModalOpen}
         onClose={() => setVolunteerModalOpen(false)}
         currentUser={currentUser}
-        eventId={selectedEvent.id}
-        eventTitle={selectedEvent.title}
         onRequireLogin={() => {
           setVolunteerModalOpen(false);
           setAuthModalOpen(true);
         }}
-        isDark={isDark}
       />
 
-      {/* 3. Nominate Cultural Act Modal */}
       <BalagaNominateModal
         isOpen={nominateModalOpen}
         onClose={() => setNominateModalOpen(false)}
-        currentUser={currentUser}
-        onOpenAuth={() => {
-          setNominateModalOpen(false);
-          setAuthModalOpen(true);
-        }}
-        isDark={isDark}
       />
 
-      {/* 4. Policy Modals */}
       <BalagaPolicyModals
         activeModal={policyModal}
         onClose={() => setPolicyModal(null)}
         isDark={isDark}
       />
 
-      {/* 5. Contribute Modal / Link to Devotee Receipts */}
-      {contributeModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs">
+      {/* MEMBERSHIP REGISTRATION MODAL */}
+      {membershipModalOpen && (
+        <div
+          onClick={() => setMembershipModalOpen(false)}
+          className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in"
+        >
           <div
-            className={`rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl border-2 border-red-600 relative animate-in fade-in ${
+            onClick={(e) => e.stopPropagation()}
+            className={`relative max-w-xl w-full p-6 sm:p-8 rounded-3xl border-2 border-red-600 shadow-2xl space-y-6 overflow-y-auto max-h-[90vh] ${
               isDark ? 'bg-stone-900 text-stone-100' : 'bg-white text-stone-900'
             }`}
           >
             <button
-              onClick={() => setContributeModalOpen(false)}
-              className="absolute top-4 right-4 p-1.5 text-stone-400 hover:text-stone-900 dark:hover:text-white cursor-pointer"
+              onClick={() => setMembershipModalOpen(false)}
+              className="absolute top-4 right-4 p-2 rounded-full text-stone-400 hover:text-stone-900 dark:hover:text-white transition-colors cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
 
-            <div className="text-center space-y-3">
-              <div className="w-12 h-12 rounded-2xl bg-red-600 text-yellow-300 flex items-center justify-center mx-auto shadow-md border-2 border-yellow-400">
-                <HeartHandshake className="w-6 h-6" />
+            <div className="space-y-1 text-center sm:text-left">
+              <div className="inline-flex items-center gap-1.5 bg-red-600 text-yellow-300 text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full border border-yellow-400">
+                <UserCheck className="w-3.5 h-3.5" />
+                <span>Online Application Form</span>
               </div>
-              <h3 className="text-xl font-serif font-black text-red-600">
-                Voluntary Devotee Seva Contribution
+              <h3 className="text-2xl font-serif font-black text-red-700 dark:text-red-400">
+                Membership Application Form
               </h3>
-              <p className={`text-xs leading-relaxed ${isDark ? 'text-stone-300' : 'text-stone-600'}`}>
-                Support community Anna Santharpane, flower decorations, sound &amp; stage setup, and Vedic
-                pooja rituals for Ganesha Chaturthi and Karnataka Rajyotsava.
+              <p className="text-xs text-stone-500">
+                El Dorado Kannadigara Balaga Membership Registration
               </p>
+            </div>
 
-              <div
-                className={`p-4 rounded-2xl border text-left text-xs space-y-1.5 ${
-                  isDark ? 'bg-stone-800/80 border-stone-700' : 'bg-amber-50 border-amber-200'
-                }`}
-              >
-                <div className="flex justify-between">
-                  <span className="text-stone-500">Official UPI ID:</span>
-                  <span className="font-mono font-bold text-red-600">
-                    {settings.upiId || 'kannadigara.balaga@upi'}
-                  </span>
+            <div className="space-y-5">
+              <div className="p-4 rounded-2xl bg-amber-50 dark:bg-stone-800 border-2 border-amber-300 dark:border-stone-700 space-y-2">
+                <div className="flex items-center gap-2 font-bold text-amber-900 dark:text-yellow-300 text-xs sm:text-sm">
+                  <BadgeIndianRupee className="w-4 h-4 text-red-600 shrink-0" />
+                  <span>Membership Fees &amp; Guidelines</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-stone-500">Payee Name:</span>
-                  <span className="font-bold">{settings.org || 'Eldorado Kannadigara Balaga'}</span>
-                </div>
+                <ul className="text-xs space-y-1 text-stone-700 dark:text-stone-300 font-semibold pl-1">
+                  <li>• Primary Member: <strong className="text-red-600 dark:text-yellow-300">₹999</strong></li>
+                  <li>• Additional Family Member (&gt;18 yrs): <strong className="text-red-600 dark:text-yellow-300">₹749</strong> per member</li>
+                  <li>• Required Documents: Address Proof (Aadhaar / Bill / Allotment) &amp; Identity Proof</li>
+                </ul>
               </div>
 
-              <div className="pt-2 flex flex-col gap-2">
-                <button
-                  onClick={() => {
-                    setContributeModalOpen(false);
-                    onNavigateToReceipts();
-                  }}
-                  className="w-full py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-yellow-300 font-bold text-xs transition-colors cursor-pointer shadow-xs inline-flex items-center justify-center gap-1.5"
+              <div className="p-6 rounded-2xl bg-red-50 dark:bg-red-950/40 border-2 border-red-600 text-center space-y-4">
+                <p className="text-xs sm:text-sm text-stone-700 dark:text-stone-200 font-medium leading-relaxed">
+                  To complete your registration, click below to open the official Google Application Form:
+                </p>
+
+                <a
+                  href={formLinks.membershipFormUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full py-4 rounded-2xl bg-red-600 hover:bg-red-700 text-yellow-300 font-black text-sm sm:text-base shadow-lg transition-transform active:scale-95 cursor-pointer flex items-center justify-center gap-2 border-2 border-yellow-400"
                 >
-                  <FileText className="w-3.5 h-3.5" />
-                  <span>Open Devotee Receipts &amp; Token Records</span>
+                  <UserCheck className="w-5 h-5" />
+                  <span>Open Official Google Form 📌</span>
+                  <ExternalLink className="w-4 h-4" />
+                </a>
+              </div>
+
+              <div className="flex justify-end pt-1">
+                <button
+                  type="button"
+                  onClick={() => setMembershipModalOpen(false)}
+                  className="px-6 py-2.5 rounded-xl bg-stone-200 dark:bg-stone-800 hover:bg-stone-300 dark:hover:bg-stone-700 font-bold text-xs text-stone-800 dark:text-stone-200 cursor-pointer"
+                >
+                  Close
                 </button>
               </div>
             </div>
           </div>
         </div>
       )}
-      {/* 4. EVENT INFORMATION AND PHOTOS EDITOR MODAL */}
-      <EventInfoAndPhotosEditorModal
-        isOpen={editorModalOpen}
-        onClose={() => setEditorModalOpen(false)}
-        events={COMMUNITY_EVENTS}
-        selectedEventId={selectedEventId}
-        customInfos={customInfos}
-        onSaveCustomInfo={handleSaveCustomInfo}
-        isDark={isDark}
-      />
+
+      {/* LIGHTBOX FOR VAIBHAVA GALLERY */}
+      {lightboxPhoto && (
+        <div
+          onClick={() => setLightboxPhoto(null)}
+          className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4 cursor-pointer"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="relative max-w-4xl w-full space-y-3 cursor-default"
+          >
+            <button
+              onClick={() => setLightboxPhoto(null)}
+              className="absolute -top-10 right-0 text-white hover:text-red-400 p-2 cursor-pointer"
+            >
+              <X className="w-6 h-6" />
+            </button>
+
+            <img
+              src={lightboxPhoto.imageUrl}
+              alt={lightboxPhoto.title}
+              className="w-full max-h-[75vh] object-contain rounded-2xl border-2 border-stone-800"
+            />
+
+            <div className="text-white text-center space-y-1">
+              <h4 className="font-serif font-bold text-lg">{lightboxPhoto.title}</h4>
+              <span className="text-yellow-400 text-xs block">{lightboxPhoto.celebration}</span>
+              {lightboxPhoto.caption && <p className="text-xs text-stone-300">{lightboxPhoto.caption}</p>}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ANNOUNCEMENT DETAIL MODAL */}
+      {selectedAnnouncement && (
+        <div
+          onClick={() => setSelectedAnnouncement(null)}
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className={`relative max-w-xl w-full p-6 sm:p-8 rounded-3xl border-2 border-red-600 shadow-2xl space-y-6 overflow-y-auto max-h-[85vh] ${
+              isDark ? 'bg-stone-900 text-stone-100' : 'bg-white text-stone-900'
+            }`}
+          >
+            <button
+              onClick={() => setSelectedAnnouncement(null)}
+              className="absolute top-4 right-4 p-2 rounded-full text-stone-400 hover:text-stone-900 dark:hover:text-white cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="space-y-2 border-b border-stone-200 dark:border-stone-800 pb-4">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold uppercase tracking-wider bg-red-600 text-yellow-300 px-2.5 py-0.5 rounded">
+                  {selectedAnnouncement.category}
+                </span>
+                {selectedAnnouncement.important && (
+                  <span className="text-[10px] font-bold uppercase bg-amber-500/20 text-amber-700 dark:text-yellow-400 px-2.5 py-0.5 rounded inline-flex items-center gap-1">
+                    <Bell className="w-3 h-3" />
+                    <span>Important Notice</span>
+                  </span>
+                )}
+              </div>
+
+              <h3 className="text-2xl font-serif font-black text-red-700 dark:text-red-400">
+                {selectedAnnouncement.title}
+              </h3>
+              {selectedAnnouncement.kannadaTitle && (
+                <span className="text-sm font-serif font-bold text-amber-800 dark:text-yellow-400 block">
+                  {selectedAnnouncement.kannadaTitle}
+                </span>
+              )}
+              <span className="text-xs text-stone-400 block pt-1">
+                Posted on {selectedAnnouncement.date}
+              </span>
+            </div>
+
+            <div className="space-y-4 text-xs sm:text-sm leading-relaxed whitespace-pre-line text-stone-700 dark:text-stone-300">
+              {selectedAnnouncement.content}
+            </div>
+
+            <div className="pt-4 border-t border-stone-200 dark:border-stone-800 flex justify-end">
+              <button
+                onClick={() => setSelectedAnnouncement(null)}
+                className="px-6 py-2.5 rounded-xl bg-red-600 text-yellow-300 font-bold text-xs hover:bg-red-700 cursor-pointer border border-yellow-400"
+              >
+                Close Notice
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

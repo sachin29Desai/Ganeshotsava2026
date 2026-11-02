@@ -159,14 +159,15 @@ export const PublicSevaPortal: React.FC<PublicSevaPortalProps> = ({
 
   const handleAdminAuthSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (adminPassInput === settings.adminHash) {
+    const email = adminPassInput.trim().toLowerCase();
+    if (email === 'desaisachin95@gmail.com') {
       if (onAdminLoginSuccess) onAdminLoginSuccess();
       setAdminAuthModalOpen(false);
       setAdminPassInput('');
       setAdminError('');
       showToast('Admin Mode unlocked successfully!');
     } else {
-      setAdminError('Incorrect admin passcode.');
+      setAdminError('Access Denied: Only designated administrator email (desaisachin95@gmail.com) can unlock Admin Mode.');
     }
   };
 
@@ -1265,7 +1266,7 @@ export const PublicSevaPortal: React.FC<PublicSevaPortalProps> = ({
               </button>
             </div>
             <p className="text-xs text-stone-600">
-              Enter the Admin Passcode to confirm seva bookings and manage entries.
+              Enter the designated Admin Email Address (desaisachin95@gmail.com) to manage entries.
             </p>
             {adminError && (
               <p className="text-xs text-red-600 bg-red-50 p-2 rounded border border-red-200">
@@ -1273,8 +1274,8 @@ export const PublicSevaPortal: React.FC<PublicSevaPortalProps> = ({
               </p>
             )}
             <input
-              type="password"
-              placeholder="Admin Passcode"
+              type="email"
+              placeholder="e.g. desaisachin95@gmail.com"
               value={adminPassInput}
               onChange={e => setAdminPassInput(e.target.value)}
               className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-[#991B1B]"

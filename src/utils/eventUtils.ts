@@ -78,14 +78,10 @@ const CUSTOM_EVENTS_STORAGE_KEY = 'ekb_custom_community_events';
 export function getStoredEvents(): CommunityEvent[] {
   try {
     const raw = localStorage.getItem(CUSTOM_EVENTS_STORAGE_KEY);
-    if (raw) {
+    if (raw !== null) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        // Merge with default COMMUNITY_EVENTS if missing
-        const combinedMap = new Map<string, CommunityEvent>();
-        COMMUNITY_EVENTS.forEach(e => combinedMap.set(e.id, e));
-        parsed.forEach((e: CommunityEvent) => combinedMap.set(e.id, e));
-        return Array.from(combinedMap.values());
+      if (Array.isArray(parsed)) {
+        return parsed;
       }
     }
   } catch (err) {

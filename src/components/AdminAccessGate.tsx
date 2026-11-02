@@ -171,8 +171,8 @@ export const AdminAccessGate: React.FC<AdminAccessGateProps> = ({
           <div className="p-6 sm:p-7 space-y-5">
             {/* Context Notice */}
             <div className="text-center text-xs text-stone-600 leading-relaxed">
-              Access to {pageType === 'receipts' ? 'Devotee Receipts' : 'Devotee Sevas'} is stopped for non-admins.
-              Please sign in with an authorized committee Gmail or enter the Admin passcode to continue.
+              Access to {pageType === 'receipts' ? 'Devotee Receipts' : 'Devotee Sevas'} management is restricted to authorized Administrators.
+              Please sign in with your Admin Gmail account.
             </div>
 
             {/* Current Non-Admin Role Indicator */}
@@ -184,7 +184,7 @@ export const AdminAccessGate: React.FC<AdminAccessGateProps> = ({
                     Signed in as {currentRole.toUpperCase()} (View Only)
                   </p>
                   <p className="text-[11px] text-amber-800 mt-0.5">
-                    Your current role does not have Admin privileges. Elevate by entering the Admin passcode below.
+                    Your current account does not have Admin privileges. Please sign in with designated administrator account (<strong className="font-mono">desaisachin95@gmail.com</strong>).
                   </p>
                 </div>
               </div>
@@ -204,7 +204,7 @@ export const AdminAccessGate: React.FC<AdminAccessGateProps> = ({
                 type="button"
                 onClick={handleGoogleSignIn}
                 disabled={loadingGoogle || isSubmitting}
-                className="w-full py-2.5 px-4 rounded-xl border border-stone-300 hover:bg-stone-50 font-bold text-xs text-stone-800 transition-colors shadow-xs inline-flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-50"
+                className="w-full py-3 px-4 rounded-xl border border-stone-300 hover:bg-stone-50 font-bold text-xs text-stone-800 transition-colors shadow-xs inline-flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-50"
               >
                 <svg className="w-4 h-4" viewBox="0 0 24 24">
                   <path
@@ -224,55 +224,15 @@ export const AdminAccessGate: React.FC<AdminAccessGateProps> = ({
                     d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
                   />
                 </svg>
-                <span>{loadingGoogle ? 'Verifying Admin Google...' : 'Sign in with Admin Gmail'}</span>
+                <span>{loadingGoogle ? 'Verifying Admin Google...' : 'Sign in as Admin with Google'}</span>
               </button>
 
-              <div className="relative flex items-center justify-center my-3">
-                <div className="border-t border-stone-200 w-full" />
-                <span className="bg-white px-2.5 text-[10px] text-stone-400 uppercase tracking-wider font-semibold">
-                  Or enter Admin Passcode
-                </span>
+              <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl text-center text-xs text-amber-900 space-y-1">
+                <span className="font-bold block text-amber-950">Passwordless Email Gate</span>
+                <p className="text-[11px] text-stone-700 leading-relaxed">
+                  Only verified administrator email address (<strong className="font-mono">desaisachin95@gmail.com</strong>) has access privileges to unlock {pageTitle}.
+                </p>
               </div>
-
-              {/* Passcode Form */}
-              <form onSubmit={handlePasscodeSubmit} className="space-y-4">
-                <div className="space-y-1.5 text-left">
-                  <label className="block text-xs font-bold uppercase tracking-wider text-stone-700">
-                    Admin Passcode
-                  </label>
-                  <div className="relative">
-                    <KeyRound className="w-4 h-4 absolute left-3.5 top-3.5 text-stone-400" />
-                    <input
-                      type={showPasscode ? 'text' : 'password'}
-                      value={passcode}
-                      onChange={e => {
-                        setPasscode(e.target.value);
-                        if (error) setError(null);
-                      }}
-                      placeholder="Enter Admin passcode"
-                      autoFocus
-                      className="w-full bg-stone-50 border border-stone-300 rounded-xl pl-10 pr-10 py-3 text-sm text-stone-900 outline-none focus:bg-white focus:border-[#991B1B] focus:ring-2 focus:ring-[#991B1B]/20 transition-all font-medium"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPasscode(!showPasscode)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 cursor-pointer p-1"
-                      title={showPasscode ? 'Hide passcode' : 'Show passcode'}
-                    >
-                      {showPasscode ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={isSubmitting || loadingGoogle}
-                  className="w-full bg-[#991B1B] hover:bg-[#7F1D1D] active:scale-[0.99] text-white font-bold text-xs sm:text-sm uppercase tracking-wider py-3.5 px-4 rounded-xl shadow-md inline-flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
-                >
-                  <UserCheck className="w-4 h-4 text-amber-300" />
-                  <span>{isSubmitting ? 'Verifying Admin...' : `Unlock ${pageTitle}`}</span>
-                </button>
-              </form>
             </div>
 
             <div className="pt-3 border-t border-stone-100 flex items-center justify-between text-xs text-stone-500">

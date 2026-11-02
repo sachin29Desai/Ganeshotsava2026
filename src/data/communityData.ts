@@ -21,8 +21,19 @@ export interface CommunityEvent {
 export interface CommitteeMember {
   name: string;
   role: string;
-  initials: string;
-  category: 'core' | 'support';
+  photoUrl?: string;
+  initials?: string;
+}
+
+export interface MembershipTier {
+  id: string;
+  title: string;
+  kannadaTitle: string;
+  priceDisplay: string;
+  period: string;
+  popular?: boolean;
+  features: string[];
+  description: string;
 }
 
 export interface AnnouncementItem {
@@ -90,8 +101,15 @@ export const COMMUNITY_EVENTS: CommunityEvent[] = [
     posterImage: 'https://images.unsplash.com/photo-1532375810709-75b1da00537c?auto=format&fit=crop&w=1200&q=80',
     description:
       'Upcoming 2-day celebration of Karnataka statehood day with red-and-yellow Karnataka flag hoisting, Naadageethe "Jaya Bharatha Jananiya Tanujathe", Dollu Kunitha folk arts, Kannada poetry, cultural stage shows, and traditional festive delights.',
-    detailsOverview:
-      'Join us on 21st and 22nd November 2026 in honoring Karnataka’s glorious cultural tapestry, Kannada language, literature, and folklore. Features all-ages cultural performances, traditional cuisine, and volunteer sign-ups.'
+    detailsOverview: `Day 1 Schedule (21st Nov 2026)
+08:30 AM — Red & Yellow Flag Hoisting & Naadageethe
+10:00 AM — Dollu Kunitha Folk Dance Procession around Eldorado plaza
+12:30 PM — Mysore Pak & Traditional Prasadam Distribution
+
+Day 2 Cultural Evening (22nd Nov 2026)
+05:30 PM — Children Bharatanatyam & Folk Dance Performances
+07:00 PM — Resident Kannada Drama Skit & Poetry Recitation
+08:30 PM — Felicitation of Senior Residents & Volunteers`
   },
   {
     id: 'ganesh-chaturthi-2026',
@@ -201,16 +219,116 @@ export const COMMUNITY_EVENTS: CommunityEvent[] = [
 ];
 
 export const COMMITTEE_MEMBERS: CommitteeMember[] = [
-  { name: 'Sachin Desai', role: 'President & Balaga Coordinator', initials: 'SD', category: 'core' },
-  { name: 'Ravi Shekhar', role: 'Vice President & Advisory', initials: 'RS', category: 'core' },
-  { name: 'Vinay Pathak', role: 'General Secretary', initials: 'VP', category: 'core' },
-  { name: 'Rahul Raj', role: 'Treasurer & Accounts', initials: 'RR', category: 'core' },
-  { name: 'Aman Gupta', role: 'Cultural Programs Head', initials: 'AG', category: 'core' },
-  { name: 'Kunal Singh', role: 'Joint Secretary', initials: 'KS', category: 'core' },
-  { name: 'Surbhi Saini', role: 'Volunteers & Hospitality Lead', initials: 'SS', category: 'core' },
-  { name: 'Ajay Rathore', role: 'Pooja & Prasadam Coordination', initials: 'AR', category: 'core' },
-  { name: 'K K Dey', role: 'Stage & Logistics Member', initials: 'KK', category: 'core' },
-  { name: 'Pankaj Kumar Roy', role: 'Auditing & Operations Member', initials: 'PK', category: 'core' }
+  {
+    name: 'Rajesh Kumar',
+    role: 'President',
+    photoUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=600&q=80',
+    initials: 'RK'
+  },
+  {
+    name: 'Suresh Patil',
+    role: 'Vice President',
+    photoUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=600&q=80',
+    initials: 'SP'
+  },
+  {
+    name: 'Anand Hegde',
+    role: 'General Secretary',
+    photoUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=600&q=80',
+    initials: 'AH'
+  },
+  {
+    name: 'Pradeep Gowda',
+    role: 'Treasurer',
+    photoUrl: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&w=600&q=80',
+    initials: 'PG'
+  },
+  {
+    name: 'Kiran Rao',
+    role: 'Cultural Lead',
+    photoUrl: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=600&q=80',
+    initials: 'KR'
+  },
+  {
+    name: 'Mahesh Murthy',
+    role: 'Youth Lead',
+    photoUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&q=80',
+    initials: 'MM'
+  },
+  {
+    name: 'Sunita Sharma',
+    role: 'Volunteers Lead',
+    photoUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=600&q=80',
+    initials: 'SS'
+  },
+  {
+    name: 'Venkatesh Bhat',
+    role: 'Pooja Coordinator',
+    photoUrl: 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?auto=format&fit=crop&w=600&q=80',
+    initials: 'VB'
+  },
+  {
+    name: 'Prakash Naik',
+    role: 'Stage & Logistics',
+    photoUrl: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=600&q=80',
+    initials: 'PN'
+  },
+  {
+    name: 'Dinesh Kulkarni',
+    role: 'Operations Lead',
+    photoUrl: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=600&q=80',
+    initials: 'DK'
+  }
+];
+
+export const MEMBERSHIP_TIERS: MembershipTier[] = [
+  {
+    id: 'annual-family',
+    title: 'Annual Family Member',
+    kannadaTitle: 'ವಾರ್ಷಿಕ ಕುಟುಂಬ ಸದಸ್ಯತ್ವ',
+    priceDisplay: '₹ 1,500',
+    period: 'per year / family',
+    popular: true,
+    description: 'Designed for resident families residing at Brigade El Dorado seeking complete access to all community festival events, cultural stage nominations, and voting rights.',
+    features: [
+      'Full family entry to all 5-day Sri Ganeshotsava & Rajyotsava celebrations',
+      'Priority stage performance slot nomination for children & adults',
+      'Daily Mahaprasada Anna Santharpane coupons for family members',
+      'Access to Balaga WhatsApp official announcement group',
+      'Digital membership card & annual voting rights in General Body meeting'
+    ]
+  },
+  {
+    id: 'patron-lifetime',
+    title: 'Patron Lifetime Member',
+    kannadaTitle: 'ಪೋಷಕ ಆಜೀವ ಸದಸ್ಯತ್ವ',
+    priceDisplay: '₹ 7,500',
+    period: 'one-time lifetime',
+    popular: false,
+    description: 'For esteemed patron residents looking to support long-term Kannada cultural heritage, temple pooja infrastructure, and community youth sports in Eldorado.',
+    features: [
+      'Lifetime non-expiring membership for resident family',
+      'Special honors & seating in VIP enclosure during Rajyotsava & Ganeshotsava',
+      'Special Mahaprasada & Pooja Sankalpa in family name during Ganeshotsava',
+      'Founding Patron plaque mention on website & festival brochure',
+      'Direct seat on the Advisory & Audit Committee'
+    ]
+  },
+  {
+    id: 'youth-student',
+    title: 'Youth & Volunteer Member',
+    kannadaTitle: 'ಯುವ ಮತ್ತು ಸ್ವಯಂಸೇವಕ ಸದಸ್ಯತ್ವ',
+    priceDisplay: '₹ 500',
+    period: 'per year / individual',
+    popular: false,
+    description: 'Tailored for individual youth residents and working professionals passionate about volunteering, organizing sports, and Kannada literature events.',
+    features: [
+      'Individual registration for sports, quizzes & cultural workshops',
+      'Official Volunteer Badge & Certificate of Seva',
+      'Access to Youth Club networking & sports leagues',
+      'Mahaprasada coupons during festival days'
+    ]
+  }
 ];
 
 export const ANNOUNCEMENTS: AnnouncementItem[] = [

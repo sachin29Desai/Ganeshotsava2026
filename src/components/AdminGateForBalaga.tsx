@@ -123,7 +123,7 @@ export const AdminGateForBalaga: React.FC<AdminGateForBalagaProps> = ({
             </h2>
             <p className="text-xs text-stone-600 leading-relaxed max-w-sm mx-auto">
               This page (<code className="text-red-700 font-mono text-[11px]">/homepageindevelop</code>)
-              is reserved for Kannadigara Balaga committee administrators. Sign in with an approved Gmail or enter the Admin passcode.
+              is reserved for Kannadigara Balaga committee administrators. Please sign in with your verified Admin Gmail (<strong className="font-mono">desaisachin95@gmail.com</strong>).
             </p>
           </div>
 
@@ -139,7 +139,7 @@ export const AdminGateForBalaga: React.FC<AdminGateForBalagaProps> = ({
             <button
               onClick={handleGoogleSignIn}
               disabled={loadingGoogle}
-              className="w-full py-2.5 px-4 rounded-xl border border-stone-300 hover:bg-stone-50 font-bold text-xs text-stone-800 transition-colors shadow-xs inline-flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-50"
+              className="w-full py-3 px-4 rounded-xl border border-stone-300 hover:bg-stone-50 font-bold text-xs text-stone-800 transition-colors shadow-xs inline-flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-50"
             >
               <svg className="w-4 h-4" viewBox="0 0 24 24">
                 <path
@@ -159,40 +159,15 @@ export const AdminGateForBalaga: React.FC<AdminGateForBalagaProps> = ({
                   d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
                 />
               </svg>
-              <span>{loadingGoogle ? 'Verifying Admin Google...' : 'Sign in with Admin Gmail'}</span>
+              <span>{loadingGoogle ? 'Verifying Admin Google...' : 'Sign in as Admin with Google'}</span>
             </button>
 
-            <div className="relative flex items-center justify-center my-2">
-              <div className="border-t border-stone-200 w-full" />
-              <span className="bg-white px-2 text-[10px] text-stone-400 uppercase tracking-wider font-semibold">
-                Or enter committee passcode
-              </span>
+            <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl text-center text-xs text-amber-900 space-y-1">
+              <span className="font-bold block text-amber-950">Passwordless Committee Gate</span>
+              <p className="text-[11px] text-stone-700 leading-relaxed">
+                Only verified administrator account (<strong className="font-mono">desaisachin95@gmail.com</strong>) has permissions to open this development portal.
+              </p>
             </div>
-
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-1.5 text-left">
-                <div className="relative">
-                  <KeyRound className="w-4 h-4 absolute left-3.5 top-3 text-stone-400" />
-                  <input
-                    type="password"
-                    value={passcode}
-                    onChange={(e) => {
-                      setPasscode(e.target.value);
-                      setError('');
-                    }}
-                    placeholder="Admin passcode"
-                    className="w-full bg-stone-50 border border-stone-300 rounded-xl pl-10 pr-4 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 outline-none focus:border-red-600 transition-colors"
-                  />
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-yellow-300 font-bold text-sm transition-all shadow-xs active:scale-98 cursor-pointer border border-yellow-400"
-              >
-                Unlock Balaga Page
-              </button>
-            </form>
           </div>
 
           <div className="pt-2 border-t border-stone-100 flex items-center justify-between text-xs text-stone-500">

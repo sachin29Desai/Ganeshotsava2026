@@ -404,13 +404,11 @@ tr:hover td{background:#FAFAF9}
     </div>
 
     <div class="card">
-      <div class="card-hdr"><h2>Admin Security &amp; Password</h2></div>
-      <p style="font-size:12px;color:#78716C;margin-bottom:12px">Set or change the master password required to access admin mode.</p>
-      <div class="form-grid">
-        <div class="field"><label>New Password</label><input type="password" id="set_pwd1" placeholder="Enter new password"></div>
-        <div class="field"><label>Confirm Password</label><input type="password" id="set_pwd2" placeholder="Confirm new password"></div>
+      <div class="card-hdr"><h2>Passwordless Email Access Control</h2></div>
+      <p style="font-size:12px;color:#78716C;margin-bottom:8px">All management features use passwordless email authentication (<strong style="color:#991B1B">desaisachin95@gmail.com</strong>).</p>
+      <div style="font-size:11px;color:#57534E;background:#FFFBEB;padding:10px;border-radius:8px;border:1px solid #FCD34D">
+        Passwordless magic link verification ensures maximum security without needing master passwords.
       </div>
-      <div style="margin-top:14px"><button class="btn btn-dark" onclick="changePassword()">🔑 Set Password</button></div>
     </div>
 
     <div class="card">
@@ -742,23 +740,15 @@ async function sha256(s) {
 async function toggleAdmin() {
   if (viewOnly) { alert('👁 View-only snapshot. Admin features are disabled.'); return; }
   if (isAdmin) { isAdmin = false; refreshAdminUI(); return; }
-  const cfg = cfgLoad();
-  if (!cfg.adminHash) {
-    const p1 = prompt('No admin password set.\\nEnter a new password:');
-    if (!p1) return;
-    const p2 = prompt('Confirm password:');
-    if (p1 !== p2) { alert('Passwords do not match.'); return; }
-    cfg.adminHash = await sha256(p1);
-    cfgSave(cfg);
+  const email = prompt('Enter designated Admin Email Address (e.g. desaisachin95@gmail.com):');
+  if (!email) return;
+  if (email.trim().toLowerCase() === 'desaisachin95@gmail.com') {
     isAdmin = true;
     refreshAdminUI();
-    alert('Admin password set! You are now in admin mode.');
-    return;
+    alert('Admin mode unlocked successfully!');
+  } else {
+    alert('Access Denied: Only desaisachin95@gmail.com is authorized as Super Admin.');
   }
-  const pwd = prompt('Enter admin password:');
-  if (!pwd) return;
-  if (await sha256(pwd) === cfg.adminHash) { isAdmin = true; refreshAdminUI(); }
-  else alert('Incorrect password.');
 }
 
 function refreshAdminUI() {
@@ -770,20 +760,6 @@ function refreshAdminUI() {
   document.getElementById('settingsTab_btn').style.display = isAdmin ? '' : 'none';
   if (!isAdmin && document.getElementById('settingsTab').classList.contains('active')) showTab('reportTab', document.querySelector('.tab'));
   renderAll();
-}
-
-async function changePassword() {
-  if (!isAdmin) { alert('Admin mode required.'); return; }
-  const p1 = document.getElementById('set_pwd1').value;
-  const p2 = document.getElementById('set_pwd2').value;
-  if (!p1) { alert('Please enter a new password.'); return; }
-  if (p1 !== p2) { alert('Passwords do not match.'); return; }
-  const cfg = cfgLoad();
-  cfg.adminHash = await sha256(p1);
-  cfgSave(cfg);
-  document.getElementById('set_pwd1').value = '';
-  document.getElementById('set_pwd2').value = '';
-  alert('Password updated successfully.');
 }
 
 function showTab(id, btn) {

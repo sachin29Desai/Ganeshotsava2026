@@ -51,16 +51,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   }, [defaultSubTab]);
 
   const [copiedRoleInfo, setCopiedRoleInfo] = useState(false);
-  const [activePasswordTab, setActivePasswordTab] = useState<'admin' | 'sponsor' | 'volunteer'>('admin');
-
-  // Input states for password changes
-  const [adminP1, setAdminP1] = useState('');
-  const [adminP2, setAdminP2] = useState('');
-  const [sponsorP1, setSponsorP1] = useState('');
-  const [sponsorP2, setSponsorP2] = useState('');
-  const [volunteerP1, setVolunteerP1] = useState('');
-  const [volunteerP2, setVolunteerP2] = useState('');
-
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
 
   if (!isAdmin) {
@@ -73,60 +63,18 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     );
   }
 
-  const handleUpdateAdminPassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!adminP1.trim()) return alert('Enter a new admin password.');
-    if (adminP1 !== adminP2) return alert('Admin passwords do not match.');
-    if (adminP1.length < 4) return alert('Password must be at least 4 characters.');
-
-    const hash = await sha256(adminP1.trim());
-    onSaveSettings({ ...settings, adminHash: hash });
-    setAdminP1('');
-    setAdminP2('');
-    setFeedbackMessage('✓ Super Admin password updated successfully! Click "Save" in the top bar to sync to cloud.');
-    setTimeout(() => setFeedbackMessage(null), 5000);
-  };
-
-  const handleUpdateSponsorPassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!sponsorP1.trim()) return alert('Enter a new sponsor password.');
-    if (sponsorP1 !== sponsorP2) return alert('Sponsor passwords do not match.');
-    if (sponsorP1.length < 4) return alert('Password must be at least 4 characters.');
-
-    const hash = await sha256(sponsorP1.trim());
-    onSaveSettings({ ...settings, sponsorHash: hash });
-    setSponsorP1('');
-    setSponsorP2('');
-    setFeedbackMessage('✓ Sponsor access password updated successfully! Click "Save" in the top bar to sync to cloud.');
-    setTimeout(() => setFeedbackMessage(null), 5000);
-  };
-
-  const handleUpdateVolunteerPassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!volunteerP1.trim()) return alert('Enter a new volunteer team password.');
-    if (volunteerP1 !== volunteerP2) return alert('Volunteer passwords do not match.');
-    if (volunteerP1.length < 4) return alert('Password must be at least 4 characters.');
-
-    const hash = await sha256(volunteerP1.trim());
-    onSaveSettings({ ...settings, volunteerHash: hash });
-    setVolunteerP1('');
-    setVolunteerP2('');
-    setFeedbackMessage('✓ Volunteer team password updated successfully! Click "Save" in the top bar to sync to cloud.');
-    setTimeout(() => setFeedbackMessage(null), 5000);
-  };
-
   const copyRoleSharingText = () => {
     const origin = window.location.origin;
     const text = `🙏 *${settings.org || 'Ganeshotsava 2026'} - Portal Access Guide*\n\n` +
       `1️⃣ *Voluntary Devotee Receipts (Residents)*\n` +
       `🔗 Link: ${origin}/ganeshotsava2026/receipts\n` +
-      `🔑 Password: None needed! Search flat number or name & download official PDF receipt.\n\n` +
-      `2️⃣ *Management Portal (Automatic Role Access)*\n` +
+      `🔑 Password: Passwordless! Search flat number or name & download official PDF receipt.\n\n` +
+      `2️⃣ *Management Portal (Passwordless Email Sign-In)*\n` +
       `🔗 Link: ${origin}/ganeshotsava2026\n` +
-      `💡 Simply enter your password on the login screen — the system automatically directs you to your authorized role:\n` +
-      `• *Super Admin*: Full access to add, edit, delete, export, and manage settings.\n` +
-      `• *Sponsors*: View all data across statements, voluntary contributions, stalls, and expenses.\n` +
-      `• *Volunteers Team*: View voluntary contributions, sevas, and expenses (Sponsorship and Stalls tabs are hidden).`;
+      `💡 Simply enter your registered email address on the sign-in screen to receive a verification magic link and 6-digit code:\n` +
+      `• *Super Admin*: Full access to add, edit, delete, export, and manage settings (desaisachin95@gmail.com).\n` +
+      `• *Sponsors & Members*: View all data across statements, voluntary contributions, stalls, and expenses.\n` +
+      `• *Devotees / Viewers*: View voluntary contributions, sevas, and high-level financial summary statements.`;
 
     navigator.clipboard.writeText(text);
     setCopiedRoleInfo(true);
@@ -324,15 +272,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
       </div>
 
-      {/* Role-Based Passwords & Multi-Role Access Control */}
+      {/* Passwordless Email Access & Role Permissions Control */}
       <div className="bg-white border border-stone-200 rounded-xl p-6 shadow-sm space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-3 pb-2 border-b border-stone-100">
           <div>
             <h2 className="text-lg font-serif font-bold text-[#1A1A1A]">
-              Role-Based Access &amp; Passwords
+              Passwordless Email Access &amp; Permissions
             </h2>
             <p className="text-xs text-stone-500 mt-0.5">
-              Configure independent passwords for each role. Only Super Admin can change these passwords.
+              All sign-ins use passwordless email magic link verification. Manage approved members and roles in the Registered Users tab.
             </p>
           </div>
 
@@ -340,7 +288,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             type="button"
             onClick={copyRoleSharingText}
             className="bg-stone-100 hover:bg-stone-200 text-stone-800 text-xs font-bold px-3 py-1.5 rounded-lg inline-flex items-center gap-1.5 transition-colors cursor-pointer border border-stone-300 shadow-2xs"
-            title="Copy formatted login guide for sharing on WhatsApp or committee groups"
+            title="Copy formatted access guide for sharing on WhatsApp or committee groups"
           >
             {copiedRoleInfo ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5 text-stone-600" />}
             <span>{copiedRoleInfo ? 'Copied Access Guide!' : 'Copy Access Guide'}</span>
@@ -350,208 +298,68 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         {/* 3 Role Overview Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
           {/* Admin Card */}
-          <div
-            onClick={() => setActivePasswordTab('admin')}
-            className={`p-3.5 rounded-xl border-2 transition-all cursor-pointer ${
-              activePasswordTab === 'admin'
-                ? 'border-[#991B1B] bg-red-50/40 shadow-xs'
-                : 'border-stone-200 hover:border-stone-300 bg-white'
-            }`}
-          >
+          <div className="p-3.5 rounded-xl border-2 border-[#991B1B] bg-red-50/40 shadow-xs">
             <div className="flex items-center justify-between mb-1.5">
               <span className="text-xs font-bold text-stone-900 flex items-center gap-1.5">
                 <Crown className="w-4 h-4 text-amber-600" />
                 <span>1. Super Admin</span>
               </span>
               <span className="text-[10px] bg-red-100 text-red-800 font-bold px-1.5 py-0.5 rounded">
-                All Access
+                desaisachin95@gmail.com
               </span>
             </div>
             <p className="text-[11px] text-stone-600 leading-relaxed">
-              Full control to view, add, modify, and delete data across all modules, plus settings and export.
+              Full control to view, add, modify, and delete data across all modules, plus settings, export, and user management.
             </p>
           </div>
 
-          {/* Sponsor Card */}
-          <div
-            onClick={() => setActivePasswordTab('sponsor')}
-            className={`p-3.5 rounded-xl border-2 transition-all cursor-pointer ${
-              activePasswordTab === 'sponsor'
-                ? 'border-amber-500 bg-amber-50/40 shadow-xs'
-                : 'border-stone-200 hover:border-stone-300 bg-white'
-            }`}
-          >
+          {/* Member/Sponsor Card */}
+          <div className="p-3.5 rounded-xl border-2 border-amber-500 bg-amber-50/40 shadow-xs">
             <div className="flex items-center justify-between mb-1.5">
               <span className="text-xs font-bold text-stone-900 flex items-center gap-1.5">
                 <Briefcase className="w-4 h-4 text-amber-700" />
-                <span>2. Sponsors</span>
+                <span>2. Members / Committee</span>
               </span>
               <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-1.5 py-0.5 rounded">
-                Read Only
+                Read Only Complete Data
               </span>
             </div>
             <p className="text-[11px] text-stone-600 leading-relaxed">
-              Can view all statements, voluntary contributions, sponsorship, stalls, and expenditures. Cannot modify any records.
+              Can view all statements, voluntary contributions, sponsorship, stalls, and expenditures via verified email link.
             </p>
           </div>
 
-          {/* Volunteer Card */}
-          <div
-            onClick={() => setActivePasswordTab('volunteer')}
-            className={`p-3.5 rounded-xl border-2 transition-all cursor-pointer ${
-              activePasswordTab === 'volunteer'
-                ? 'border-stone-700 bg-stone-100/60 shadow-xs'
-                : 'border-stone-200 hover:border-stone-300 bg-white'
-            }`}
-          >
+          {/* Devotee Card */}
+          <div className="p-3.5 rounded-xl border-2 border-stone-300 bg-stone-50 shadow-xs">
             <div className="flex items-center justify-between mb-1.5">
               <span className="text-xs font-bold text-stone-900 flex items-center gap-1.5">
                 <Users2 className="w-4 h-4 text-stone-700" />
-                <span>3. Volunteers</span>
+                <span>3. Devotees / Residents</span>
               </span>
               <span className="text-[10px] bg-stone-200 text-stone-800 font-bold px-1.5 py-0.5 rounded">
-                Restricted View
+                Devotee Access
               </span>
             </div>
             <p className="text-[11px] text-stone-600 leading-relaxed">
-              Can view statements, voluntary contributions, and expenses. <strong>Sponsorship and Stalls tabs are hidden</strong>.
+              Can view financial summary statements, voluntary contribution receipts, and book sevas.
             </p>
           </div>
         </div>
 
-        {/* Active Password Update Form */}
-        <div className="bg-stone-50 border border-stone-200 rounded-xl p-4 sm:p-5">
-          {activePasswordTab === 'admin' && (
-            <form onSubmit={handleUpdateAdminPassword} className="space-y-3">
-              <div className="flex items-center gap-2 mb-2">
-                <Crown className="w-4 h-4 text-amber-600" />
-                <h3 className="text-sm font-bold text-stone-900">
-                  Update Super Admin (Super User) Password
-                </h3>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-stone-600 mb-1">
-                    New Super Admin Password
-                  </label>
-                  <input
-                    type="password"
-                    value={adminP1}
-                    onChange={e => setAdminP1(e.target.value)}
-                    placeholder="Enter new admin password"
-                    className="w-full bg-white border border-stone-300 rounded px-3 py-2 text-sm outline-none focus:border-[#991B1B]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-stone-600 mb-1">
-                    Confirm Password
-                  </label>
-                  <input
-                    type="password"
-                    value={adminP2}
-                    onChange={e => setAdminP2(e.target.value)}
-                    placeholder="Confirm new admin password"
-                    className="w-full bg-white border border-stone-300 rounded px-3 py-2 text-sm outline-none focus:border-[#991B1B]"
-                  />
-                </div>
-              </div>
-              <button
-                type="submit"
-                className="bg-[#991B1B] hover:bg-[#7F1D1D] text-white text-xs font-bold uppercase tracking-wider px-4 py-2 rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1.5 shadow-xs"
-              >
-                <KeyRound className="w-3.5 h-3.5" />
-                <span>Save Super Admin Password</span>
-              </button>
-            </form>
-          )}
-
-          {activePasswordTab === 'sponsor' && (
-            <form onSubmit={handleUpdateSponsorPassword} className="space-y-3">
-              <div className="flex items-center gap-2 mb-2">
-                <Briefcase className="w-4 h-4 text-amber-700" />
-                <h3 className="text-sm font-bold text-stone-900">
-                  Update Sponsors Access Password (Read-Only • View All Data)
-                </h3>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-stone-600 mb-1">
-                    New Sponsor Password
-                  </label>
-                  <input
-                    type="password"
-                    value={sponsorP1}
-                    onChange={e => setSponsorP1(e.target.value)}
-                    placeholder="e.g. sponsor2026"
-                    className="w-full bg-white border border-stone-300 rounded px-3 py-2 text-sm outline-none focus:border-amber-600"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-stone-600 mb-1">
-                    Confirm Password
-                  </label>
-                  <input
-                    type="password"
-                    value={sponsorP2}
-                    onChange={e => setSponsorP2(e.target.value)}
-                    placeholder="Confirm new sponsor password"
-                    className="w-full bg-white border border-stone-300 rounded px-3 py-2 text-sm outline-none focus:border-amber-600"
-                  />
-                </div>
-              </div>
-              <button
-                type="submit"
-                className="bg-amber-700 hover:bg-amber-800 text-white text-xs font-bold uppercase tracking-wider px-4 py-2 rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1.5 shadow-xs"
-              >
-                <KeyRound className="w-3.5 h-3.5" />
-                <span>Save Sponsor Password</span>
-              </button>
-            </form>
-          )}
-
-          {activePasswordTab === 'volunteer' && (
-            <form onSubmit={handleUpdateVolunteerPassword} className="space-y-3">
-              <div className="flex items-center gap-2 mb-2">
-                <Users2 className="w-4 h-4 text-stone-700" />
-                <h3 className="text-sm font-bold text-stone-900">
-                  Update Volunteer Team Password (Restricted View • No Sponsorship / Stalls)
-                </h3>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-stone-600 mb-1">
-                    New Volunteer Password
-                  </label>
-                  <input
-                    type="password"
-                    value={volunteerP1}
-                    onChange={e => setVolunteerP1(e.target.value)}
-                    placeholder="e.g. volunteer2026"
-                    className="w-full bg-white border border-stone-300 rounded px-3 py-2 text-sm outline-none focus:border-stone-700"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-stone-600 mb-1">
-                    Confirm Password
-                  </label>
-                  <input
-                    type="password"
-                    value={volunteerP2}
-                    onChange={e => setVolunteerP2(e.target.value)}
-                    placeholder="Confirm new volunteer password"
-                    className="w-full bg-white border border-stone-300 rounded px-3 py-2 text-sm outline-none focus:border-stone-700"
-                  />
-                </div>
-              </div>
-              <button
-                type="submit"
-                className="bg-stone-800 hover:bg-stone-900 text-white text-xs font-bold uppercase tracking-wider px-4 py-2 rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1.5 shadow-xs"
-              >
-                <KeyRound className="w-3.5 h-3.5" />
-                <span>Save Volunteer Password</span>
-              </button>
-            </form>
-          )}
+        <div className="bg-amber-50/80 border border-amber-300 rounded-xl p-4 flex items-center justify-between gap-3">
+          <div className="space-y-0.5">
+            <h4 className="text-xs font-bold text-amber-950">Manage Registered Devotees &amp; Approved Roles</h4>
+            <p className="text-[11px] text-amber-800">
+              To add or update member emails and permissions, switch to the <strong>Registered Users Management</strong> tab above.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setActiveSettingsTab('users')}
+            className="px-3.5 py-1.5 bg-amber-400 hover:bg-amber-300 text-stone-950 font-bold text-xs rounded-lg transition-colors cursor-pointer shrink-0 shadow-2xs"
+          >
+            Open User Management
+          </button>
         </div>
       </div>
 

@@ -26,7 +26,6 @@ import { CommunityEvent, GALLERY_PHOTOS, GalleryPhoto, GANESHA_FAQS } from '../.
 import { db } from '../../lib/firebase';
 import { collection, getDocs } from 'firebase/firestore';
 import { UserRole, UserProfile } from '../../types';
-import { EventVolunteersList } from './EventVolunteersList';
 
 interface BalagaEventDetailViewProps {
   event: CommunityEvent;
@@ -88,7 +87,7 @@ export const BalagaEventDetailView: React.FC<BalagaEventDetailViewProps> = ({
       p.year === event.year
   );
 
-  const canAccessFinancials = isAdmin || isMember || userRole === 'admin' || userRole === 'member' || userRole === 'read_only';
+  const canAccessFinancials = isAdmin || userRole === 'admin';
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 space-y-10">
@@ -170,9 +169,9 @@ export const BalagaEventDetailView: React.FC<BalagaEventDetailViewProps> = ({
             "{event.theme}"
           </p>
 
-          <p className={`text-sm sm:text-base leading-relaxed ${isDark ? 'text-stone-300' : 'text-stone-700'}`}>
+          <div className={`text-sm sm:text-base leading-relaxed whitespace-pre-line p-5 rounded-2xl bg-stone-50 dark:bg-stone-800/40 border border-stone-200 dark:border-stone-700/60 font-sans ${isDark ? 'text-stone-200' : 'text-stone-800'}`}>
             {event.detailsOverview || event.description}
-          </p>
+          </div>
 
           <div
             className={`grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 border-t ${
@@ -267,15 +266,6 @@ export const BalagaEventDetailView: React.FC<BalagaEventDetailViewProps> = ({
         )}
       </section>
 
-      {/* Event-Specific Volunteers List */}
-      <EventVolunteersList
-        eventId={event.id}
-        eventTitle={event.title}
-        onOpenVolunteerModal={() => onOpenVolunteer()}
-        isAdmin={isAdmin}
-        isDark={isDark}
-      />
-
       {/* 2. Photo Gallery & Moments Highlights */}
       <section className="space-y-4">
         <div className="flex items-center justify-between">
@@ -323,135 +313,7 @@ export const BalagaEventDetailView: React.FC<BalagaEventDetailViewProps> = ({
         )}
       </section>
 
-      {/* 3. Financial Overview & Privacy Guard */}
-      <section className="space-y-4">
-        <div className="flex items-center gap-2">
-          <FileText className="w-5 h-5 text-red-600" />
-          <h3 className="text-xl sm:text-2xl font-serif font-black">
-            Financials &amp; Accounts Overview
-          </h3>
-        </div>
 
-        {canAccessFinancials ? (
-          /* VERIFIED MEMBERS & ADMINS: SEE DETAILED FINANCIAL CARDS */
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div
-                className={`p-5 rounded-2xl border-2 space-y-2 ${
-                  isDark ? 'bg-stone-900 border-stone-800' : 'bg-white border-stone-200'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] uppercase font-black text-stone-500 tracking-wider">Total Income</span>
-                  <Coins className="w-5 h-5 text-emerald-600" />
-                </div>
-                <div className="text-2xl font-black text-emerald-700 dark:text-emerald-400">
-                  ₹ 7,34,333
-                </div>
-                <p className="text-[11px] text-stone-500">
-                  Voluntary Devotee Contributions + Corporate Sponsors + Commercial Stalls + Hundi
-                </p>
-              </div>
-
-              <div
-                className={`p-5 rounded-2xl border-2 space-y-2 ${
-                  isDark ? 'bg-stone-900 border-stone-800' : 'bg-white border-stone-200'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] uppercase font-black text-stone-500 tracking-wider">Total Expenses</span>
-                  <Receipt className="w-5 h-5 text-red-600" />
-                </div>
-                <div className="text-2xl font-black text-red-700 dark:text-red-400">
-                  ₹ 6,19,706.96
-                </div>
-                <p className="text-[11px] text-stone-500">
-                  100% bank-processed vendor &amp; supplier settlements
-                </p>
-              </div>
-
-              <div className="p-5 rounded-2xl border-2 border-amber-500/50 bg-gradient-to-br from-amber-500/10 via-yellow-500/5 to-transparent space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] uppercase font-black text-amber-800 dark:text-amber-300 tracking-wider">Closing Surplus</span>
-                  <TrendingUp className="w-5 h-5 text-amber-600" />
-                </div>
-                <div className="text-2xl font-black text-amber-700 dark:text-yellow-400">
-                  ₹ 1,14,626.04
-                </div>
-                <p className="text-[11px] text-amber-900/80 dark:text-amber-200/80 font-medium">
-                  Deposited in Fixed Deposit (FD) for future celebrations
-                </p>
-              </div>
-
-              <div
-                className={`p-5 rounded-2xl border-2 space-y-2 ${
-                  isDark ? 'bg-stone-900 border-stone-800' : 'bg-white border-stone-200'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] uppercase font-black text-stone-500 tracking-wider">Pending Receivables</span>
-                  <Clock className="w-5 h-5 text-blue-600" />
-                </div>
-                <div className="text-2xl font-black text-blue-700 dark:text-blue-400">
-                  ₹ 35,000
-                </div>
-                <p className="text-[11px] text-stone-500">
-                  Pending sponsor receivables under active follow-up
-                </p>
-              </div>
-            </div>
-
-            <div className="p-6 rounded-2xl bg-amber-500/10 border-2 border-amber-500/30 text-stone-900 dark:text-stone-100 space-y-2">
-              <div className="flex items-center gap-2 text-amber-800 dark:text-yellow-400 font-bold text-sm">
-                <ShieldCheck className="w-5 h-5 text-amber-600" />
-                <span>Verified Financial Audit &amp; Ledger Access</span>
-              </div>
-              <p className="text-xs sm:text-sm leading-relaxed text-stone-700 dark:text-stone-300">
-                You are signed in as a verified Balaga member. Every rupee collected and spent is documented in the digital ledger.
-              </p>
-            </div>
-
-            <div className="flex justify-center pt-2">
-              <button
-                onClick={onNavigateToFinancialStatement}
-                className="px-6 py-3.5 rounded-xl bg-red-700 hover:bg-red-800 text-yellow-300 font-bold text-xs sm:text-sm shadow-sm transition-all cursor-pointer inline-flex items-center gap-2"
-              >
-                <FileText className="w-4 h-4 text-yellow-300" />
-                <span>Open Full Itemized Income &amp; Expenditure Ledger</span>
-              </button>
-            </div>
-          </div>
-        ) : (
-          /* PUBLIC / NON-MEMBER VISITORS: FRIENDLY LOCK BANNER */
-          <div className="p-6 sm:p-8 rounded-3xl border-2 border-amber-300 bg-gradient-to-r from-amber-50 via-white to-amber-50 dark:from-stone-900 dark:via-stone-900 dark:to-stone-900 dark:border-stone-800 text-stone-900 dark:text-stone-100 shadow-xs space-y-4">
-            <div className="flex items-start gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-amber-400 text-stone-950 flex items-center justify-center shrink-0 shadow-xs">
-                <Lock className="w-6 h-6 text-[#991B1B]" />
-              </div>
-              <div className="space-y-1">
-                <h4 className="font-serif font-bold text-base sm:text-lg text-stone-900 dark:text-stone-100">
-                  Devotee Privacy &amp; Financial Statement Protection
-                </h4>
-                <p className="text-xs sm:text-sm text-stone-600 dark:text-stone-300 leading-relaxed">
-                  Public Overview Mode: Event details, photo gallery, and volunteer planner are open to all visitors. Detailed financial statements, itemized vendor accounts, and receipt search are restricted to verified Balaga members and admins.
-                </p>
-              </div>
-            </div>
-
-            <div className="pt-2 flex flex-wrap items-center gap-3">
-              {onRequestAccess && (
-                <button
-                  onClick={onRequestAccess}
-                  className="px-5 py-2.5 rounded-xl bg-[#991B1B] hover:bg-[#7F1D1D] text-white font-bold text-xs uppercase tracking-wider shadow-xs transition-all cursor-pointer inline-flex items-center gap-2"
-                >
-                  <PhoneCall className="w-4 h-4 text-amber-300" />
-                  <span>Contact Us / Request Member Access</span>
-                </button>
-              )}
-            </div>
-          </div>
-        )}
-      </section>
 
       {/* 4. FAQs Section */}
       <section className="space-y-4">

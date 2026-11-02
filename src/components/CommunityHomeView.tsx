@@ -55,7 +55,16 @@ import { BalagaPolicyModals } from './balaga/BalagaPolicyModals';
 import { BalagaLoginView } from './balaga/BalagaLoginView';
 import { BalagaEventDetailView } from './balaga/BalagaEventDetailView';
 import { AdminPortalView } from './AdminPortalView';
-import { auth, onAuthStateChanged, type User } from '../lib/firebase';
+import {
+  auth,
+  onAuthStateChanged,
+  type User,
+  cloudGetCommunityEvents,
+  cloudGetCommunityTeam,
+  cloudGetCommunityPhotos,
+  cloudGetCommunityAnnouncements,
+  cloudGetCommunityFormLinks
+} from '../lib/firebase';
 
 interface CommunityHomeViewProps {
   settings: AppSettings;
@@ -106,6 +115,41 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
     setFormLinks(getStoredFormLinks());
   };
 
+  // Continuous Cloud Sync on load
+  useEffect(() => {
+    async function loadCloudCommunityData() {
+      try {
+        const [cloudEvents, cloudTeam, cloudPhotos, cloudAnnouncements, cloudLinks] = await Promise.all([
+          cloudGetCommunityEvents(),
+          cloudGetCommunityTeam(),
+          cloudGetCommunityPhotos(),
+          cloudGetCommunityAnnouncements(),
+          cloudGetCommunityFormLinks()
+        ]);
+
+        if (cloudEvents && cloudEvents.length > 0) {
+          setAllEvents(cloudEvents);
+        }
+        if (cloudTeam && cloudTeam.length > 0) {
+          setTeamMembersList(cloudTeam);
+        }
+        if (cloudPhotos && cloudPhotos.length > 0) {
+          setPhotosList(cloudPhotos);
+        }
+        if (cloudAnnouncements && cloudAnnouncements.length > 0) {
+          setAnnouncementsList(cloudAnnouncements);
+        }
+        if (cloudLinks) {
+          setFormLinks(prev => ({ ...prev, ...cloudLinks }));
+        }
+      } catch (err) {
+        console.warn('Failed to load cloud community data:', err);
+      }
+    }
+
+    loadCloudCommunityData();
+  }, []);
+
   const { currentEvents, upcomingEvents, pastEvents } = classifyEvents(allEvents);
 
   // Target event for home page timer (next upcoming event or active event)
@@ -137,6 +181,7 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
       document.documentElement.classList.remove('dark');
     }
   }, [isDark]);
+
 
   // Route initial detection matching the 7 Sharavati reference pages + Admin Portal
   const getInitialTabFromLocation = (): { tab: CommunityPageTab; eventId?: string } => {
@@ -564,7 +609,9 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
                   </div>
 
                   <div>
-                    <h1 className="text-3xl sm:text-5xl lg:text-6xl font-serif font-black tracking-tight text-stone-950 dark:text-stone-100 leading-tight">
+                    <h1 className={`text-3xl sm:text-5xl lg:text-6xl font-serif font-black tracking-tight leading-tight ${
+                      isDark ? 'text-stone-100' : 'text-stone-950'
+                    }`}>
                       Kannadigara Balaga: Celebrating Our Heritage.
                     </h1>
                     <span className="text-base sm:text-xl font-serif font-bold text-red-700 dark:text-red-400 block mt-2">

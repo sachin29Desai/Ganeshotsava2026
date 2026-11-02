@@ -1209,6 +1209,134 @@ export async function cloudDeleteVolunteer(id: string): Promise<void> {
   }
 }
 
+// --- COMMUNITY WEBSITE DATA FIRESTORE PERSISTENCE ---
+
+export async function cloudSaveCommunityEvents(events: any[]): Promise<void> {
+  try {
+    const batch = writeBatch(db);
+    events.forEach((evt) => {
+      batch.set(doc(db, 'community_events', evt.id), {
+        ...evt,
+        updatedAt: new Date().toISOString()
+      });
+    });
+    await batch.commit();
+  } catch (err) {
+    console.error('Error saving community events to Firestore:', err);
+  }
+}
+
+export async function cloudGetCommunityEvents(): Promise<any[] | null> {
+  try {
+    const snap = await getDocs(collection(db, 'community_events'));
+    if (snap.empty) return null;
+    const items: any[] = [];
+    snap.forEach((d) => items.push({ id: d.id, ...d.data() }));
+    return items;
+  } catch (err) {
+    console.warn('Error fetching community events from Firestore:', err);
+    return null;
+  }
+}
+
+export async function cloudSaveCommunityTeam(team: any[]): Promise<void> {
+  try {
+    await setDoc(doc(db, 'settings', 'community_team'), { items: team, updatedAt: new Date().toISOString() });
+  } catch (err) {
+    console.error('Error saving community team to Firestore:', err);
+  }
+}
+
+export async function cloudGetCommunityTeam(): Promise<any[] | null> {
+  try {
+    const snap = await getDoc(doc(db, 'settings', 'community_team'));
+    if (snap.exists() && snap.data()?.items) {
+      return snap.data().items;
+    }
+    return null;
+  } catch (err) {
+    console.warn('Error fetching community team from Firestore:', err);
+    return null;
+  }
+}
+
+export async function cloudSaveCommunityPhotos(photos: any[]): Promise<void> {
+  try {
+    const batch = writeBatch(db);
+    photos.forEach((p) => {
+      batch.set(doc(db, 'community_photos', p.id), {
+        ...p,
+        updatedAt: new Date().toISOString()
+      });
+    });
+    await batch.commit();
+  } catch (err) {
+    console.error('Error saving community photos to Firestore:', err);
+  }
+}
+
+export async function cloudGetCommunityPhotos(): Promise<any[] | null> {
+  try {
+    const snap = await getDocs(collection(db, 'community_photos'));
+    if (snap.empty) return null;
+    const items: any[] = [];
+    snap.forEach((d) => items.push({ id: d.id, ...d.data() }));
+    return items;
+  } catch (err) {
+    console.warn('Error fetching community photos from Firestore:', err);
+    return null;
+  }
+}
+
+export async function cloudSaveCommunityAnnouncements(announcements: any[]): Promise<void> {
+  try {
+    const batch = writeBatch(db);
+    announcements.forEach((a) => {
+      batch.set(doc(db, 'community_announcements', a.id), {
+        ...a,
+        updatedAt: new Date().toISOString()
+      });
+    });
+    await batch.commit();
+  } catch (err) {
+    console.error('Error saving community announcements to Firestore:', err);
+  }
+}
+
+export async function cloudGetCommunityAnnouncements(): Promise<any[] | null> {
+  try {
+    const snap = await getDocs(collection(db, 'community_announcements'));
+    if (snap.empty) return null;
+    const items: any[] = [];
+    snap.forEach((d) => items.push({ id: d.id, ...d.data() }));
+    return items;
+  } catch (err) {
+    console.warn('Error fetching community announcements from Firestore:', err);
+    return null;
+  }
+}
+
+export async function cloudSaveCommunityFormLinks(links: any): Promise<void> {
+  try {
+    await setDoc(doc(db, 'settings', 'form_links'), { ...links, updatedAt: new Date().toISOString() });
+  } catch (err) {
+    console.error('Error saving form links to Firestore:', err);
+  }
+}
+
+export async function cloudGetCommunityFormLinks(): Promise<any | null> {
+  try {
+    const snap = await getDoc(doc(db, 'settings', 'form_links'));
+    if (snap.exists()) {
+      return snap.data();
+    }
+    return null;
+  } catch (err) {
+    console.warn('Error fetching form links from Firestore:', err);
+    return null;
+  }
+}
+
 // --- SECURE USER REGISTRATION, LOGIN & PASSWORD RESET WITH FIRESTORE BACKEND ---
 
 export async function cloudRegisterUser(data: {

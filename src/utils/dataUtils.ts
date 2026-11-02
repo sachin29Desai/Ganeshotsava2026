@@ -6,6 +6,12 @@ import {
   AnnouncementItem,
   ANNOUNCEMENTS
 } from '../data/communityData';
+import {
+  cloudSaveCommunityTeam,
+  cloudSaveCommunityPhotos,
+  cloudSaveCommunityAnnouncements,
+  cloudSaveCommunityFormLinks
+} from '../lib/firebase';
 
 const TEAM_MEMBERS_KEY = 'ekb_custom_team_members';
 const GALLERY_PHOTOS_KEY = 'ekb_custom_gallery_photos';
@@ -16,7 +22,7 @@ export function getStoredTeamMembers(): CommitteeMember[] {
     const raw = localStorage.getItem(TEAM_MEMBERS_KEY);
     if (raw !== null) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
+      if (Array.isArray(parsed) && parsed.length > 0) {
         return parsed;
       }
     }
@@ -32,6 +38,7 @@ export function saveStoredTeamMembers(members: CommitteeMember[]): void {
   } catch (err) {
     console.warn('Failed to save team members to storage:', err);
   }
+  cloudSaveCommunityTeam(members).catch((e) => console.warn('Cloud save team warning:', e));
 }
 
 export function getStoredPhotos(): GalleryPhoto[] {
@@ -39,7 +46,7 @@ export function getStoredPhotos(): GalleryPhoto[] {
     const raw = localStorage.getItem(GALLERY_PHOTOS_KEY);
     if (raw !== null) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
+      if (Array.isArray(parsed) && parsed.length > 0) {
         return parsed;
       }
     }
@@ -55,6 +62,7 @@ export function saveStoredPhotos(photos: GalleryPhoto[]): void {
   } catch (err) {
     console.warn('Failed to save gallery photos to storage:', err);
   }
+  cloudSaveCommunityPhotos(photos).catch((e) => console.warn('Cloud save photos warning:', e));
 }
 
 export function getStoredAnnouncements(): AnnouncementItem[] {
@@ -62,7 +70,7 @@ export function getStoredAnnouncements(): AnnouncementItem[] {
     const raw = localStorage.getItem(ANNOUNCEMENTS_KEY);
     if (raw !== null) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
+      if (Array.isArray(parsed) && parsed.length > 0) {
         return parsed;
       }
     }
@@ -78,6 +86,7 @@ export function saveStoredAnnouncements(announcements: AnnouncementItem[]): void
   } catch (err) {
     console.warn('Failed to save announcements to storage:', err);
   }
+  cloudSaveCommunityAnnouncements(announcements).catch((e) => console.warn('Cloud save announcements warning:', e));
 }
 
 export interface FormLinksConfig {
@@ -116,4 +125,6 @@ export function saveStoredFormLinks(links: FormLinksConfig): void {
   } catch (err) {
     console.warn('Failed to save form links to storage:', err);
   }
+  cloudSaveCommunityFormLinks(links).catch((e) => console.warn('Cloud save form links warning:', e));
 }
+

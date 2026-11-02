@@ -1,4 +1,5 @@
 import { CommunityEvent, COMMUNITY_EVENTS } from '../data/communityData';
+import { cloudSaveCommunityEvents, cloudGetCommunityEvents } from '../lib/firebase';
 
 /**
  * Calculates the status of an event based on current date relative to start and end dates.
@@ -80,7 +81,7 @@ export function getStoredEvents(): CommunityEvent[] {
     const raw = localStorage.getItem(CUSTOM_EVENTS_STORAGE_KEY);
     if (raw !== null) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
+      if (Array.isArray(parsed) && parsed.length > 0) {
         return parsed;
       }
     }
@@ -96,4 +97,6 @@ export function saveStoredEvents(events: CommunityEvent[]): void {
   } catch (err) {
     console.warn('Failed to save custom events to storage:', err);
   }
+  cloudSaveCommunityEvents(events).catch((e) => console.warn('Cloud save events warning:', e));
 }
+

@@ -437,7 +437,7 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
           isDark ? 'bg-stone-900/95 text-stone-100' : 'bg-white/95 text-stone-900'
         }`}
       >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4 relative">
           {/* Brand Logo & Name */}
           <div
             onClick={() => handleNavigateTab('home')}
@@ -498,44 +498,50 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
               <span>Menu</span>
             </button>
           </div>
-        </div>
 
-        {/* Simple List Navigation Dropdown */}
-        {mobileMenuOpen && (
-          <div className="border-t border-stone-200 dark:border-stone-800 p-4 sm:p-6 bg-white/98 dark:bg-stone-900/98 backdrop-blur-md shadow-2xl animate-in slide-in-from-top duration-200">
-            <div className="max-w-md mx-auto space-y-2">
-              <div className="flex items-center justify-between px-2 pb-2 border-b border-stone-100 dark:border-stone-800 text-[11px] font-bold text-stone-400 uppercase tracking-wider">
-                <span>Navigation Menu</span>
-                <span>ಕನ್ನಡಿಗರ ಬಳಗ</span>
+          {/* Relative Overlay Navigation Dropdown */}
+          {mobileMenuOpen && (
+            <>
+              {/* Backdrop listener to close when clicking outside */}
+              <div
+                className="fixed inset-0 z-40 bg-black/20 dark:bg-black/40 backdrop-blur-[1px]"
+                onClick={() => setMobileMenuOpen(false)}
+              />
+
+              <div className="absolute right-4 sm:right-6 top-full mt-2 z-50 w-72 sm:w-80 rounded-3xl border-2 border-red-600 bg-white dark:bg-stone-900 p-4 shadow-2xl animate-in fade-in slide-in-from-top-2 duration-150">
+                <div className="flex items-center justify-between px-2 pb-2.5 border-b border-stone-200 dark:border-stone-800 text-[11px] font-bold text-red-600 dark:text-yellow-400 uppercase tracking-wider">
+                  <span>Navigation Menu</span>
+                  <span>ಕನ್ನಡಿಗರ ಬಳಗ</span>
+                </div>
+                <ul className="mt-2 space-y-1">
+                  {navLinks.map((link) => {
+                    const isActive = activeTab === link.id;
+                    return (
+                      <li key={link.id}>
+                        <button
+                          onClick={() => handleNavigateTab(link.id)}
+                          className={`w-full py-2.5 px-3.5 rounded-xl text-left text-xs font-bold transition-all cursor-pointer flex items-center justify-between ${
+                            isActive
+                              ? 'bg-red-600 text-yellow-300 shadow-xs border border-yellow-400'
+                              : isDark
+                              ? 'text-stone-200 hover:bg-stone-800 hover:text-yellow-300'
+                              : 'text-stone-800 hover:bg-amber-50 hover:text-red-700'
+                          }`}
+                        >
+                          <span className="flex items-center gap-2">
+                            <span className={`w-2 h-2 rounded-full ${isActive ? 'bg-yellow-300' : 'bg-red-600'}`} />
+                            {link.label}
+                          </span>
+                          <ChevronRight className={`w-3.5 h-3.5 ${isActive ? 'text-yellow-300' : 'text-stone-400'}`} />
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
               </div>
-              <ul className="divide-y divide-stone-100 dark:divide-stone-800/80">
-                {navLinks.map((link) => {
-                  const isActive = activeTab === link.id;
-                  return (
-                    <li key={link.id}>
-                      <button
-                        onClick={() => handleNavigateTab(link.id)}
-                        className={`w-full py-3 px-4 rounded-2xl text-left text-sm font-bold transition-all cursor-pointer flex items-center justify-between ${
-                          isActive
-                            ? 'bg-red-600 text-yellow-300 shadow-md border border-yellow-400 my-1'
-                            : isDark
-                            ? 'text-stone-200 hover:bg-stone-800 hover:text-yellow-300'
-                            : 'text-stone-800 hover:bg-amber-50 hover:text-red-700'
-                        }`}
-                      >
-                        <span className="flex items-center gap-2.5">
-                          <span className={`w-2 h-2 rounded-full ${isActive ? 'bg-yellow-300' : 'bg-red-600'}`} />
-                          {link.label}
-                        </span>
-                        <ChevronRight className={`w-4 h-4 ${isActive ? 'text-yellow-300' : 'text-stone-400'}`} />
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          </div>
-        )}
+            </>
+          )}
+        </div>
       </header>
 
       {/* 2. MAIN BODY PAGES */}
@@ -937,25 +943,6 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
               ))}
             </div>
 
-            {/* Call to Volunteer Squad */}
-            <div className="p-8 rounded-3xl bg-amber-400 text-stone-950 flex flex-col sm:flex-row items-center justify-between gap-6 shadow-md">
-              <div className="space-y-1 text-center sm:text-left">
-                <h3 className="text-2xl font-serif font-black">Want to join our Volunteer Squad?</h3>
-                <p className="text-xs sm:text-sm text-stone-800">
-                  Enrol in Pooja, Stage Setup, Cultural Coordination, Prasadam serving, or Hospitality teams.
-                </p>
-              </div>
-
-              <button
-                onClick={() => {
-                  if (!currentUser) setAuthModalOpen(true);
-                  else setVolunteerModalOpen(true);
-                }}
-                className="px-6 py-3 rounded-xl bg-red-600 hover:bg-red-700 text-yellow-300 font-bold text-xs sm:text-sm shadow-md transition-all cursor-pointer border border-yellow-400 shrink-0"
-              >
-                Sign Up as Volunteer
-              </button>
-            </div>
           </div>
         )}
 

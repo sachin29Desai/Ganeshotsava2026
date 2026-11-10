@@ -89,7 +89,7 @@ export const StatementView: React.FC<StatementViewProps> = ({
   // Ganesha photo from festive video / showcase first photo
   const ganeshaPhotoUrl = (settings?.adminPhotos && settings.adminPhotos.length > 0 && settings.adminPhotos[0])
     ? settings.adminPhotos[0]
-    : '/Gemini_Generated_Image_jforcsjforcsjfor.png';
+    : '/bhuvaneshwari_kannada_flag.jpg';
 
   // Lighting & Decoration Vendor Payable Calculation
   const lightingData = getLightingAndDecorationExpense(expenses);

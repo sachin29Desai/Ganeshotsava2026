@@ -50,6 +50,7 @@ import {
   saveStoredTeamMembers,
   getStoredPhotos,
   saveStoredPhotos,
+  isSamplePhoto,
   getStoredAnnouncements,
   saveStoredAnnouncements,
   getStoredFormLinks,
@@ -190,8 +191,9 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
           saveStoredTeamMembers(cloudTeam);
         }
         if (cloudPhotos !== null) {
-          setPhotosList(cloudPhotos);
-          saveStoredPhotos(cloudPhotos);
+          const cleanPhotos = cloudPhotos.filter((p: any) => !isSamplePhoto(p));
+          setPhotosList(cleanPhotos);
+          saveStoredPhotos(cleanPhotos);
         }
         if (cloudAnnouncements !== null) {
           setAnnouncementsList(cloudAnnouncements);

@@ -41,13 +41,54 @@ export function saveStoredTeamMembers(members: CommitteeMember[]): void {
   cloudSaveCommunityTeam(members).catch((e) => console.warn('Cloud save team warning:', e));
 }
 
+export function isSamplePhoto(photo: any): boolean {
+  if (!photo) return true;
+  const title = (photo.title || photo.caption || photo.tag || photo.celebration || '').toLowerCase().trim();
+  const url = (photo.imageUrl || photo.url || '').toLowerCase();
+
+  if (url.includes('unsplash.com') || url.includes('gemini_generated_image')) {
+    return true;
+  }
+
+  const sampleKeywords = [
+    'sri ganesha maha pooja',
+    'floral alankara',
+    'karnataka flag hoisting',
+    'naadageethe',
+    'children folk dance',
+    'traditional attire',
+    'community mahaprasada',
+    'visarjana procession',
+    'kannada literature',
+    'poetry evening',
+    'deepavali 1,000',
+    'deepavali deepotsava',
+    'foundational balaga',
+    'grand stage alankara',
+    'ganesha chaturthi 2024',
+    'ganesha chaturthi 2025',
+    'ganesha chaturthi 2026',
+    'karnataka rajyotsava 2024',
+    'karnataka rajyotsava 2025'
+  ];
+
+  return sampleKeywords.some(keyword => title.includes(keyword));
+}
+
 export function getStoredPhotos(): GalleryPhoto[] {
   try {
     const raw = localStorage.getItem(GALLERY_PHOTOS_KEY);
     if (raw !== null) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) {
-        return parsed;
+        const clean = parsed.filter(p => !isSamplePhoto(p));
+        if (clean.length !== parsed.length) {
+          try {
+            localStorage.setItem(GALLERY_PHOTOS_KEY, JSON.stringify(clean));
+            cloudSaveCommunityPhotos(clean).catch(() => {});
+          } catch (e) {}
+        }
+        return clean;
       }
     }
   } catch (err) {

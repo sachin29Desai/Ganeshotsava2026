@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 import { CommunityEvent, GALLERY_PHOTOS, GalleryPhoto, GANESHA_FAQS } from '../../data/communityData';
 import { cloudGetCommunityPhotos } from '../../lib/firebase';
-import { getStoredPhotos } from '../../utils/dataUtils';
+import { getStoredPhotos, isSamplePhoto } from '../../utils/dataUtils';
 import { UserRole, UserProfile } from '../../types';
 
 interface BalagaEventDetailViewProps {
@@ -57,7 +57,7 @@ export const BalagaEventDetailView: React.FC<BalagaEventDetailViewProps> = ({
   isDark = false
 }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'gallery' | 'financials'>('overview');
-  const [customPhotos, setCustomPhotos] = useState<GalleryPhoto[]>(() => getStoredPhotos());
+  const [customPhotos, setCustomPhotos] = useState<GalleryPhoto[]>(() => getStoredPhotos().filter(p => !isSamplePhoto(p)));
   const [lightboxPhoto, setLightboxPhoto] = useState<GalleryPhoto | null>(null);
 
   // Load custom photos from Firestore
@@ -66,7 +66,7 @@ export const BalagaEventDetailView: React.FC<BalagaEventDetailViewProps> = ({
       try {
         const cloudPhotos = await cloudGetCommunityPhotos();
         if (cloudPhotos !== null) {
-          setCustomPhotos(cloudPhotos);
+          setCustomPhotos(cloudPhotos.filter((p: any) => !isSamplePhoto(p)));
         }
       } catch (err) {
         console.warn('Could not load firestore photos:', err);
@@ -112,7 +112,7 @@ export const BalagaEventDetailView: React.FC<BalagaEventDetailViewProps> = ({
       >
         <div className="relative h-56 sm:h-72 bg-gradient-to-r from-stone-900 via-red-950 to-stone-900 overflow-hidden">
           <img
-            src={event.posterImage || 'https://images.unsplash.com/photo-1567591370504-20a2e7c4f4a3?auto=format&fit=crop&w=1200&q=80'}
+            src={event.posterImage || '/bhuvaneshwari_kannada_flag.jpg'}
             alt={event.title}
             className="w-full h-full object-cover opacity-35 mix-blend-overlay scale-105"
           />

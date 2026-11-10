@@ -76,7 +76,7 @@ export const HISTORICAL_ERAS: HistoryEra[] = [
       { labelEn: 'Initial Attendees', labelKn: 'ಪ್ರಥಮ ಸಮಾರಂಭ', value: '300+' },
       { labelEn: 'Volunteers Enrolled', labelKn: 'ಸೇವಾರ್ಥಿ ಸ್ವಯಂಸೇವಕರು', value: '25' }
     ],
-    imageUrl: 'https://images.unsplash.com/photo-1532375810709-75b1da00537c?auto=format&fit=crop&w=1200&q=80',
+    imageUrl: '/bhuvaneshwari_kannada_flag.jpg',
     imageCaptionEn: 'Inaugural Gathering of Eldorado Kannadigara Balaga in 2024',
     imageCaptionKn: '೨೦೨೪ ರ ಪ್ರಥಮ ಕನ್ನಡಿಗರ ಬಳಗ ಸಭೆ'
   },
@@ -110,7 +110,7 @@ export const HISTORICAL_ERAS: HistoryEra[] = [
       { labelEn: 'Cultural Acts', labelKn: 'ಸಾಂಸ್ಕೃತಿಕ ಪ್ರದರ್ಶನಗಳು', value: '35+' },
       { labelEn: 'Donations Raised', labelKn: 'ನಿಧಿ ಸಂಗ್ರಹ', value: '₹1.8L+' }
     ],
-    imageUrl: 'https://images.unsplash.com/photo-1609345635867-27b036578768?auto=format&fit=crop&w=1200&q=80',
+    imageUrl: '/bhuvaneshwari_kannada_flag.jpg',
     imageCaptionEn: 'Sri Ganesha Mahotsava Puja & Mahaprasada Distribution 2025',
     imageCaptionKn: '೨೦೨೫ ರ ಗಣೇಶೋತ್ಸವ ಮಹಾಪೂಜೆ ಮತ್ತು ಮಹಾಪ್ರಸಾದ'
   },
@@ -142,7 +142,7 @@ export const HISTORICAL_ERAS: HistoryEra[] = [
       { labelEn: 'Volunteer Squad', labelKn: 'ಸ್ವಯಂಸೇವಕರ ತಂಡ', value: '60+' },
       { labelEn: 'Annual Events', labelKn: 'ವಾರ್ಷಿಕ ಆಚರಣೆಗಳು', value: '6' }
     ],
-    imageUrl: 'https://images.unsplash.com/photo-1567591370504-20a2e7c4f4a3?auto=format&fit=crop&w=1200&q=80',
+    imageUrl: '/bhuvaneshwari_kannada_flag.jpg',
     imageCaptionEn: 'Karnataka Rajyotsava Flag Hoisting & Cultural Celebration 2026',
     imageCaptionKn: '೨೦೨೬ ರ ಕನ್ನಡ ರಾಜ್ಯೋತ್ಸವ ಧ್ವಜಾರೋಹಣ ಮತ್ತು ಸಂಭ್ರಮ'
   },
@@ -177,7 +177,7 @@ export const HISTORICAL_ERAS: HistoryEra[] = [
       { labelEn: 'Kannada Kali Kids', labelKn: 'ಕನ್ನಡ ಕಲಿ ಮಕ್ಕಳು', value: '200+' },
       { labelEn: 'Charitable Trust', labelKn: 'ಕಲ್ಯಾಣ ನಿಧಿ', value: '100% Seva' }
     ],
-    imageUrl: 'https://images.unsplash.com/photo-1511632765486-a01980e01a18?auto=format&fit=crop&w=1200&q=80',
+    imageUrl: '/bhuvaneshwari_kannada_flag.jpg',
     imageCaptionEn: 'Vision 2030: Youth Learning & Cultural Excellence',
     imageCaptionKn: 'ಮುನ್ನೋಟ ೨೦೩೦: ಯುವ ಪೀಳಿಗೆಗೆ ಸಂಸ್ಕೃತಿ ತರಬೇತಿ'
   }

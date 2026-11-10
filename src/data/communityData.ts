@@ -98,7 +98,7 @@ export const COMMUNITY_EVENTS: CommunityEvent[] = [
     volunteersCount: 42,
     actsCount: 20,
     year: 2026,
-    posterImage: 'https://images.unsplash.com/photo-1532375810709-75b1da00537c?auto=format&fit=crop&w=1200&q=80',
+    posterImage: '/bhuvaneshwari_kannada_flag.jpg',
     description:
       'Upcoming 2-day celebration of Karnataka statehood day with red-and-yellow Karnataka flag hoisting, Naadageethe "Jaya Bharatha Jananiya Tanujathe", Dollu Kunitha folk arts, Kannada poetry, cultural stage shows, and traditional festive delights.',
     detailsOverview: `Day 1 Schedule (21st Nov 2026)
@@ -126,7 +126,7 @@ Day 2 Cultural Evening (22nd Nov 2026)
     volunteersCount: 48,
     actsCount: 16,
     year: 2026,
-    posterImage: 'https://images.unsplash.com/photo-1567591370504-20a2e7c4f4a3?auto=format&fit=crop&w=1200&q=80',
+    posterImage: '/bhuvaneshwari_kannada_flag.jpg',
     description:
       'Concluded grand Sri Ganesha Chaturthi celebration (completed on 18th of last month). The complete Income & Expenditure Statement, Financial Balance Sheet, and itemized accounts are published for public view and audit.',
     detailsOverview:
@@ -147,7 +147,7 @@ Day 2 Cultural Evening (22nd Nov 2026)
     volunteersCount: 32,
     actsCount: 16,
     year: 2025,
-    posterImage: 'https://images.unsplash.com/photo-1532375810709-75b1da00537c?auto=format&fit=crop&w=1200&q=80',
+    posterImage: '/bhuvaneshwari_kannada_flag.jpg',
     description:
       'Celebrated with grand Karnataka flag hoisting, Naadageethe, 16 cultural performances by children and families, and Mysore Pak distribution.',
     detailsOverview:
@@ -168,7 +168,7 @@ Day 2 Cultural Evening (22nd Nov 2026)
     volunteersCount: 45,
     actsCount: 22,
     year: 2025,
-    posterImage: 'https://images.unsplash.com/photo-1567591370504-20a2e7c4f4a3?auto=format&fit=crop&w=1200&q=80',
+    posterImage: '/bhuvaneshwari_kannada_flag.jpg',
     description:
       '5-day grand festival with clay idol, daily Atharvashirsha chantings, cultural dance and vocal performances, and community Mahaprasada for 1,200+ residents.',
     detailsOverview:
@@ -189,7 +189,7 @@ Day 2 Cultural Evening (22nd Nov 2026)
     volunteersCount: 24,
     actsCount: 12,
     year: 2024,
-    posterImage: 'https://images.unsplash.com/photo-1532375810709-75b1da00537c?auto=format&fit=crop&w=1200&q=80',
+    posterImage: '/bhuvaneshwari_kannada_flag.jpg',
     description:
       'Inaugural Karnataka Rajyotsava celebration of Eldorado Kannadigara Balaga with flag hoisting, folk songs, Kannada quiz, and cultural evening.',
     detailsOverview:
@@ -210,7 +210,7 @@ Day 2 Cultural Evening (22nd Nov 2026)
     volunteersCount: 38,
     actsCount: 15,
     year: 2024,
-    posterImage: 'https://images.unsplash.com/photo-1567591370504-20a2e7c4f4a3?auto=format&fit=crop&w=1200&q=80',
+    posterImage: '/bhuvaneshwari_kannada_flag.jpg',
     description:
       'First historic 5-day Sri Ganesha Chaturthi celebration by Eldorado Kannadigara Balaga residents, creating an annual tradition of devotional unity.',
     detailsOverview:
@@ -222,61 +222,51 @@ export const COMMITTEE_MEMBERS: CommitteeMember[] = [
   {
     name: 'Rajesh Kumar',
     role: 'President',
-    photoUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=600&q=80',
     initials: 'RK'
   },
   {
     name: 'Suresh Patil',
     role: 'Vice President',
-    photoUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=600&q=80',
     initials: 'SP'
   },
   {
     name: 'Anand Hegde',
     role: 'General Secretary',
-    photoUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=600&q=80',
     initials: 'AH'
   },
   {
     name: 'Pradeep Gowda',
     role: 'Treasurer',
-    photoUrl: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&w=600&q=80',
     initials: 'PG'
   },
   {
     name: 'Kiran Rao',
     role: 'Cultural Lead',
-    photoUrl: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=600&q=80',
     initials: 'KR'
   },
   {
     name: 'Mahesh Murthy',
     role: 'Youth Lead',
-    photoUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&q=80',
     initials: 'MM'
   },
   {
     name: 'Sunita Sharma',
     role: 'Volunteers Lead',
-    photoUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=600&q=80',
     initials: 'SS'
   },
   {
     name: 'Venkatesh Bhat',
     role: 'Pooja Coordinator',
-    photoUrl: 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?auto=format&fit=crop&w=600&q=80',
     initials: 'VB'
   },
   {
     name: 'Prakash Naik',
     role: 'Stage & Logistics',
-    photoUrl: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=600&q=80',
     initials: 'PN'
   },
   {
     name: 'Dinesh Kulkarni',
     role: 'Operations Lead',
-    photoUrl: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=600&q=80',
     initials: 'DK'
   }
 ];

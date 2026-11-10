@@ -19,7 +19,8 @@ import {
   Sparkles,
   Lock
 } from 'lucide-react';
-import { CommunityEvent, GALLERY_PHOTOS, GalleryPhoto } from '../../data/communityData';
+import { CommunityEvent, GalleryPhoto } from '../../data/communityData';
+import { getStoredPhotos, isSamplePhoto } from '../../utils/dataUtils';
 import { EventCustomInfo } from './EventInfoAndPhotosEditorModal';
 
 interface PastEventViewProps {
@@ -44,18 +45,17 @@ export const PastEventView: React.FC<PastEventViewProps> = ({
   const [activeTab, setActiveTab] = useState<'highlights' | 'financials' | 'gallery'>('highlights');
   const [lightboxPhoto, setLightboxPhoto] = useState<GalleryPhoto | null>(null);
 
-  // Photos resolution: customInfo override or default gallery photos for this event
-  const defaultEventPhotos = GALLERY_PHOTOS.filter(
+  // Photos resolution: customInfo override or saved database photos for this event
+  const allCleanPhotos = getStoredPhotos().filter(p => !isSamplePhoto(p));
+  const defaultEventPhotos = allCleanPhotos.filter(
     (p) =>
-      p.celebration.toLowerCase().includes(event.festival.toLowerCase()) ||
+      (p.celebration || '').toLowerCase().includes((event.festival || '').toLowerCase()) ||
       p.year === event.year ||
-      p.tag.toLowerCase().includes(event.festival.toLowerCase())
+      (p.tag || '').toLowerCase().includes((event.festival || '').toLowerCase())
   );
   const eventPhotos = customInfo?.photos && customInfo.photos.length > 0
-    ? customInfo.photos
-    : defaultEventPhotos.length > 0
-    ? defaultEventPhotos
-    : GALLERY_PHOTOS.slice(0, 6);
+    ? customInfo.photos.filter(p => !isSamplePhoto(p))
+    : defaultEventPhotos;
 
   // Dynamic Event Metadata
   const displayTitle = customInfo?.title || event.title;
@@ -108,7 +108,7 @@ export const PastEventView: React.FC<PastEventViewProps> = ({
       >
         <div className="relative h-52 sm:h-72 bg-gradient-to-r from-stone-950 via-red-950 to-amber-950 overflow-hidden">
           <img
-            src={event.posterImage || 'https://images.unsplash.com/photo-1567591370504-20a2e7c4f4a3?auto=format&fit=crop&w=1200&q=80'}
+            src={event.posterImage || '/bhuvaneshwari_kannada_flag.jpg'}
             alt={displayTitle}
             className="w-full h-full object-cover opacity-35 mix-blend-overlay scale-105"
           />

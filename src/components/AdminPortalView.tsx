@@ -271,7 +271,7 @@ export const AdminPortalView: React.FC<AdminPortalViewProps> = ({
       status: 'upcoming',
       description: '',
       detailsOverview: '',
-      posterImage: 'https://images.unsplash.com/photo-1532375810709-75b1da00537c?auto=format&fit=crop&w=1200&q=80',
+      posterImage: '',
       year: new Date().getFullYear(),
       volunteersCount: 20,
       actsCount: 10
@@ -341,7 +341,7 @@ export const AdminPortalView: React.FC<AdminPortalViewProps> = ({
     setTeamForm({
       name: '',
       role: '',
-      photoUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=600&q=80',
+      photoUrl: '',
       initials: ''
     });
     setIsTeamModalOpen(true);
@@ -401,7 +401,7 @@ export const AdminPortalView: React.FC<AdminPortalViewProps> = ({
       celebration: events[0]?.title || 'Ganesha Chaturthi 2026',
       year: new Date().getFullYear(),
       tag: 'Festive Moment',
-      imageUrl: 'https://images.unsplash.com/photo-1567591370504-20a2e7c4f4a3?auto=format&fit=crop&w=800&q=80',
+      imageUrl: '',
       caption: ''
     });
     setIsPhotoModalOpen(true);

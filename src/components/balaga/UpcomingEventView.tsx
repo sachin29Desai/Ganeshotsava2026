@@ -100,7 +100,7 @@ export const UpcomingEventView: React.FC<UpcomingEventViewProps> = ({
         {/* Banner image overlay */}
         <div className="relative h-56 sm:h-72 bg-gradient-to-r from-red-900 via-amber-900 to-yellow-800 overflow-hidden">
           <img
-            src={event.posterImage || 'https://images.unsplash.com/photo-1532375810709-75b1da00537c?auto=format&fit=crop&w=1200&q=80'}
+            src={event.posterImage || '/bhuvaneshwari_kannada_flag.jpg'}
             alt={displayTitle}
             className="w-full h-full object-cover opacity-35 mix-blend-overlay scale-105"
           />

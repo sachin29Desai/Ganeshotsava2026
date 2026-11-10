@@ -22,6 +22,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { AppSettings } from '../types';
+import { getStoredPhotos } from '../utils/dataUtils';
 
 interface GaneshaFestivalVideoShowcaseProps {
   compact?: boolean;
@@ -134,7 +135,21 @@ export const GaneshaFestivalVideoShowcase: React.FC<GaneshaFestivalVideoShowcase
       });
     }
 
-    // 3. Add custom admin photos configured in settings
+    // 3. Add custom admin photos uploaded in Admin Portal
+    const storedPhotos = getStoredPhotos();
+    if (storedPhotos && Array.isArray(storedPhotos)) {
+      storedPhotos.forEach((p, idx) => {
+        if (p.imageUrl) {
+          list.push({
+            id: `stored_photo_${p.id || idx}`,
+            type: 'photo',
+            url: p.imageUrl,
+            caption: p.title || p.caption || `Celebration Photo ${idx + 1}`
+          });
+        }
+      });
+    }
+
     if (settings?.adminPhotos && Array.isArray(settings.adminPhotos)) {
       settings.adminPhotos.forEach((url, i) => {
         if (url) {
@@ -148,34 +163,14 @@ export const GaneshaFestivalVideoShowcase: React.FC<GaneshaFestivalVideoShowcase
       });
     }
 
-    // 4. Fallback defaults featuring user's Goddess Bhuvaneshwari & Karnataka Flag photo
+    // 4. Clean fallback featuring Goddess Bhuvaneshwari & Karnataka Flag photo
     if (list.length === 0) {
-      list.push(
-        {
-          id: 'def_bhuvaneshwari',
-          type: 'photo',
-          url: '/bhuvaneshwari_kannada_flag.jpg',
-          caption: 'ಶ್ರೀ ತಾಯಿ ಭುವನೇಶ್ವರಿ ದೇವಿ - Goddess Bhuvaneshwari Devi & Karnataka Flag'
-        },
-        {
-          id: 'def_altar',
-          type: 'photo',
-          url: '/Gemini_Generated_Image_jforcsjforcsjfor.png',
-          caption: 'Sri Ganesha Divine Altar Alankara'
-        },
-        {
-          id: 'def_dollu',
-          type: 'photo',
-          url: 'https://images.unsplash.com/photo-1609137144820-21151ef34a02?auto=format&fit=crop&w=1200&q=80',
-          caption: 'Folk Cultural Procession & Dollu Kunitha'
-        },
-        {
-          id: 'def_cultural',
-          type: 'photo',
-          url: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=1200&q=80',
-          caption: 'Grand Cultural Stage Performance & Dance Recital'
-        }
-      );
+      list.push({
+        id: 'def_bhuvaneshwari',
+        type: 'photo',
+        url: '/bhuvaneshwari_kannada_flag.jpg',
+        caption: 'ಶ್ರೀ ತಾಯಿ ಭುವನೇಶ್ವರಿ ದೇವಿ - Goddess Bhuvaneshwari Devi & Karnataka Flag'
+      });
     }
 
     return list;

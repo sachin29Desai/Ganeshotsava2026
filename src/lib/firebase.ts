@@ -563,135 +563,180 @@ export async function cloudSaveExpense(expense: Expense) {
   try {
     const prepared = await prepareExpenseForStorage(expense);
     await setDoc(doc(db, 'expenses', prepared.id), { ...prepared, updatedAt: new Date().toISOString() });
-  } catch (err) {
-    console.error('Error saving expense to Firestore:', err);
-    throw err;
+  } catch (err: any) {
+    if (isQuotaExceededError(err)) {
+      console.warn('Firestore daily write quota reached for expenses. Saved to local storage.');
+    } else {
+      console.error('Error saving expense to Firestore:', err);
+    }
   }
 }
 
 export async function cloudDeleteExpense(id: string) {
   try {
     await deleteDoc(doc(db, 'expenses', id));
-  } catch (err) {
-    console.error('Error deleting expense from Firestore:', err);
-    throw err;
+  } catch (err: any) {
+    if (isQuotaExceededError(err)) {
+      console.warn('Firestore daily write quota reached for expenses deletion.');
+    } else {
+      console.error('Error deleting expense from Firestore:', err);
+    }
   }
 }
 
 export async function cloudSaveContribution(contribution: Contribution) {
   try {
     await setDoc(doc(db, 'contributions', contribution.id), { ...contribution, updatedAt: new Date().toISOString() });
-  } catch (err) {
-    console.error('Error saving contribution to Firestore:', err);
-    throw err;
+  } catch (err: any) {
+    if (isQuotaExceededError(err)) {
+      console.warn('Firestore daily write quota reached for contributions. Saved to local storage.');
+    } else {
+      console.error('Error saving contribution to Firestore:', err);
+    }
   }
 }
 
 export async function cloudDeleteContribution(id: string) {
   try {
     await deleteDoc(doc(db, 'contributions', id));
-  } catch (err) {
-    console.error('Error deleting contribution from Firestore:', err);
-    throw err;
+  } catch (err: any) {
+    if (isQuotaExceededError(err)) {
+      console.warn('Firestore daily write quota reached for contribution deletion.');
+    } else {
+      console.error('Error deleting contribution from Firestore:', err);
+    }
   }
 }
 
 export async function cloudSaveSponsor(sponsor: Sponsor) {
   try {
     await setDoc(doc(db, 'sponsors', sponsor.id), { ...sponsor, updatedAt: new Date().toISOString() });
-  } catch (err) {
-    console.error('Error saving sponsor to Firestore:', err);
-    throw err;
+  } catch (err: any) {
+    if (isQuotaExceededError(err)) {
+      console.warn('Firestore daily write quota reached for sponsors. Saved to local storage.');
+    } else {
+      console.error('Error saving sponsor to Firestore:', err);
+    }
   }
 }
 
 export async function cloudDeleteSponsor(id: string) {
   try {
     await deleteDoc(doc(db, 'sponsors', id));
-  } catch (err) {
-    console.error('Error deleting sponsor from Firestore:', err);
-    throw err;
+  } catch (err: any) {
+    if (isQuotaExceededError(err)) {
+      console.warn('Firestore daily write quota reached for sponsor deletion.');
+    } else {
+      console.error('Error deleting sponsor from Firestore:', err);
+    }
   }
 }
 
 export async function cloudSaveCommercialStall(stall: CommercialStall) {
   try {
     await setDoc(doc(db, 'commercialStalls', stall.id), { ...stall, updatedAt: new Date().toISOString() });
-  } catch (err) {
-    console.error('Error saving commercial stall to Firestore:', err);
-    throw err;
+  } catch (err: any) {
+    if (isQuotaExceededError(err)) {
+      console.warn('Firestore daily write quota reached for commercialStalls. Saved to local storage.');
+    } else {
+      console.error('Error saving commercial stall to Firestore:', err);
+    }
   }
 }
 
 export async function cloudDeleteCommercialStall(id: string) {
   try {
     await deleteDoc(doc(db, 'commercialStalls', id));
-  } catch (err) {
-    console.error('Error deleting commercial stall from Firestore:', err);
-    throw err;
+  } catch (err: any) {
+    if (isQuotaExceededError(err)) {
+      console.warn('Firestore daily write quota reached for stall deletion.');
+    } else {
+      console.error('Error deleting commercial stall from Firestore:', err);
+    }
   }
 }
 
 export async function cloudSaveHundi(hundi: HundiCollection) {
   try {
     await setDoc(doc(db, 'hundi', hundi.id), { ...hundi, updatedAt: new Date().toISOString() });
-  } catch (err) {
-    console.error('Error saving hundi record to Firestore:', err);
-    throw err;
+  } catch (err: any) {
+    if (isQuotaExceededError(err)) {
+      console.warn('Firestore daily write quota reached for hundi. Saved to local storage.');
+    } else {
+      console.error('Error saving hundi record to Firestore:', err);
+    }
   }
 }
 
 export async function cloudDeleteHundi(id: string) {
   try {
     await deleteDoc(doc(db, 'hundi', id));
-  } catch (err) {
-    console.error('Error deleting hundi record from Firestore:', err);
-    throw err;
+  } catch (err: any) {
+    if (isQuotaExceededError(err)) {
+      console.warn('Firestore daily write quota reached for hundi deletion.');
+    } else {
+      console.error('Error deleting hundi record from Firestore:', err);
+    }
   }
 }
 
 export async function cloudSaveSeva(seva: SevaBooking) {
   try {
     await setDoc(doc(db, 'sevas', seva.id), { ...seva, updatedAt: new Date().toISOString() });
-  } catch (err) {
-    console.error('Error saving seva booking to Firestore:', err);
-    throw err;
+  } catch (err: any) {
+    if (isQuotaExceededError(err)) {
+      console.warn('Firestore daily write quota reached for sevas. Saved to local storage.');
+    } else {
+      console.error('Error saving seva booking to Firestore:', err);
+    }
   }
 }
 
 export async function cloudDeleteSeva(id: string) {
   try {
     await deleteDoc(doc(db, 'sevas', id));
-  } catch (err) {
-    console.error('Error deleting seva booking from Firestore:', err);
-    throw err;
+  } catch (err: any) {
+    if (isQuotaExceededError(err)) {
+      console.warn('Firestore daily write quota reached for seva deletion.');
+    } else {
+      console.error('Error deleting seva booking from Firestore:', err);
+    }
   }
 }
 
 export async function cloudSaveSevaCatalogueItem(item: SevaCatalogueItem) {
   try {
     await setDoc(doc(db, 'sevaCatalogue', item.id), item);
-  } catch (err) {
-    console.error('Error saving seva catalogue item to Firestore:', err);
-    throw err;
+  } catch (err: any) {
+    if (isQuotaExceededError(err)) {
+      console.warn('Firestore daily write quota reached for sevaCatalogue. Saved to local storage.');
+    } else {
+      console.error('Error saving seva catalogue item to Firestore:', err);
+    }
   }
 }
 
 export async function cloudDeleteSevaCatalogueItem(id: string) {
   try {
     await deleteDoc(doc(db, 'sevaCatalogue', id));
-  } catch (err) {
-    console.error('Error deleting seva catalogue item from Firestore:', err);
-    throw err;
+  } catch (err: any) {
+    if (isQuotaExceededError(err)) {
+      console.warn('Firestore daily write quota reached for seva catalogue deletion.');
+    } else {
+      console.error('Error deleting seva catalogue item from Firestore:', err);
+    }
   }
 }
 
 export async function cloudSaveSettings(settings: AppSettings) {
   try {
     await setDoc(doc(db, 'settings', 'config'), settings);
-  } catch (err) {
-    console.error('Error saving settings to Firestore:', err);
-    throw err;
+  } catch (err: any) {
+    if (isQuotaExceededError(err)) {
+      console.warn('Firestore daily write quota reached for settings. Saved to local storage.');
+    } else {
+      console.error('Error saving settings to Firestore:', err);
+    }
   }
 }
 
@@ -1214,25 +1259,40 @@ export async function cloudDeleteVolunteer(id: string): Promise<void> {
 export async function cloudSaveCommunityEvents(events: any[]): Promise<void> {
   try {
     const snap = await getDocs(collection(db, 'community_events'));
+    const existingMap = new Map<string, any>();
+    snap.forEach((d) => existingMap.set(d.id, d.data()));
+
     const currentIds = new Set(events.map((evt) => evt.id));
     const batch = writeBatch(db);
+    let opCount = 0;
 
-    snap.forEach((d) => {
-      if (!currentIds.has(d.id)) {
-        batch.delete(d.ref);
+    existingMap.forEach((_, id) => {
+      if (!currentIds.has(id)) {
+        batch.delete(doc(db, 'community_events', id));
+        opCount++;
       }
     });
 
     events.forEach((evt) => {
-      batch.set(doc(db, 'community_events', evt.id), {
-        ...evt,
-        updatedAt: new Date().toISOString()
-      });
+      const existing = existingMap.get(evt.id);
+      if (!existing || existing.title !== evt.title || existing.startDate !== evt.startDate || existing.endDate !== evt.endDate || existing.description !== evt.description) {
+        batch.set(doc(db, 'community_events', evt.id), {
+          ...evt,
+          updatedAt: new Date().toISOString()
+        });
+        opCount++;
+      }
     });
 
-    await batch.commit();
-  } catch (err) {
-    console.error('Error saving community events to Firestore:', err);
+    if (opCount > 0) {
+      await batch.commit();
+    }
+  } catch (err: any) {
+    if (isQuotaExceededError(err)) {
+      console.warn('Firestore daily write quota reached for community_events. Saved to local storage.');
+    } else {
+      console.error('Error saving community events to Firestore:', err);
+    }
   }
 }
 
@@ -1250,17 +1310,30 @@ export async function cloudGetCommunityEvents(): Promise<any[] | null> {
       }
     });
     return items;
-  } catch (err) {
-    console.warn('Error fetching community events from Firestore:', err);
+  } catch (err: any) {
+    if (isQuotaExceededError(err)) {
+      console.warn('Firestore daily read quota reached for community_events. Using local storage data.');
+    } else {
+      console.warn('Error fetching community events from Firestore:', err);
+    }
     return null;
   }
 }
 
 export async function cloudSaveCommunityTeam(team: any[]): Promise<void> {
   try {
+    const snap = await getDoc(doc(db, 'settings', 'community_team'));
+    const existing = snap.exists() ? snap.data()?.items : null;
+    if (existing && JSON.stringify(existing) === JSON.stringify(team)) {
+      return;
+    }
     await setDoc(doc(db, 'settings', 'community_team'), { items: team, updatedAt: new Date().toISOString() });
-  } catch (err) {
-    console.error('Error saving community team to Firestore:', err);
+  } catch (err: any) {
+    if (isQuotaExceededError(err)) {
+      console.warn('Firestore daily write quota reached for community_team. Saved to local storage.');
+    } else {
+      console.error('Error saving community team to Firestore:', err);
+    }
   }
 }
 
@@ -1271,8 +1344,12 @@ export async function cloudGetCommunityTeam(): Promise<any[] | null> {
       return snap.data().items;
     }
     return snap.exists() ? [] : null;
-  } catch (err) {
-    console.warn('Error fetching community team from Firestore:', err);
+  } catch (err: any) {
+    if (isQuotaExceededError(err)) {
+      console.warn('Firestore daily read quota reached for community_team. Using local storage data.');
+    } else {
+      console.warn('Error fetching community team from Firestore:', err);
+    }
     return null;
   }
 }
@@ -1280,26 +1357,65 @@ export async function cloudGetCommunityTeam(): Promise<any[] | null> {
 export async function cloudSaveCommunityPhotos(photos: any[]): Promise<void> {
   try {
     const snap = await getDocs(collection(db, 'community_photos'));
+    const existingMap = new Map<string, any>();
+    snap.forEach((d) => existingMap.set(d.id, d.data()));
+
     const currentIds = new Set(photos.map((p) => p.id));
     const batch = writeBatch(db);
+    let opCount = 0;
 
-    snap.forEach((d) => {
-      if (!currentIds.has(d.id)) {
-        batch.delete(d.ref);
+    existingMap.forEach((_, id) => {
+      if (!currentIds.has(id)) {
+        batch.delete(doc(db, 'community_photos', id));
+        opCount++;
       }
     });
 
     photos.forEach((p) => {
-      batch.set(doc(db, 'community_photos', p.id), {
-        ...p,
-        updatedAt: new Date().toISOString()
-      });
+      const existing = existingMap.get(p.id);
+      if (!existing || existing.imageUrl !== p.imageUrl || existing.title !== p.title || existing.celebration !== p.celebration) {
+        batch.set(doc(db, 'community_photos', p.id), {
+          ...p,
+          updatedAt: new Date().toISOString()
+        });
+        opCount++;
+      }
     });
 
-    await batch.commit();
-  } catch (err) {
-    console.error('Error saving community photos to Firestore:', err);
+    if (opCount > 0) {
+      await batch.commit();
+    }
+  } catch (err: any) {
+    if (isQuotaExceededError(err)) {
+      console.warn('Firestore daily write quota reached for community_photos. Saved to local storage.');
+    } else {
+      console.error('Error saving community photos to Firestore:', err);
+    }
   }
+}
+
+function isFirebaseSamplePhoto(photo: any): boolean {
+  if (!photo) return true;
+  const title = (photo.title || photo.caption || photo.tag || photo.celebration || '').toLowerCase().trim();
+  const url = (photo.imageUrl || photo.url || '').toLowerCase();
+  if (url.includes('unsplash.com') || url.includes('gemini_generated_image')) return true;
+  const sampleKeywords = [
+    'sri ganesha maha pooja',
+    'floral alankara',
+    'karnataka flag hoisting',
+    'naadageethe',
+    'children folk dance',
+    'traditional attire',
+    'community mahaprasada',
+    'visarjana procession',
+    'kannada literature',
+    'poetry evening',
+    'deepavali 1,000',
+    'deepavali deepotsava',
+    'foundational balaga',
+    'grand stage alankara'
+  ];
+  return sampleKeywords.some(kw => title.includes(kw));
 }
 
 export async function cloudGetCommunityPhotos(): Promise<any[] | null> {
@@ -1310,14 +1426,18 @@ export async function cloudGetCommunityPhotos(): Promise<any[] | null> {
     const seenIds = new Set<string>();
     snap.forEach((d) => {
       const data = { id: d.id, ...d.data() };
-      if (!seenIds.has(d.id)) {
+      if (!seenIds.has(d.id) && !isFirebaseSamplePhoto(data)) {
         seenIds.add(d.id);
         items.push(data);
       }
     });
     return items;
-  } catch (err) {
-    console.warn('Error fetching community photos from Firestore:', err);
+  } catch (err: any) {
+    if (isQuotaExceededError(err)) {
+      console.warn('Firestore daily read quota reached for community_photos. Using local storage data.');
+    } else {
+      console.warn('Error fetching community photos from Firestore:', err);
+    }
     return null;
   }
 }
@@ -1325,25 +1445,40 @@ export async function cloudGetCommunityPhotos(): Promise<any[] | null> {
 export async function cloudSaveCommunityAnnouncements(announcements: any[]): Promise<void> {
   try {
     const snap = await getDocs(collection(db, 'community_announcements'));
+    const existingMap = new Map<string, any>();
+    snap.forEach((d) => existingMap.set(d.id, d.data()));
+
     const currentIds = new Set(announcements.map((a) => a.id));
     const batch = writeBatch(db);
+    let opCount = 0;
 
-    snap.forEach((d) => {
-      if (!currentIds.has(d.id)) {
-        batch.delete(d.ref);
+    existingMap.forEach((_, id) => {
+      if (!currentIds.has(id)) {
+        batch.delete(doc(db, 'community_announcements', id));
+        opCount++;
       }
     });
 
     announcements.forEach((a) => {
-      batch.set(doc(db, 'community_announcements', a.id), {
-        ...a,
-        updatedAt: new Date().toISOString()
-      });
+      const existing = existingMap.get(a.id);
+      if (!existing || existing.title !== a.title || existing.summary !== a.summary || existing.content !== a.content) {
+        batch.set(doc(db, 'community_announcements', a.id), {
+          ...a,
+          updatedAt: new Date().toISOString()
+        });
+        opCount++;
+      }
     });
 
-    await batch.commit();
-  } catch (err) {
-    console.error('Error saving community announcements to Firestore:', err);
+    if (opCount > 0) {
+      await batch.commit();
+    }
+  } catch (err: any) {
+    if (isQuotaExceededError(err)) {
+      console.warn('Firestore daily write quota reached for community_announcements. Saved to local storage.');
+    } else {
+      console.error('Error saving community announcements to Firestore:', err);
+    }
   }
 }
 
@@ -1361,17 +1496,30 @@ export async function cloudGetCommunityAnnouncements(): Promise<any[] | null> {
       }
     });
     return items;
-  } catch (err) {
-    console.warn('Error fetching community announcements from Firestore:', err);
+  } catch (err: any) {
+    if (isQuotaExceededError(err)) {
+      console.warn('Firestore daily read quota reached for community_announcements. Using local storage data.');
+    } else {
+      console.warn('Error fetching community announcements from Firestore:', err);
+    }
     return null;
   }
 }
 
 export async function cloudSaveCommunityFormLinks(links: any): Promise<void> {
   try {
+    const snap = await getDoc(doc(db, 'settings', 'form_links'));
+    const existing = snap.exists() ? snap.data() : null;
+    if (existing && existing.membershipFormUrl === links.membershipFormUrl && existing.volunteerFormUrl === links.volunteerFormUrl && existing.nominationFormUrl === links.nominationFormUrl && existing.homeYoutubeUrl === links.homeYoutubeUrl && existing.defaultTheme === links.defaultTheme) {
+      return;
+    }
     await setDoc(doc(db, 'settings', 'form_links'), { ...links, updatedAt: new Date().toISOString() });
-  } catch (err) {
-    console.error('Error saving form links to Firestore:', err);
+  } catch (err: any) {
+    if (isQuotaExceededError(err)) {
+      console.warn('Firestore daily write quota reached for form_links. Saved to local storage.');
+    } else {
+      console.error('Error saving form links to Firestore:', err);
+    }
   }
 }
 

@@ -90,45 +90,45 @@ export const RequestDetailsModal: React.FC<RequestDetailsModalProps> = ({
                 <span>Verified Devotee Profile</span>
               </h4>
 
-              <div className="space-y-2.5 text-xs text-stone-800">
+              <div className="space-y-2.5 text-xs text-stone-800 dark:text-stone-200">
                 <div className="flex items-start gap-2.5">
-                  <User className="w-4 h-4 text-[#991B1B] shrink-0 mt-0.5" />
+                  <User className="w-4 h-4 text-[#991B1B] dark:text-amber-400 shrink-0 mt-0.5" />
                   <div>
-                    <span className="block text-[10px] text-stone-500 font-bold uppercase tracking-wider">Full Name</span>
-                    <span className="font-semibold text-stone-900">{userProfile?.name || 'Not Registered'}</span>
+                    <span className="block text-[10px] text-stone-500 dark:text-stone-400 font-bold uppercase tracking-wider">Full Name</span>
+                    <span className="font-semibold text-stone-900 dark:text-stone-100">{userProfile?.name || 'Not Registered'}</span>
                   </div>
                 </div>
 
                 <div className="flex items-start gap-2.5">
-                  <Home className="w-4 h-4 text-[#991B1B] shrink-0 mt-0.5" />
+                  <Home className="w-4 h-4 text-[#991B1B] dark:text-amber-400 shrink-0 mt-0.5" />
                   <div>
-                    <span className="block text-[10px] text-stone-500 font-bold uppercase tracking-wider">Flat / Unit Number</span>
-                    <span className="font-semibold text-stone-900 font-mono">{userProfile?.flat || 'N/A'}</span>
+                    <span className="block text-[10px] text-stone-500 dark:text-stone-400 font-bold uppercase tracking-wider">Flat / Unit Number</span>
+                    <span className="font-semibold text-stone-900 dark:text-stone-100 font-mono">{userProfile?.flat || 'N/A'}</span>
                   </div>
                 </div>
 
                 <div className="flex items-start gap-2.5">
-                  <Phone className="w-4 h-4 text-[#991B1B] shrink-0 mt-0.5" />
+                  <Phone className="w-4 h-4 text-[#991B1B] dark:text-amber-400 shrink-0 mt-0.5" />
                   <div>
-                    <span className="block text-[10px] text-stone-500 font-bold uppercase tracking-wider">Mobile Number</span>
-                    <span className="font-semibold text-stone-900 font-mono">{userProfile?.mobile || 'N/A'}</span>
+                    <span className="block text-[10px] text-stone-500 dark:text-stone-400 font-bold uppercase tracking-wider">Mobile Number</span>
+                    <span className="font-semibold text-stone-900 dark:text-stone-100 font-mono">{userProfile?.mobile || 'N/A'}</span>
                   </div>
                 </div>
 
                 <div className="flex items-start gap-2.5">
-                  <Mail className="w-4 h-4 text-[#991B1B] shrink-0 mt-0.5" />
+                  <Mail className="w-4 h-4 text-[#991B1B] dark:text-amber-400 shrink-0 mt-0.5" />
                   <div className="min-w-0">
-                    <span className="block text-[10px] text-stone-500 font-bold uppercase tracking-wider">Email Address</span>
-                    <span className="font-semibold text-stone-900 break-all">{userProfile?.email || 'N/A'}</span>
+                    <span className="block text-[10px] text-stone-500 dark:text-stone-400 font-bold uppercase tracking-wider">Email Address</span>
+                    <span className="font-semibold text-stone-900 dark:text-stone-100 break-all">{userProfile?.email || 'N/A'}</span>
                   </div>
                 </div>
               </div>
 
-              <div className="pt-2 border-t border-amber-200/50">
+              <div className="pt-2 border-t border-amber-200/50 dark:border-stone-700">
                 <button
                   type="button"
                   onClick={handleCopyDetails}
-                  className="w-full py-2.5 px-3 rounded-lg border border-amber-300 hover:border-[#991B1B] hover:bg-amber-100/50 text-stone-800 font-bold text-[11px] uppercase tracking-wider transition-all inline-flex items-center justify-center gap-1.5 cursor-pointer shadow-3xs"
+                  className="w-full py-2.5 px-3 rounded-lg border border-amber-300 dark:border-stone-700 hover:border-[#991B1B] dark:hover:border-amber-400 hover:bg-amber-100/50 dark:hover:bg-stone-800 text-stone-800 dark:text-stone-200 font-bold text-[11px] uppercase tracking-wider transition-all inline-flex items-center justify-center gap-1.5 cursor-pointer shadow-3xs"
                 >
                   {copied ? (
                     <>

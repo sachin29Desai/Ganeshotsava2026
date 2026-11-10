@@ -639,32 +639,32 @@ export const DonationsView: React.FC<DonationsViewProps> = ({
                         />
                       </td>
                     )}
-                    <td className="py-3 px-4 font-mono font-bold text-stone-900">{c.rcptNo}</td>
-                    <td className="py-3 px-4 font-semibold text-stone-900">
+                    <td className="py-3 px-4 font-mono font-bold text-stone-900 dark:text-stone-100">{c.rcptNo}</td>
+                    <td className="py-3 px-4 font-semibold text-stone-900 dark:text-stone-100">
                       {c.name}
-                      {c.notes && <span className="block text-xs font-normal text-stone-500 italic">{c.notes}</span>}
+                      {c.notes && <span className="block text-xs font-normal text-stone-500 dark:text-stone-400 italic">{c.notes}</span>}
                     </td>
                     <td className="py-3 px-4">
                       {c.flat ? (
-                        <span className="bg-stone-100 text-stone-700 text-xs font-medium px-2 py-0.5 rounded">
+                        <span className="bg-stone-100 dark:bg-stone-800 text-stone-700 dark:text-stone-300 text-xs font-medium px-2 py-0.5 rounded">
                           {c.flat}
                         </span>
                       ) : (
                         '—'
                       )}
                     </td>
-                    <td className="py-3 px-4 text-stone-600 text-xs">{fmtDate(c.date)}</td>
-                    <td className="py-3 px-4 text-xs text-stone-600">
-                      <span className="font-medium text-stone-800">{c.pay || 'UPI'}</span>
-                      {c.txn ? <span className="block text-[10px] font-mono text-stone-500">{c.txn}</span> : null}
+                    <td className="py-3 px-4 text-stone-600 dark:text-stone-400 text-xs">{fmtDate(c.date)}</td>
+                    <td className="py-3 px-4 text-xs text-stone-600 dark:text-stone-400">
+                      <span className="font-medium text-stone-800 dark:text-stone-200">{c.pay || 'UPI'}</span>
+                      {c.txn ? <span className="block text-[10px] font-mono text-stone-500 dark:text-stone-400">{c.txn}</span> : null}
                     </td>
-                    <td className="py-3 px-4 font-mono text-right font-bold text-emerald-700">₹ {fmt(c.amt)}</td>
+                    <td className="py-3 px-4 font-mono text-right font-bold text-emerald-700 dark:text-emerald-400">₹ {fmt(c.amt)}</td>
                     <td className="py-3 px-4 text-right">
                       {isAdmin ? (
                         <div className="inline-flex gap-1.5 justify-end">
                           <button
                             onClick={() => onPrintReceipt(c)}
-                            className="bg-stone-100 hover:bg-stone-200 text-stone-800 text-xs font-medium px-2.5 py-1 rounded inline-flex items-center gap-1 transition-colors cursor-pointer"
+                            className="bg-stone-100 dark:bg-stone-800 hover:bg-stone-200 dark:hover:bg-stone-700 text-stone-800 dark:text-stone-200 text-xs font-medium px-2.5 py-1 rounded inline-flex items-center gap-1 transition-colors cursor-pointer"
                             title="Print Official E-Receipt"
                           >
                             <Printer className="w-3 h-3 text-[#991B1B]" />

@@ -93,6 +93,8 @@ export interface FormLinksConfig {
   membershipFormUrl: string;
   volunteerFormUrl: string;
   nominationFormUrl: string;
+  homeYoutubeUrl?: string;
+  defaultTheme?: 'light' | 'dark';
 }
 
 const FORM_LINKS_KEY = 'ekb_custom_form_links';
@@ -100,7 +102,9 @@ const FORM_LINKS_KEY = 'ekb_custom_form_links';
 export const DEFAULT_FORM_LINKS: FormLinksConfig = {
   membershipFormUrl: 'https://forms.gle/dBvhab2hFVuzM3xS9',
   volunteerFormUrl: 'https://forms.gle/dBvhab2hFVuzM3xS9',
-  nominationFormUrl: 'https://forms.gle/dBvhab2hFVuzM3xS9'
+  nominationFormUrl: 'https://forms.gle/dBvhab2hFVuzM3xS9',
+  homeYoutubeUrl: 'https://www.youtube-nocookie.com/embed/YUhBamMUk8c?si=-xXlf5w6VEU1GFFn',
+  defaultTheme: 'light'
 };
 
 export function getStoredFormLinks(): FormLinksConfig {
@@ -126,6 +130,74 @@ export function saveStoredFormLinks(links: FormLinksConfig): void {
     console.warn('Failed to save form links to storage:', err);
   }
   cloudSaveCommunityFormLinks(links).catch((e) => console.warn('Cloud save form links warning:', e));
+}
+
+/**
+ * Extracts or constructs a clean YouTube embed URL with autoplay parameters
+ * from plain links, YouTube share URLs, or pasted raw <iframe ...> HTML snippets.
+ */
+export function extractYouTubeEmbedUrl(url?: string): string {
+  const fallbackBase = 'https://www.youtube-nocookie.com/embed/YUhBamMUk8c?si=-xXlf5w6VEU1GFFn';
+  if (!url || !url.trim()) {
+    return `${fallbackBase}?autoplay=1&mute=1&enablejsapi=1`;
+  }
+
+  let target = url.trim();
+
+  // If user pasted src="..." or src='...' or full <iframe ... src="..."> snippet in Admin Portal
+  const iframeSrcMatch = target.match(/(?:src=["']?)([^"'\s>]+)(?:["']?)/i);
+  if (iframeSrcMatch && iframeSrcMatch[1] && (iframeSrcMatch[1].startsWith('http') || iframeSrcMatch[1].startsWith('//'))) {
+    target = iframeSrcMatch[1].trim();
+  }
+
+  let baseUrl = '';
+  const params = new URLSearchParams();
+
+  try {
+    if (target.includes('youtube.com/embed/') || target.includes('youtube-nocookie.com/embed/')) {
+      const parts = target.split('?');
+      baseUrl = parts[0];
+      if (parts[1]) {
+        const parsedParams = new URLSearchParams(parts[1]);
+        parsedParams.forEach((val, key) => params.set(key, val));
+      }
+    } else if (target.includes('youtu.be/')) {
+      const pathAndQuery = target.split('youtu.be/')[1] || '';
+      const parts = pathAndQuery.split('?');
+      const id = parts[0];
+      baseUrl = `https://www.youtube-nocookie.com/embed/${id}`;
+      if (parts[1]) {
+        const parsedParams = new URLSearchParams(parts[1]);
+        parsedParams.forEach((val, key) => params.set(key, val));
+      }
+    } else if (target.includes('youtube.com/watch')) {
+      const urlObj = new URL(target);
+      const v = urlObj.searchParams.get('v');
+      if (v) {
+        baseUrl = `https://www.youtube-nocookie.com/embed/${v}`;
+        urlObj.searchParams.forEach((val, key) => {
+          if (key !== 'v') params.set(key, val);
+        });
+      }
+    } else {
+      const cleanId = target.replace(/[^a-zA-Z0-9_\-]/g, '');
+      if (cleanId) {
+        baseUrl = `https://www.youtube-nocookie.com/embed/${cleanId}`;
+      }
+    }
+  } catch (err) {
+    console.warn('Error parsing YouTube URL:', err);
+  }
+
+  if (!baseUrl) {
+    baseUrl = fallbackBase;
+  }
+
+  params.set('autoplay', '1');
+  params.set('mute', '1');
+
+  const queryString = params.toString();
+  return queryString ? `${baseUrl}?${queryString}` : baseUrl;
 }
 
 /**

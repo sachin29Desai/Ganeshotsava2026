@@ -1080,15 +1080,15 @@ export const AdminPortalView: React.FC<AdminPortalViewProps> = ({
         </div>
       )}
 
-        {/* TAB 5: MANAGE GOOGLE FORM LINKS */}
+        {/* TAB 5: MANAGE GOOGLE FORM LINKS & HOMEPAGE MEDIA */}
         {activeTab === 'form-links' && (
           <div className="space-y-6">
             <div>
               <h2 className="text-xl font-serif font-black text-stone-900 dark:text-stone-100">
-                Configurable Google Form Links
+                Configurable Form Links &amp; Homepage Media
               </h2>
               <p className="text-xs text-stone-500">
-                Update the Google Form URLs for Membership, Volunteer Registration, and Stage Performance Nominations across the website.
+                Update the Google Form URLs and Homepage Embedded YouTube Video URL across the website. All changes sync to database.
               </p>
             </div>
 
@@ -1109,7 +1109,7 @@ export const AdminPortalView: React.FC<AdminPortalViewProps> = ({
                   className="w-full p-3 rounded-xl border bg-transparent text-xs font-mono"
                 />
                 <p className="text-[11px] text-stone-500">
-                  Used when residents click "Become a Member" or "Register Now" on the Membership page.
+                  Used when residents click "Become a Member" or "Register Now" on the Membership section.
                 </p>
               </div>
 
@@ -1126,7 +1126,7 @@ export const AdminPortalView: React.FC<AdminPortalViewProps> = ({
                   className="w-full p-3 rounded-xl border bg-transparent text-xs font-mono"
                 />
                 <p className="text-[11px] text-stone-500">
-                  Used when residents click "Volunteer for [Event]" or "Volunteer Sign Up".
+                  Used when residents click "Volunteer Sign Up".
                 </p>
               </div>
 
@@ -1147,12 +1147,46 @@ export const AdminPortalView: React.FC<AdminPortalViewProps> = ({
                 </p>
               </div>
 
+              <div className="space-y-2 pt-4 border-t border-stone-100 dark:border-stone-800">
+                <label className="block font-bold uppercase text-red-600 dark:text-yellow-400">
+                  4. Homepage YouTube Video Embed Link / SRC URL *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder='src="https://www.youtube-nocookie.com/embed/..." or full <iframe src=...>'
+                  value={formLinks.homeYoutubeUrl || ''}
+                  onChange={(e) => setFormLinks({ ...formLinks, homeYoutubeUrl: e.target.value })}
+                  className="w-full p-3 rounded-xl border bg-transparent text-xs font-mono"
+                />
+                <p className="text-[11px] text-stone-500">
+                  You can paste a direct YouTube link, embed URL, src="..." value, or full &lt;iframe ...&gt; snippet. The video player on the homepage will automatically update with the new src.
+                </p>
+              </div>
+
+              <div className="space-y-2 pt-4 border-t border-stone-100 dark:border-stone-800">
+                <label className="block font-bold uppercase text-red-600 dark:text-yellow-400">
+                  5. Website Default Theme Mode *
+                </label>
+                <select
+                  value={formLinks.defaultTheme || 'light'}
+                  onChange={(e) => setFormLinks({ ...formLinks, defaultTheme: e.target.value as 'light' | 'dark' })}
+                  className="w-full p-3 rounded-xl border bg-white dark:bg-stone-800 text-stone-900 dark:text-stone-100 text-xs font-bold cursor-pointer"
+                >
+                  <option value="light">☀️ Light Theme (Default Cream &amp; Gold)</option>
+                  <option value="dark">🌙 Dark Theme (Rich Deep Maroon &amp; Dark Stone)</option>
+                </select>
+                <p className="text-[11px] text-stone-500">
+                  Select the default website visual theme mode. Applying this setting updates the website theme for all visitors.
+                </p>
+              </div>
+
               <div className="pt-4 flex justify-end">
                 <button
                   type="submit"
                   className="px-6 py-3 rounded-xl bg-red-600 text-yellow-300 font-bold border border-yellow-400 hover:bg-red-700 cursor-pointer shadow-md transition-colors"
                 >
-                  Save All Form Links
+                  Save All Links &amp; Media Config
                 </button>
               </div>
             </form>

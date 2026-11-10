@@ -1278,7 +1278,7 @@ export async function cloudSaveCommunityPhotos(photos: any[]): Promise<void> {
 export async function cloudGetCommunityPhotos(): Promise<any[] | null> {
   try {
     const snap = await getDocs(collection(db, 'community_photos'));
-    if (snap.empty) return null;
+    if (snap.empty) return [];
     const items: any[] = [];
     snap.forEach((d) => items.push({ id: d.id, ...d.data() }));
     return items;

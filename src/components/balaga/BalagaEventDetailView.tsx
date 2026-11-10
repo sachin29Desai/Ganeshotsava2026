@@ -279,7 +279,7 @@ export const BalagaEventDetailView: React.FC<BalagaEventDetailViewProps> = ({
 
         {eventPhotos.length === 0 ? (
           <div className="p-8 rounded-2xl border text-center text-xs text-stone-500">
-            No custom photos added for this event yet. Admins can upload photos from the Admin Panel.
+            No gallery photos available for this event yet.
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">

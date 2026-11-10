@@ -50,7 +50,12 @@ import {
   cloudSaveCommunityTeam,
   cloudSaveCommunityPhotos,
   cloudSaveCommunityAnnouncements,
-  cloudSaveCommunityFormLinks
+  cloudSaveCommunityFormLinks,
+  cloudGetCommunityEvents,
+  cloudGetCommunityTeam,
+  cloudGetCommunityPhotos,
+  cloudGetCommunityAnnouncements,
+  cloudGetCommunityFormLinks
 } from '../lib/firebase';
 
 interface AdminPortalViewProps {
@@ -80,6 +85,29 @@ export const AdminPortalView: React.FC<AdminPortalViewProps> = ({
   const [teamMembers, setTeamMembers] = useState<CommitteeMember[]>(() => getStoredTeamMembers());
   const [announcements, setAnnouncements] = useState<AnnouncementItem[]>(() => getStoredAnnouncements());
   const [formLinks, setFormLinks] = useState<FormLinksConfig>(() => getStoredFormLinks());
+
+  // Cloud Data Auto Sync on Admin Load
+  useEffect(() => {
+    async function syncAdminWithCloud() {
+      try {
+        const [cEvents, cTeam, cPhotos, cAnn, cLinks] = await Promise.all([
+          cloudGetCommunityEvents(),
+          cloudGetCommunityTeam(),
+          cloudGetCommunityPhotos(),
+          cloudGetCommunityAnnouncements(),
+          cloudGetCommunityFormLinks()
+        ]);
+        if (cEvents !== null) setEvents(cEvents);
+        if (cTeam !== null) setTeamMembers(cTeam);
+        if (cPhotos !== null) setPhotos(cPhotos);
+        if (cAnn !== null) setAnnouncements(cAnn);
+        if (cLinks) setFormLinks(prev => ({ ...prev, ...cLinks }));
+      } catch (err) {
+        console.warn('Admin cloud sync warning:', err);
+      }
+    }
+    syncAdminWithCloud();
+  }, []);
 
   // Global Save & Loading State
   const [isSavingAll, setIsSavingAll] = useState(false);

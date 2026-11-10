@@ -44,12 +44,16 @@ import {
   CommitteeMember,
   AnnouncementItem
 } from '../data/communityData';
-import { getStoredEvents, classifyEvents } from '../utils/eventUtils';
+import { getStoredEvents, saveStoredEvents, classifyEvents } from '../utils/eventUtils';
 import {
   getStoredTeamMembers,
+  saveStoredTeamMembers,
   getStoredPhotos,
+  saveStoredPhotos,
   getStoredAnnouncements,
+  saveStoredAnnouncements,
   getStoredFormLinks,
+  saveStoredFormLinks,
   FormLinksConfig,
   extractYouTubeEmbedUrl
 } from '../utils/dataUtils';
@@ -177,17 +181,21 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
           cloudGetCommunityFormLinks()
         ]);
 
-        if (cloudEvents && cloudEvents.length > 0) {
+        if (cloudEvents !== null) {
           setAllEvents(cloudEvents);
+          saveStoredEvents(cloudEvents);
         }
-        if (cloudTeam && cloudTeam.length > 0) {
+        if (cloudTeam !== null) {
           setTeamMembersList(cloudTeam);
+          saveStoredTeamMembers(cloudTeam);
         }
-        if (cloudPhotos) {
+        if (cloudPhotos !== null) {
           setPhotosList(cloudPhotos);
+          saveStoredPhotos(cloudPhotos);
         }
         if (cloudAnnouncements !== null) {
           setAnnouncementsList(cloudAnnouncements);
+          saveStoredAnnouncements(cloudAnnouncements);
         }
         if (cloudLinks) {
           setFormLinks(prev => ({ ...prev, ...cloudLinks }));
@@ -673,102 +681,16 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
             isDark={isDark}
           />
         ) : (
-          <div className="space-y-16 sm:space-y-24 py-8 sm:py-12">
+          <div className="space-y-8 sm:space-y-12 py-4 sm:py-6">
             
             {/* SECTION 1: HOME (#home) */}
-            <section id="home" className="max-w-6xl mx-auto px-4 sm:px-6 space-y-10 scroll-mt-24">
+            <section id="home" className="max-w-6xl mx-auto px-4 sm:px-6 space-y-6 scroll-mt-24">
               
-              {/* 1. AUTO-MOVABLE ANNOUNCEMENTS BANNER (AUTO-LOOPING TICKER CAROUSEL) */}
-              {announcementsList.length > 0 && (
-                <div
-                  className={`relative rounded-3xl p-4 sm:p-5 border-2 shadow-sm transition-all overflow-hidden ${
-                    isDark
-                      ? 'bg-gradient-to-r from-red-950/70 via-stone-900 to-amber-950/50 border-red-800'
-                      : 'bg-gradient-to-r from-red-50 via-[#FFFDF7] to-amber-50 border-red-500/50'
-                  }`}
-                >
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                    <div className="flex items-center gap-3 shrink-0">
-                      <div className="w-10 h-10 rounded-2xl bg-red-600 text-yellow-300 flex items-center justify-center border-2 border-yellow-400 font-bold shadow-xs shrink-0 animate-pulse">
-                        <Megaphone className="w-5 h-5" />
-                      </div>
-                      <div>
-                        <span className="text-[10px] font-bold uppercase tracking-wider bg-red-600 text-yellow-300 px-2 py-0.5 rounded">
-                          {lang === 'kn' ? 'ಅಧಿಕೃತ ಪ್ರಕಟಣೆ' : 'Official Notice'}
-                        </span>
-                        <h4 className="text-xs text-stone-500 font-semibold mt-0.5">
-                          {lang === 'kn' ? 'ಬಳಗದ ಇತ್ತೀಚಿನ ಸುದ್ದಿಗಳು' : 'Latest Balaga Announcements'}
-                        </h4>
-                      </div>
-                    </div>
-
-                    {/* Auto-scrolling Announcement Content */}
-                    <div
-                      onClick={() => setSelectedAnnouncement(announcementsList[announcementIndex])}
-                      className="flex-1 cursor-pointer group px-2 py-1"
-                    >
-                      <div className="flex items-center gap-2">
-                        {announcementsList[announcementIndex].important && (
-                          <span className="text-[10px] font-extrabold uppercase bg-amber-500 text-stone-950 px-2 py-0.5 rounded shrink-0">
-                            {lang === 'kn' ? 'ಪ್ರಮುಖ' : 'Urgent'}
-                          </span>
-                        )}
-                        <h3 className="font-serif font-black text-sm sm:text-base text-stone-900 dark:text-stone-100 group-hover:text-red-600 line-clamp-1">
-                          {lang === 'kn'
-                            ? (announcementsList[announcementIndex].kannadaTitle || announcementsList[announcementIndex].title)
-                            : announcementsList[announcementIndex].title}
-                        </h3>
-                      </div>
-                      <p className="text-xs text-stone-600 dark:text-stone-300 line-clamp-1 mt-0.5 font-medium">
-                        {announcementsList[announcementIndex].summary || announcementsList[announcementIndex].content}
-                      </p>
-                    </div>
-
-                    {/* Carousel Controls & Indicator */}
-                    <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
-                      <button
-                        onClick={() =>
-                          setAnnouncementIndex(
-                            (prev) => (prev - 1 + announcementsList.length) % announcementsList.length
-                          )
-                        }
-                        className="p-1.5 rounded-xl border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-800 text-stone-700 dark:text-stone-300 hover:bg-stone-100 cursor-pointer"
-                        title={lang === 'kn' ? 'ಹಿಂದಿನ ಪ್ರಕಟಣೆ' : 'Previous notice'}
-                      >
-                        <ChevronLeft className="w-4 h-4" />
-                      </button>
-
-                      <span className="text-[11px] font-mono font-bold text-stone-500 px-1">
-                        {announcementIndex + 1}/{announcementsList.length}
-                      </span>
-
-                      <button
-                        onClick={() =>
-                          setAnnouncementIndex((prev) => (prev + 1) % announcementsList.length)
-                        }
-                        className="p-1.5 rounded-xl border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-800 text-stone-700 dark:text-stone-300 hover:bg-stone-100 cursor-pointer"
-                        title={lang === 'kn' ? 'ಮುಂದಿನ ಪ್ರಕಟಣೆ' : 'Next notice'}
-                      >
-                        <ChevronRight className="w-4 h-4" />
-                      </button>
-
-                      <button
-                        onClick={() => setSelectedAnnouncement(announcementsList[announcementIndex])}
-                        className="px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-yellow-300 font-bold text-xs shadow-xs transition-colors cursor-pointer inline-flex items-center gap-1 border border-yellow-400"
-                      >
-                        <span>{lang === 'kn' ? 'ಓದಿ' : 'Read'}</span>
-                        <ChevronRight className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* 2. HERO CONTENT & YOUTUBE VIDEO SIDE-BY-SIDE RESPONSIVE GRID */}
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+              {/* HERO CONTENT & YOUTUBE VIDEO + ANNOUNCEMENTS SIDE-BY-SIDE RESPONSIVE GRID */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-stretch">
                 {/* Left Column: Hero Text + Visible Brand Image Card */}
                 <div
-                  className={`lg:col-span-7 rounded-3xl p-6 sm:p-10 border-2 shadow-sm flex flex-col justify-between space-y-6 ${
+                  className={`lg:col-span-7 rounded-3xl p-6 sm:p-8 border-2 shadow-sm flex flex-col justify-between space-y-6 ${
                     isDark
                       ? 'bg-gradient-to-br from-stone-900 via-stone-900 to-red-950/40 border-stone-800'
                       : 'bg-gradient-to-br from-white via-[#FFFDF7] to-amber-50/60 border-stone-200'
@@ -862,36 +784,104 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
                   </div>
                 </div>
 
-                {/* Right Column: Configurable YouTube Video Side-by-Side (Compact & Fitted) */}
-                <div
-                  className={`lg:col-span-5 w-full self-start max-w-lg mx-auto lg:mx-0 rounded-3xl p-5 sm:p-6 border-2 shadow-md flex flex-col space-y-4 ${
-                    isDark ? 'bg-stone-900 border-stone-800' : 'bg-white border-[#D4AF37]/50'
-                  }`}
-                >
-                  <div className="flex items-center gap-3 border-b border-stone-200 dark:border-stone-800 pb-3">
-                    <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-red-600 text-yellow-300 flex items-center justify-center border border-yellow-400 font-bold text-xs shadow-xs shrink-0">
-                      ▶
+                {/* Right Column: YouTube Video Card + Announcements Marquee Card Below (Matching Height) */}
+                <div className="lg:col-span-5 w-full flex flex-col justify-between space-y-4">
+                  {/* YouTube Video Player Card */}
+                  <div
+                    className={`rounded-3xl p-5 border-2 shadow-md flex flex-col space-y-3 ${
+                      isDark ? 'bg-stone-900 border-stone-800' : 'bg-white border-[#D4AF37]/50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5 border-b border-stone-200 dark:border-stone-800 pb-2.5">
+                      <div className="w-8 h-8 rounded-xl bg-red-600 text-yellow-300 flex items-center justify-center border border-yellow-400 font-bold text-xs shadow-xs shrink-0">
+                        ▶
+                      </div>
+                      <div>
+                        <h3 className="font-serif font-black text-base text-stone-900 dark:text-stone-100">
+                          {lang === 'kn' ? 'ಬಳಗದ ಸಾಂಸ್ಕೃತಿಕ ವಿಡಿಯೋ' : 'Balaga Cultural Spotlight'}
+                        </h3>
+                        <p className="text-[11px] text-stone-500">
+                          {lang === 'kn' ? 'ಬ್ರಿಗೇಡ್ ಎಲ್ ಡೊರಾಡೊ ಆಚರಣೆಗಳ ನೋಟ' : 'Watch highlights of Balaga celebrations'}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="font-serif font-black text-base sm:text-lg text-stone-900 dark:text-stone-100">
-                        {lang === 'kn' ? 'ಬಳಗದ ಸಾಂಸ್ಕೃತಿಕ ವಿಡಿಯೋ' : 'Balaga Cultural Spotlight'}
-                      </h3>
-                      <p className="text-[11px] text-stone-500">
-                        {lang === 'kn' ? 'ಬ್ರಿಗೇಡ್ ಎಲ್ ಡೊರಾಡೊ ಆಚರಣೆಗಳ ವಿಶೇಷ ನೋಟ' : 'Watch highlights of Balaga celebrations'}
-                      </p>
+
+                    <div className="relative w-full aspect-video rounded-2xl overflow-hidden border-2 border-red-600/40 shadow-md bg-black">
+                      <iframe
+                        src={extractYouTubeEmbedUrl(formLinks.homeYoutubeUrl)}
+                        title="YouTube video player"
+                        className="w-full h-full border-0"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                        referrerPolicy="strict-origin-when-cross-origin"
+                        allowFullScreen
+                      />
                     </div>
                   </div>
 
-                  <div className="relative w-full aspect-video rounded-2xl overflow-hidden border-2 border-red-600/40 shadow-lg bg-black">
-                    <iframe
-                      src={extractYouTubeEmbedUrl(formLinks.homeYoutubeUrl)}
-                      title="YouTube video player"
-                      className="w-full h-full border-0"
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                      referrerPolicy="strict-origin-when-cross-origin"
-                      allowFullScreen
-                    />
-                  </div>
+                  {/* Auto-Movable Announcements Banner Card (Positioned directly under YouTube player) */}
+                  {announcementsList.length > 0 && (
+                    <div
+                      className={`relative rounded-3xl p-4 border-2 shadow-sm transition-all overflow-hidden flex-1 flex flex-col justify-between ${
+                        isDark
+                          ? 'bg-gradient-to-r from-red-950/70 via-stone-900 to-amber-950/50 border-red-800'
+                          : 'bg-gradient-to-r from-red-50 via-[#FFFDF7] to-amber-50 border-red-500/50'
+                      }`}
+                    >
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between border-b border-stone-200/60 dark:border-stone-800 pb-2">
+                          <div className="flex items-center gap-2">
+                            <div className="w-7 h-7 rounded-xl bg-red-600 text-yellow-300 flex items-center justify-center border border-yellow-400 font-bold text-xs shrink-0 animate-pulse">
+                              <Megaphone className="w-3.5 h-3.5" />
+                            </div>
+                            <span className="text-[10px] font-bold uppercase tracking-wider bg-red-600 text-yellow-300 px-2 py-0.5 rounded">
+                              {lang === 'kn' ? 'ಅಧಿಕೃತ ಪ್ರಕಟಣೆ' : 'Official Notice'}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <button
+                              onClick={() => setAnnouncementIndex((prev) => (prev - 1 + announcementsList.length) % announcementsList.length)}
+                              className="p-1 rounded-lg border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-800 text-stone-700 dark:text-stone-300 hover:bg-stone-100 cursor-pointer"
+                              title={lang === 'kn' ? 'ಹಿಂದಿನ ಪ್ರಕಟಣೆ' : 'Previous notice'}
+                            >
+                              <ChevronLeft className="w-3.5 h-3.5" />
+                            </button>
+                            <span className="text-[10px] font-mono font-bold text-stone-500">
+                              {announcementIndex + 1}/{announcementsList.length}
+                            </span>
+                            <button
+                              onClick={() => setAnnouncementIndex((prev) => (prev + 1) % announcementsList.length)}
+                              className="p-1 rounded-lg border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-800 text-stone-700 dark:text-stone-300 hover:bg-stone-100 cursor-pointer"
+                              title={lang === 'kn' ? 'ಮುಂದಿನ ಪ್ರಕಟಣೆ' : 'Next notice'}
+                            >
+                              <ChevronRight className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Announcement item text */}
+                        <div
+                          onClick={() => setSelectedAnnouncement(announcementsList[announcementIndex])}
+                          className="cursor-pointer group space-y-1"
+                        >
+                          <div className="flex items-center gap-1.5">
+                            {announcementsList[announcementIndex].important && (
+                              <span className="text-[9px] font-extrabold uppercase bg-amber-500 text-stone-950 px-1.5 py-0.2 rounded shrink-0">
+                                {lang === 'kn' ? 'ಪ್ರಮುಖ' : 'Urgent'}
+                              </span>
+                            )}
+                            <h3 className="font-serif font-black text-xs sm:text-sm text-stone-900 dark:text-stone-100 group-hover:text-red-600 line-clamp-1">
+                              {lang === 'kn'
+                                ? (announcementsList[announcementIndex].kannadaTitle || announcementsList[announcementIndex].title)
+                                : announcementsList[announcementIndex].title}
+                            </h3>
+                          </div>
+                          <p className="text-[11px] text-stone-600 dark:text-stone-300 line-clamp-2 font-medium leading-tight">
+                            {announcementsList[announcementIndex].summary || announcementsList[announcementIndex].content}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1506,7 +1496,8 @@ export const CommunityHomeView: React.FC<CommunityHomeViewProps> = ({
                           { name: 'Yuvaraj', phone: '9741660828' },
                           { name: 'Mahesh', phone: '9945511992' },
                           { name: 'Santhosh', phone: '8050579923' },
-                          { name: 'Rakesh', phone: '9900153813' }
+                          { name: 'Rakesh', phone: '9900153813' },
+                          { name: 'Adithya', phone: '9482859947' }
                         ].map((person) => (
                           <a
                             key={person.name}

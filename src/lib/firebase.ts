@@ -1229,7 +1229,7 @@ export async function cloudSaveCommunityEvents(events: any[]): Promise<void> {
 export async function cloudGetCommunityEvents(): Promise<any[] | null> {
   try {
     const snap = await getDocs(collection(db, 'community_events'));
-    if (snap.empty) return null;
+    if (snap.empty) return [];
     const items: any[] = [];
     snap.forEach((d) => items.push({ id: d.id, ...d.data() }));
     return items;
@@ -1250,10 +1250,10 @@ export async function cloudSaveCommunityTeam(team: any[]): Promise<void> {
 export async function cloudGetCommunityTeam(): Promise<any[] | null> {
   try {
     const snap = await getDoc(doc(db, 'settings', 'community_team'));
-    if (snap.exists() && snap.data()?.items) {
+    if (snap.exists() && snap.data()?.items && Array.isArray(snap.data().items)) {
       return snap.data().items;
     }
-    return null;
+    return snap.exists() ? [] : null;
   } catch (err) {
     console.warn('Error fetching community team from Firestore:', err);
     return null;

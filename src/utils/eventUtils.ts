@@ -81,7 +81,7 @@ export function getStoredEvents(): CommunityEvent[] {
     const raw = localStorage.getItem(CUSTOM_EVENTS_STORAGE_KEY);
     if (raw !== null) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
+      if (Array.isArray(parsed)) {
         return parsed;
       }
     }

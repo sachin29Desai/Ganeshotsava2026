@@ -1213,13 +1213,23 @@ export async function cloudDeleteVolunteer(id: string): Promise<void> {
 
 export async function cloudSaveCommunityEvents(events: any[]): Promise<void> {
   try {
+    const snap = await getDocs(collection(db, 'community_events'));
+    const currentIds = new Set(events.map((evt) => evt.id));
     const batch = writeBatch(db);
+
+    snap.forEach((d) => {
+      if (!currentIds.has(d.id)) {
+        batch.delete(d.ref);
+      }
+    });
+
     events.forEach((evt) => {
       batch.set(doc(db, 'community_events', evt.id), {
         ...evt,
         updatedAt: new Date().toISOString()
       });
     });
+
     await batch.commit();
   } catch (err) {
     console.error('Error saving community events to Firestore:', err);
@@ -1231,7 +1241,14 @@ export async function cloudGetCommunityEvents(): Promise<any[] | null> {
     const snap = await getDocs(collection(db, 'community_events'));
     if (snap.empty) return [];
     const items: any[] = [];
-    snap.forEach((d) => items.push({ id: d.id, ...d.data() }));
+    const seenIds = new Set<string>();
+    snap.forEach((d) => {
+      const data = { id: d.id, ...d.data() };
+      if (!seenIds.has(d.id)) {
+        seenIds.add(d.id);
+        items.push(data);
+      }
+    });
     return items;
   } catch (err) {
     console.warn('Error fetching community events from Firestore:', err);
@@ -1262,13 +1279,23 @@ export async function cloudGetCommunityTeam(): Promise<any[] | null> {
 
 export async function cloudSaveCommunityPhotos(photos: any[]): Promise<void> {
   try {
+    const snap = await getDocs(collection(db, 'community_photos'));
+    const currentIds = new Set(photos.map((p) => p.id));
     const batch = writeBatch(db);
+
+    snap.forEach((d) => {
+      if (!currentIds.has(d.id)) {
+        batch.delete(d.ref);
+      }
+    });
+
     photos.forEach((p) => {
       batch.set(doc(db, 'community_photos', p.id), {
         ...p,
         updatedAt: new Date().toISOString()
       });
     });
+
     await batch.commit();
   } catch (err) {
     console.error('Error saving community photos to Firestore:', err);
@@ -1280,7 +1307,14 @@ export async function cloudGetCommunityPhotos(): Promise<any[] | null> {
     const snap = await getDocs(collection(db, 'community_photos'));
     if (snap.empty) return [];
     const items: any[] = [];
-    snap.forEach((d) => items.push({ id: d.id, ...d.data() }));
+    const seenIds = new Set<string>();
+    snap.forEach((d) => {
+      const data = { id: d.id, ...d.data() };
+      if (!seenIds.has(d.id)) {
+        seenIds.add(d.id);
+        items.push(data);
+      }
+    });
     return items;
   } catch (err) {
     console.warn('Error fetching community photos from Firestore:', err);
@@ -1290,13 +1324,23 @@ export async function cloudGetCommunityPhotos(): Promise<any[] | null> {
 
 export async function cloudSaveCommunityAnnouncements(announcements: any[]): Promise<void> {
   try {
+    const snap = await getDocs(collection(db, 'community_announcements'));
+    const currentIds = new Set(announcements.map((a) => a.id));
     const batch = writeBatch(db);
+
+    snap.forEach((d) => {
+      if (!currentIds.has(d.id)) {
+        batch.delete(d.ref);
+      }
+    });
+
     announcements.forEach((a) => {
       batch.set(doc(db, 'community_announcements', a.id), {
         ...a,
         updatedAt: new Date().toISOString()
       });
     });
+
     await batch.commit();
   } catch (err) {
     console.error('Error saving community announcements to Firestore:', err);
@@ -1308,7 +1352,14 @@ export async function cloudGetCommunityAnnouncements(): Promise<any[] | null> {
     const snap = await getDocs(collection(db, 'community_announcements'));
     if (snap.empty) return [];
     const items: any[] = [];
-    snap.forEach((d) => items.push({ id: d.id, ...d.data() }));
+    const seenIds = new Set<string>();
+    snap.forEach((d) => {
+      const data = { id: d.id, ...d.data() };
+      if (!seenIds.has(d.id)) {
+        seenIds.add(d.id);
+        items.push(data);
+      }
+    });
     return items;
   } catch (err) {
     console.warn('Error fetching community announcements from Firestore:', err);

@@ -23,8 +23,8 @@ import {
   UserCheck
 } from 'lucide-react';
 import { CommunityEvent, GALLERY_PHOTOS, GalleryPhoto, GANESHA_FAQS } from '../../data/communityData';
-import { db } from '../../lib/firebase';
-import { collection, getDocs } from 'firebase/firestore';
+import { cloudGetCommunityPhotos } from '../../lib/firebase';
+import { getStoredPhotos } from '../../utils/dataUtils';
 import { UserRole, UserProfile } from '../../types';
 
 interface BalagaEventDetailViewProps {
@@ -57,26 +57,22 @@ export const BalagaEventDetailView: React.FC<BalagaEventDetailViewProps> = ({
   isDark = false
 }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'gallery' | 'financials'>('overview');
-  const [customPhotos, setCustomPhotos] = useState<GalleryPhoto[]>([]);
+  const [customPhotos, setCustomPhotos] = useState<GalleryPhoto[]>(() => getStoredPhotos());
   const [lightboxPhoto, setLightboxPhoto] = useState<GalleryPhoto | null>(null);
 
   // Load custom photos from Firestore
   useEffect(() => {
-    async function loadFirestoreHighlights() {
+    async function loadFirestorePhotos() {
       try {
-        const snap = await getDocs(collection(db, 'event_highlights'));
-        const fetched: GalleryPhoto[] = [];
-        snap.forEach((docSnap) => {
-          fetched.push({ id: docSnap.id, ...docSnap.data() } as GalleryPhoto);
-        });
-        if (fetched.length > 0) {
-          setCustomPhotos(fetched);
+        const cloudPhotos = await cloudGetCommunityPhotos();
+        if (cloudPhotos !== null) {
+          setCustomPhotos(cloudPhotos);
         }
       } catch (err) {
-        console.warn('Could not load firestore highlights:', err);
+        console.warn('Could not load firestore photos:', err);
       }
     }
-    loadFirestoreHighlights();
+    loadFirestorePhotos();
   }, []);
 
   // Filter gallery photos for this event (strictly saved database photos)

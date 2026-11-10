@@ -266,6 +266,7 @@ export function App() {
   };
 
   useEffect(() => {
+    document.title = 'EL DORADO KANNADIGARA BALAGA';
     const handleUrlChange = () => {
       setCurrentRoute(getInitialRoute());
     };
